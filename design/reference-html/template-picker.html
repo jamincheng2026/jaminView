@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "background": "#fafaf5",
+              "on-background": "#1a1c19",
+              "surface-container-low": "#f4f4ef",
+              "on-secondary-container": "#446c44",
+              "surface-variant": "#e3e3de",
+              "surface-container": "#eeeee9",
+              "on-secondary": "#ffffff",
+              "tertiary-fixed-dim": "#b0cdbc",
+              "surface-container-high": "#e8e8e3",
+              "on-surface-variant": "#424842",
+              "on-tertiary": "#ffffff",
+              "error-container": "#ffdad6",
+              "on-error": "#ffffff",
+              "secondary-fixed-dim": "#a5d2a2",
+              "on-primary-fixed": "#02210c",
+              "surface-container-highest": "#e3e3de",
+              "primary-container": "#3a5a40",
+              "tertiary": "#274134",
+              "primary-fixed-dim": "#abd0af",
+              "inverse-surface": "#2f312e",
+              "primary": "#23422a",
+              "surface": "#fafaf5",
+              "on-tertiary-container": "#b0cdbc",
+              "outline-variant": "#c2c8bf",
+              "error": "#ba1a1a",
+              "tertiary-fixed": "#ccead8",
+              "inverse-on-surface": "#f1f1ec",
+              "secondary-fixed": "#c1eebc",
+              "inverse-primary": "#abd0af",
+              "outline": "#727971",
+              "surface-bright": "#fafaf5",
+              "on-primary-fixed-variant": "#2e4e35",
+              "on-secondary-fixed-variant": "#284f2a",
+              "secondary-container": "#beecb9",
+              "surface-dim": "#dadad5",
+              "on-error-container": "#93000a",
+              "on-surface": "#1a1c19",
+              "on-primary-container": "#acd0af",
+              "surface-container-lowest": "#ffffff",
+              "on-secondary-fixed": "#002106",
+              "tertiary-container": "#3e584b",
+              "primary-fixed": "#c7ecca",
+              "on-tertiary-fixed-variant": "#324c3f",
+              "secondary": "#406840",
+              "surface-tint": "#45664b",
+              "on-tertiary-fixed": "#062015",
+              "on-primary": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
+        .template-card:hover .action-overlay { opacity: 1; }
+        .action-overlay { transition: opacity 0.2s ease-in-out; }
+    </style>
+</head>
+<body class="bg-background text-on-surface min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<nav class="bg-surface dark:bg-on-background font-headline antialiased text-sm tracking-wide border-b border-outline-variant/30 top-0 z-50 flex items-center justify-between px-6 h-16 w-full shrink-0">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tighter text-primary dark:text-primary-fixed-dim">JaminView</span>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-on-surface-variant dark:text-outline-variant hover:text-primary duration-200 ease-in-out font-medium" href="#">Projects</a>
+<a class="text-primary dark:text-primary-fixed-dim font-bold border-b-2 border-primary dark:border-primary-fixed-dim pb-1" href="#">Templates</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative flex items-center bg-surface-container rounded-full px-3 h-9 mr-2">
+<span class="material-symbols-outlined text-outline text-lg mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-xs w-48 p-0 placeholder:text-outline" placeholder="Search templates..." type="text"/>
+</div>
+<div class="relative group">
+<span class="material-symbols-outlined text-on-surface-variant p-2 hover:bg-surface-container-high rounded-full cursor-pointer transition-colors">notifications</span>
+</div>
+<div class="h-8 w-8 rounded-full bg-surface-container-highest overflow-hidden border border-outline-variant/30">
+<img alt="User Profile" data-alt="Close up portrait of a professional male architect in a studio setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDUtzg1ugGiWYlNd6VYPC9rqJl8rMbTtiEzU1qgrMAcHYLOu01dfN3Mh4jVwUs8H_0-ShYTiOtTP6FR0wdTlQNcHE8HyoEF-Ipm0X1TTcqF3IBU9qCY4rPsTt6hC7jCOh8QYbCSKvUvagnrwS-Q_SwwFoRhVyQCeamXeH6BFCaiIekNs_pvhLDKsz-HkR6hqmZVBDGSKNBRP2TJouZ7U4JtRwgrpj8fLv5rDv7PpzPa_MUBrrsZ3vOcDU1FjK35an8rMcM5eaH_-VM7"/>
+</div>
+</div>
+</nav>
+<main class="flex-1 flex overflow-hidden">
+<!-- SideNav - Categorization -->
+<aside class="bg-surface-container-low dark:bg-on-background w-64 flex flex-col py-6 px-4 border-r border-outline-variant/30 shrink-0">
+<div class="px-2 mb-8">
+<h3 class="text-primary font-bold text-xs uppercase tracking-widest mb-1">Library</h3>
+<p class="text-on-surface-variant text-[11px] font-medium opacity-60">Professional Assets</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 bg-surface-container-highest dark:bg-primary-container text-primary dark:text-on-primary-container rounded-lg px-3 py-2.5 transition-all duration-150 group" href="#">
+<span class="material-symbols-outlined text-xl">grid_view</span>
+<span class="text-sm font-semibold">All Templates</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant dark:text-outline-variant px-3 py-2.5 hover:bg-surface-container-high rounded-lg transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-xl">factory</span>
+<span class="text-sm font-medium">Operations</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant dark:text-outline-variant px-3 py-2.5 hover:bg-surface-container-high rounded-lg transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-xl">monitoring</span>
+<span class="text-sm font-medium">Sales &amp; ROI</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant dark:text-outline-variant px-3 py-2.5 hover:bg-surface-container-high rounded-lg transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-xl">domain</span>
+<span class="text-sm font-medium">Smart City</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant dark:text-outline-variant px-3 py-2.5 hover:bg-surface-container-high rounded-lg transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-xl">precision_manufacturing</span>
+<span class="text-sm font-medium">Industrial IoT</span>
+</a>
+</nav>
+<div class="pt-6 border-t border-outline-variant/30 mt-6 space-y-1">
+<a class="flex items-center gap-3 text-on-surface-variant px-3 py-2 hover:bg-surface-container-high rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined text-xl">auto_awesome</span>
+<span class="text-sm font-medium">My Custom</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant px-3 py-2 hover:bg-surface-container-high rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined text-xl">settings</span>
+<span class="text-sm font-medium">Preferences</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<section class="flex-1 overflow-y-auto bg-surface p-10">
+<div class="max-w-7xl mx-auto">
+<!-- Workflow Ritual: Naming & Actions -->
+<header class="mb-10 pb-8 border-b border-outline-variant/20">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+<div class="flex-1 max-w-2xl">
+<div class="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-[0.2em] mb-3">
+<span class="material-symbols-outlined text-base">add_circle</span>
+<span>New Workflow Setup</span>
+</div>
+<h1 class="text-4xl font-extrabold text-on-surface tracking-tight mb-6">Create New Project</h1>
+<div class="group relative">
+<label class="absolute -top-2.5 left-4 px-1.5 bg-surface text-[10px] font-bold uppercase tracking-widest text-primary transition-all group-focus-within:text-primary" for="project-name">Project Name</label>
+<input class="w-full bg-white border border-outline-variant focus:border-primary focus:ring-4 focus:ring-primary/5 rounded-xl h-14 px-5 text-on-surface text-lg font-medium placeholder:text-outline/40 transition-all shadow-sm" id="project-name" placeholder="E.g., Global Logistics Dashboard 2024" type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4 shrink-0">
+<button class="px-6 h-14 text-on-surface-variant font-bold hover:text-primary transition-colors">Discard</button>
+<button class="px-10 h-14 bg-primary text-on-primary font-extrabold rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-3">
+<span>Start Building</span>
+<span class="material-symbols-outlined">rocket_launch</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Grid Header -->
+<div class="flex items-center justify-between mb-8">
+<h2 class="text-xl font-bold text-on-surface">Available Templates <span class="text-on-surface-variant font-normal text-sm ml-2">(24)</span></h2>
+<div class="flex items-center gap-2 bg-surface-container-low p-1 rounded-lg border border-outline-variant/30">
+<button class="p-1.5 bg-white shadow-sm rounded text-primary"><span class="material-symbols-outlined text-xl">grid_view</span></button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-high rounded"><span class="material-symbols-outlined text-xl">view_list</span></button>
+</div>
+</div>
+<!-- Template Asset Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+<!-- Template 1: Operations -->
+<div class="template-card flex flex-col bg-white rounded-2xl overflow-hidden border border-outline-variant/40 shadow-sm hover:shadow-xl transition-all duration-300 group">
+<div class="relative aspect-[16/10] bg-on-background overflow-hidden">
+<img alt="Comprehensive Operation" class="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" data-alt="Sophisticated dashboard interface with emerald and oatmeal palette" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBAIfWJ4kqSJqpZzsgMHBCSFHgz8VUQ-5NeMjiojieEqEpZbxd6EaGjLk2g6CspPtftqWnJEYfuxZmBcDzWdcXOrSJavEQjpEW3dh-tY2NOOdeAYBWB50IcZxIpSLnfnTCv5xPFzZdn8_91GkTOZRJzUtBuSrPv69xUpEK0-OaObhzlO8Y3_C_-2GfWjn91zSCDqaFvEERWgU0QciZDwzBsj3btl_eLlE3yFJOUCUBpocvPC-8hp2p9J_2cul1VvkKO6lihyO0o-uIb"/>
+<div class="absolute top-4 left-4 flex gap-2">
+<span class="bg-primary text-on-primary px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-widest">Popular</span>
+</div>
+<div class="action-overlay absolute inset-0 bg-primary/60 backdrop-blur-[2px] opacity-0 flex items-center justify-center p-6">
+<button class="w-full bg-white text-primary font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-surface transition-colors shadow-xl">
+<span class="material-symbols-outlined">file_open</span>
+                                    Use Template
+                                </button>
+</div>
+</div>
+<div class="p-6 flex flex-col flex-1 border-t border-outline-variant/10">
+<div class="flex justify-between items-start mb-3">
+<h4 class="text-lg font-bold text-on-surface leading-tight">Comprehensive Operation</h4>
+<span class="material-symbols-outlined text-outline text-lg">info</span>
+</div>
+<div class="grid grid-cols-2 gap-y-3 gap-x-4 mb-6">
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Industry</span>
+<span class="text-xs font-semibold text-on-surface">Manufacturing</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Complexity</span>
+<span class="text-xs font-semibold text-on-surface">Enterprise</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Charts</span>
+<span class="text-xs font-semibold text-on-surface">24+ Widgets</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Data Source</span>
+<span class="text-xs font-semibold text-on-surface">SQL / API</span>
+</div>
+</div>
+<div class="mt-auto flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">desktop_windows</span>
+<span class="text-[11px] font-medium uppercase tracking-tight">Optimized for 1920 x 1080</span>
+</div>
+</div>
+</div>
+<!-- Template 2: Sales -->
+<div class="template-card flex flex-col bg-white rounded-2xl overflow-hidden border border-outline-variant/40 shadow-sm hover:shadow-xl transition-all duration-300 group">
+<div class="relative aspect-[16/10] bg-on-background overflow-hidden">
+<img alt="Sales Analysis" class="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" data-alt="Clean minimal data visualization showing sales trends" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDa5UPdEiTw4v9nEr1PZBqUh31NRRUr6IwhWeGMqia3xumGnYKYTNZ8vgNMjySG9lfgjzS5wfzZOQ4TXoV-2kIv4RWlJpNA09N5EZexQG9ZpFXSFn7H1j7vHkKpO9L7nja4ylV2eE02AZAY15ZmOHaCf2pZFEJVYQhUpzXO4qyEUmZQFSqF9scC8xxoa1Lp3XVfclOk1Y89JJuvpw9ew8CmDy514qqyG4Ke9_LONKaKeCc27DI0qA2UctQCKWcavoOtR7-6QmWvjk58"/>
+<div class="absolute top-4 left-4 flex gap-2">
+<span class="bg-secondary-container text-on-secondary-fixed-variant px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-widest">New</span>
+</div>
+<div class="action-overlay absolute inset-0 bg-primary/60 backdrop-blur-[2px] opacity-0 flex items-center justify-center p-6">
+<button class="w-full bg-white text-primary font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-surface transition-colors shadow-xl">
+<span class="material-symbols-outlined">file_open</span>
+                                    Use Template
+                                </button>
+</div>
+</div>
+<div class="p-6 flex flex-col flex-1 border-t border-outline-variant/10">
+<div class="flex justify-between items-start mb-3">
+<h4 class="text-lg font-bold text-on-surface leading-tight">Strategic Sales Analysis</h4>
+<span class="material-symbols-outlined text-outline text-lg">info</span>
+</div>
+<div class="grid grid-cols-2 gap-y-3 gap-x-4 mb-6">
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Industry</span>
+<span class="text-xs font-semibold text-on-surface">Finance &amp; Retail</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Complexity</span>
+<span class="text-xs font-semibold text-on-surface">Advanced</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Charts</span>
+<span class="text-xs font-semibold text-on-surface">15+ Dynamic</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Data Source</span>
+<span class="text-xs font-semibold text-on-surface">CSV / JSON</span>
+</div>
+</div>
+<div class="mt-auto flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">responsive_layout</span>
+<span class="text-[11px] font-medium uppercase tracking-tight">Fully Responsive</span>
+</div>
+</div>
+</div>
+<!-- Template 3: City Monitoring -->
+<div class="template-card flex flex-col bg-white rounded-2xl overflow-hidden border border-outline-variant/40 shadow-sm hover:shadow-xl transition-all duration-300 group">
+<div class="relative aspect-[16/10] bg-on-background overflow-hidden">
+<img alt="City Monitoring" class="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" data-alt="Stylized 3D urban city model at night" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnS_-4PMrzeZ9NJaCqVlWBZ4NejsXV5GIyYbJbq1bf52o9jyCCPQab1MXDYqlc3mU9UpBhKFQ7FM3li_L0mNZbS_Ne6l0eodPc2KganD6iK-vmddaBlFA1BscJWVGaTMoZhazAhhwOww0wsJFknDYxZ_sLzplGg646Ru1vqOGg0V4ejJeYUSstG0LLKm3PXohObkHgShNgcqsFnZB3yutZ2tq2VLHEfupeK4J3sYIwmScniB4OdFNhjDT5YR7yUuZEcSqZg_NmChxi"/>
+<div class="action-overlay absolute inset-0 bg-primary/60 backdrop-blur-[2px] opacity-0 flex items-center justify-center p-6">
+<button class="w-full bg-white text-primary font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-surface transition-colors shadow-xl">
+<span class="material-symbols-outlined">file_open</span>
+                                    Use Template
+                                </button>
+</div>
+</div>
+<div class="p-6 flex flex-col flex-1 border-t border-outline-variant/10">
+<div class="flex justify-between items-start mb-3">
+<h4 class="text-lg font-bold text-on-surface leading-tight">Urban Control Hub</h4>
+<span class="material-symbols-outlined text-outline text-lg">info</span>
+</div>
+<div class="grid grid-cols-2 gap-y-3 gap-x-4 mb-6">
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Industry</span>
+<span class="text-xs font-semibold text-on-surface">Public Sector</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Complexity</span>
+<span class="text-xs font-semibold text-on-surface">Immersive 3D</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Charts</span>
+<span class="text-xs font-semibold text-on-surface">GIS Layers</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Data Source</span>
+<span class="text-xs font-semibold text-on-surface">Real-time IoT</span>
+</div>
+</div>
+<div class="mt-auto flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">3d_rotation</span>
+<span class="text-[11px] font-medium uppercase tracking-tight">Web GL Enabled</span>
+</div>
+</div>
+</div>
+<!-- Template 4: Store Management -->
+<div class="template-card flex flex-col bg-white rounded-2xl overflow-hidden border border-outline-variant/40 shadow-sm hover:shadow-xl transition-all duration-300 group">
+<div class="relative aspect-[16/10] bg-on-background overflow-hidden">
+<img alt="Store Management" class="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" data-alt="Top-down view of a modern boutique retail space" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBM-AoWEV36xwMeLYml0KmMosId-l6-DO1HiIaGJTMaWN8euEdu3AHhpAfrKrO6768BTafdsoc1-A70K-EYGuw_qiRT5_O6_coiseOm_GyWb9nbtA7MfdlxgY0CJCv_FuI6UqHT7fzt5YnC8lmqetAJn1ANv7U0asKPEkxQjKunOwDuKJLo8jQ1NJdj9X_66pVvqJb3irWhzerPL0DJwfVpV9axCAt3V6crKKhJTMia7_vY9Zp3kHhwQcQU6pRWSHpn1blPdMrdfazu"/>
+<div class="action-overlay absolute inset-0 bg-primary/60 backdrop-blur-[2px] opacity-0 flex items-center justify-center p-6">
+<button class="w-full bg-white text-primary font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-surface transition-colors shadow-xl">
+<span class="material-symbols-outlined">file_open</span>
+                                    Use Template
+                                </button>
+</div>
+</div>
+<div class="p-6 flex flex-col flex-1 border-t border-outline-variant/10">
+<div class="flex justify-between items-start mb-3">
+<h4 class="text-lg font-bold text-on-surface leading-tight">Boutique Operations</h4>
+<span class="material-symbols-outlined text-outline text-lg">info</span>
+</div>
+<div class="grid grid-cols-2 gap-y-3 gap-x-4 mb-6">
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Industry</span>
+<span class="text-xs font-semibold text-on-surface">Luxury Retail</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Complexity</span>
+<span class="text-xs font-semibold text-on-surface">Standard</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Charts</span>
+<span class="text-xs font-semibold text-on-surface">Inventory Focus</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Data Source</span>
+<span class="text-xs font-semibold text-on-surface">ERP Integration</span>
+</div>
+</div>
+<div class="mt-auto flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">storefront</span>
+<span class="text-[11px] font-medium uppercase tracking-tight">Multi-location Support</span>
+</div>
+</div>
+</div>
+<!-- Template 5: Project Demo -->
+<div class="template-card flex flex-col bg-white rounded-2xl overflow-hidden border border-outline-variant/40 shadow-sm hover:shadow-xl transition-all duration-300 group">
+<div class="relative aspect-[16/10] bg-on-background overflow-hidden">
+<img alt="Project Demo" class="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" data-alt="Interior of a modern office meeting room" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCu3zCr36T44i3BuJQBJ5AHKVuNrD8x3eeqOiXLb_JgGM5VrCg91ALoPpWyxddGOcN7LOiigtdKZkssFUW2E6LPICMdcijOnlKWfmrl-g7M5C94llwzaCUOPVGRyLzvHbRru-ijgIgbMdnzz817NSLwhGlX4BUvMmt4YXvgEkD2bQVZEnbTeG6A5a7kX66jk6TlpiOIV1g7geTZ0oqlwlAVuf775iW_ea5gofn6vOXG6lrd2k7h66JMnyIKw567p1t0A7E85F4R-YId"/>
+<div class="action-overlay absolute inset-0 bg-primary/60 backdrop-blur-[2px] opacity-0 flex items-center justify-center p-6">
+<button class="w-full bg-white text-primary font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-surface transition-colors shadow-xl">
+<span class="material-symbols-outlined">file_open</span>
+                                    Use Template
+                                </button>
+</div>
+</div>
+<div class="p-6 flex flex-col flex-1 border-t border-outline-variant/10">
+<div class="flex justify-between items-start mb-3">
+<h4 class="text-lg font-bold text-on-surface leading-tight">Executive Presentation</h4>
+<span class="material-symbols-outlined text-outline text-lg">info</span>
+</div>
+<div class="grid grid-cols-2 gap-y-3 gap-x-4 mb-6">
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Industry</span>
+<span class="text-xs font-semibold text-on-surface">General</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Complexity</span>
+<span class="text-xs font-semibold text-on-surface">High Impact</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Charts</span>
+<span class="text-xs font-semibold text-on-surface">KPI Summary</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Data Source</span>
+<span class="text-xs font-semibold text-on-surface">Multi-source</span>
+</div>
+</div>
+<div class="mt-auto flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">tv</span>
+<span class="text-[11px] font-medium uppercase tracking-tight">Presentation Mode Only</span>
+</div>
+</div>
+</div>
+<!-- Empty State / Create Blank -->
+<div class="group cursor-pointer border-2 border-dashed border-outline-variant/50 rounded-2xl flex flex-col items-center justify-center p-8 aspect-[16/10] hover:border-primary/40 hover:bg-surface-container-low transition-all bg-surface-container-lowest">
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+<span class="material-symbols-outlined text-4xl text-primary">add</span>
+</div>
+<h4 class="font-bold text-lg text-on-surface group-hover:text-primary transition-colors">Blank Canvas</h4>
+<p class="text-xs text-on-surface-variant mt-1 font-medium">Build a custom solution from scratch</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="h-10 border-t border-outline-variant/10 bg-surface-container-low flex items-center justify-between px-6 text-[10px] text-on-surface-variant font-medium shrink-0">
+<div class="flex items-center gap-4">
+<span>© 2024 JaminView Industrial Intelligence</span>
+<span class="opacity-30">|</span>
+<span>Version 2.4.0-Stable</span>
+</div>
+<div class="flex gap-4">
+<span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> System Online</span>
+<span class="hover:text-primary cursor-pointer transition-colors">Privacy Policy</span>
+<span class="hover:text-primary cursor-pointer transition-colors">Terms of Service</span>
+</div>
+</footer>
+</body></html>

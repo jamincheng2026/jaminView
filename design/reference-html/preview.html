@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "background": "#fafaf5",
+              "on-background": "#1a1c19",
+              "surface-container-low": "#f4f4ef",
+              "on-secondary-container": "#446c44",
+              "surface-variant": "#e3e3de",
+              "surface-container": "#eeeee9",
+              "on-secondary": "#ffffff",
+              "tertiary-fixed-dim": "#b0cdbc",
+              "surface-container-high": "#e8e8e3",
+              "on-surface-variant": "#424842",
+              "on-tertiary": "#ffffff",
+              "error-container": "#ffdad6",
+              "on-error": "#ffffff",
+              "secondary-fixed-dim": "#a5d2a2",
+              "on-primary-fixed": "#02210c",
+              "surface-container-highest": "#e3e3de",
+              "primary-container": "#3a5a40",
+              "tertiary": "#274134",
+              "primary-fixed-dim": "#abd0af",
+              "inverse-surface": "#2f312e",
+              "primary": "#23422a",
+              "surface": "#fafaf5",
+              "on-tertiary-container": "#b0cdbc",
+              "outline-variant": "#c2c8bf",
+              "error": "#ba1a1a",
+              "tertiary-fixed": "#ccead8",
+              "inverse-on-surface": "#f1f1ec",
+              "secondary-fixed": "#c1eebc",
+              "inverse-primary": "#abd0af",
+              "outline": "#727971",
+              "surface-bright": "#fafaf5",
+              "on-primary-fixed-variant": "#2e4e35",
+              "on-secondary-fixed-variant": "#284f2a",
+              "secondary-container": "#beecb9",
+              "surface-dim": "#dadad5",
+              "on-error-container": "#93000a",
+              "on-surface": "#1a1c19",
+              "on-primary-container": "#acd0af",
+              "surface-container-lowest": "#ffffff",
+              "on-secondary-fixed": "#002106",
+              "tertiary-container": "#3e584b",
+              "primary-fixed": "#c7ecca",
+              "on-tertiary-fixed-variant": "#324c3f",
+              "secondary": "#406840",
+              "surface-tint": "#45664b",
+              "on-tertiary-fixed": "#062015",
+              "on-primary": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .canvas-grid {
+            background-image: radial-gradient(#c2c8bf 1px, transparent 1px);
+            background-size: 1.5rem 1.5rem;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3 { font-family: 'Manrope', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased overflow-hidden">
+<!-- Top Toolbar (Preview specific) -->
+<header class="bg-[#fafaf5] dark:bg-[#1a1c19] font-['Manrope'] antialiased text-sm tracking-wide docked full-width top-0 z-50 flex items-center justify-between px-6 h-16 w-full">
+<div class="flex items-center gap-6">
+<button class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors duration-200">
+<span class="material-symbols-outlined text-lg" data-icon="arrow_back">arrow_back</span>
+<span class="font-medium">Back to Editor</span>
+</button>
+<div class="h-4 w-px bg-outline-variant opacity-30"></div>
+<div class="flex items-center gap-1">
+<span class="text-on-surface-variant font-semibold tracking-tight">Previewing:</span>
+<span class="text-primary font-bold">Quarterly Growth Analysis</span>
+</div>
+</div>
+<!-- Device Toggles & Controls -->
+<div class="flex items-center bg-surface-container-low rounded-lg p-1">
+<button class="p-2 rounded bg-surface-container-lowest text-primary">
+<span class="material-symbols-outlined" data-icon="desktop_windows">desktop_windows</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="tablet">tablet</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="smartphone">smartphone</span>
+</button>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded">
+<span class="material-symbols-outlined text-lg" data-icon="link">link</span>
+<span class="font-medium">Copy Link</span>
+</button>
+<button class="bg-primary text-on-primary px-5 py-2 rounded-md font-bold tracking-wide flex items-center gap-2 hover:bg-primary-container transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="share">share</span>
+<span>Publish</span>
+</button>
+</div>
+</header>
+<!-- Main Viewport Canvas -->
+<main class="relative h-[calc(100vh-64px)] w-full bg-surface-dim overflow-y-auto pt-8 pb-16 px-8 flex justify-center">
+<!-- The "Device" Frame / Canvas Representation -->
+<div class="w-full max-w-7xl bg-surface-container-lowest shadow-2xl min-h-screen rounded-sm overflow-hidden border border-outline-variant/10">
+<!-- Internal Dashboard Header -->
+<div class="p-10 flex flex-col gap-2">
+<div class="flex justify-between items-start">
+<div>
+<h1 class="text-4xl font-extrabold text-primary tracking-tighter mb-1">Analytical Draft v2.4</h1>
+<p class="text-on-surface-variant font-medium tracking-wide">Macro-economic data visualization cluster for Q3 performance metrics.</p>
+</div>
+<div class="flex gap-4">
+<div class="text-right">
+<p class="text-[10px] uppercase tracking-[0.2em] text-on-surface-variant font-bold">Last Synchronized</p>
+<p class="text-sm font-bold text-primary">2 Mins Ago</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Dashboard Content: Bento Grid -->
+<div class="px-10 pb-20 grid grid-cols-12 gap-6">
+<!-- Hero Metric: Large Column -->
+<div class="col-span-12 lg:col-span-8 bg-surface-container-low p-8 rounded flex flex-col justify-between h-[400px] relative overflow-hidden">
+<div class="relative z-10">
+<span class="inline-block px-3 py-1 bg-primary-container/20 text-primary text-xs font-bold rounded-full mb-4">Core Revenue</span>
+<h2 class="text-5xl font-extrabold text-primary tracking-tighter">$2.48M</h2>
+<div class="flex items-center gap-2 text-on-secondary-container font-bold mt-2">
+<span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
+<span>+14.2% from last quarter</span>
+</div>
+</div>
+<!-- Simplified Visual Decoration for the Chart Area -->
+<div class="absolute bottom-0 left-0 w-full h-48 opacity-40">
+<img class="w-full h-full object-cover grayscale" data-alt="abstract architectural sketch with minimalist line work and green botanical accents on textured paper background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB6dRiYLNKJ4SXZvCGUF3v760uNzkubZw3GXfwpYSR-wex8dYkE8H1JK8zgaOQhB8QSOHGKe9QzSFm9LdDFGux4LQVzcWxVLaLzKGXeQ1avvzMXoaHzVjgsvBuMbgYvUHci2GS7vE0FRp6SjrXDgBubQkORPD2f5j1JQSyseBPSk04OFbiUf6rYKjl9E97fF6RHZYoC3MYnSQfhyPr3M9uHS0XWJl1uvcpF3n8PK9KQeLq6zYUQf2pIXS2JsHSs9QCOS3hmsoPzzq2-"/>
+</div>
+</div>
+<!-- Side KPI Cards -->
+<div class="col-span-12 lg:col-span-4 grid grid-rows-2 gap-6">
+<div class="bg-surface-container-highest p-6 rounded flex flex-col justify-center border-l-4 border-primary">
+<p class="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">User Retention</p>
+<h3 class="text-3xl font-bold text-primary">88.4%</h3>
+<div class="w-full bg-outline-variant/30 h-1.5 mt-4 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[88%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-highest p-6 rounded flex flex-col justify-center">
+<p class="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Global Reach</p>
+<h3 class="text-3xl font-bold text-primary">42 <span class="text-lg font-medium text-on-surface-variant">Markets</span></h3>
+<div class="flex gap-2 mt-4">
+<div class="h-2 w-2 rounded-full bg-primary opacity-30"></div>
+<div class="h-2 w-2 rounded-full bg-primary opacity-60"></div>
+<div class="h-2 w-2 rounded-full bg-primary"></div>
+<div class="h-2 w-2 rounded-full bg-primary opacity-10"></div>
+</div>
+</div>
+</div>
+<!-- Geographic/Map Section -->
+<div class="col-span-12 lg:col-span-5 h-[350px] bg-surface-container-low rounded p-6">
+<div class="flex justify-between items-center mb-6">
+<h4 class="font-bold text-primary tracking-tight">Active Nodes</h4>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer" data-icon="more_horiz">more_horiz</span>
+</div>
+<div class="w-full h-[240px] rounded bg-surface-dim relative overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="stylized vector world map with pinpoint nodes in moss green and subtle grid overlays" data-location="Global" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBV0ao21AUHNzEWviM9vOknckO7fa0Kva9N-U27fxuEeqpvdRq3hvLvPi71-llQrclTvbBbYEqKtShklm1_mbuYk_ruaehycIzcJv8Z28LNJhTsyIKeOt9H2NcuvrVZjoJ2WdWfQXB3G8MeV_NDVoaT6s6S72D6wJQxKGERRlqKTs5C1TmpvzW4aTbNf9wLJJpe2CKkLWOi-FdR32nVHaprwhXXLgOcWfxMc0nUUjLQRyGctCtW5sK0gW_R_GZlDjcASyW0hpnGLe-i"/>
+<div class="absolute bottom-4 left-4 bg-surface-container-lowest/90 backdrop-blur-sm p-3 rounded shadow-sm border border-outline-variant/20">
+<p class="text-[10px] font-bold text-on-surface-variant uppercase">Primary Hub</p>
+<p class="text-xs font-bold text-primary">Copenhagen, Denmark</p>
+</div>
+</div>
+</div>
+<!-- List/Activity Feed -->
+<div class="col-span-12 lg:col-span-7 h-[350px] bg-surface-container-low rounded p-6 flex flex-col">
+<h4 class="font-bold text-primary tracking-tight mb-4">Latest Insights</h4>
+<div class="space-y-4 flex-1">
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest rounded border border-transparent hover:border-outline-variant/30 transition-all cursor-default">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="monitoring">monitoring</span>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface">Trend Alert: APAC Markets</p>
+<p class="text-xs text-on-surface-variant">Significantly outperforming projections in consumer tech.</p>
+</div>
+</div>
+<span class="text-xs font-medium text-on-surface-variant">2h ago</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest rounded border border-transparent hover:border-outline-variant/30 transition-all cursor-default">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary" data-icon="security">security</span>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface">Data Integrity Check</p>
+<p class="text-xs text-on-surface-variant">Q2 reconciliation completed with 0.01% variance.</p>
+</div>
+</div>
+<span class="text-xs font-medium text-on-surface-variant">5h ago</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest rounded border border-transparent hover:border-outline-variant/30 transition-all cursor-default">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="cloud_done">cloud_done</span>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface">Node Sync Complete</p>
+<p class="text-xs text-on-surface-variant">All 12 clusters successfully mirrored to primary storage.</p>
+</div>
+</div>
+<span class="text-xs font-medium text-on-surface-variant">Yesterday</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Dashboard Footer -->
+<footer class="px-10 py-8 border-t border-outline-variant/10 flex justify-between items-center text-on-surface-variant">
+<p class="text-xs font-medium">© JaminView 2024. All analytical data is encrypted end-to-end.</p>
+<div class="flex gap-6 text-xs font-bold uppercase tracking-widest">
+<a class="hover:text-primary transition-colors" href="#">Documentation</a>
+<a class="hover:text-primary transition-colors" href="#">Privacy</a>
+<a class="hover:text-primary transition-colors" href="#">Export Logs</a>
+</div>
+</footer>
+</div>
+</main>
+<!-- Floating Tooltip for Preview Mode -->
+<div class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface px-6 py-3 rounded-full shadow-xl flex items-center gap-3 z-[60]">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+<span class="text-xs font-bold tracking-widest uppercase">Live Preview Mode</span>
+</div>
+<div class="h-4 w-px bg-on-surface-variant/30"></div>
+<button class="text-xs font-bold hover:text-primary-fixed-dim transition-colors">Interactive On</button>
+</div>
+</body></html>

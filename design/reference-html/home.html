@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>JaminView - 更快交付数据大屏</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-container": "#3e584b",
+              "primary-fixed-dim": "#abd0af",
+              "surface": "#fafaf5",
+              "on-primary-container": "#acd0af",
+              "on-tertiary-container": "#b0cdbc",
+              "inverse-surface": "#2f312e",
+              "outline": "#727971",
+              "error-container": "#ffdad6",
+              "on-surface": "#1a1c19",
+              "surface-container-highest": "#e3e3de",
+              "secondary-fixed-dim": "#a5d2a2",
+              "secondary-fixed": "#c1eebc",
+              "surface-container-low": "#f4f4ef",
+              "on-tertiary-fixed-variant": "#324c3f",
+              "primary-fixed": "#c7ecca",
+              "on-error": "#ffffff",
+              "surface-container-lowest": "#ffffff",
+              "tertiary-fixed-dim": "#b0cdbc",
+              "surface-bright": "#fafaf5",
+              "secondary": "#406840",
+              "on-secondary-fixed-variant": "#284f2a",
+              "on-surface-variant": "#424842",
+              "inverse-primary": "#abd0af",
+              "on-primary-fixed": "#02210c",
+              "tertiary": "#274134",
+              "surface-variant": "#e3e3de",
+              "on-error-container": "#93000a",
+              "on-tertiary": "#ffffff",
+              "error": "#ba1a1a",
+              "on-tertiary-fixed": "#062015",
+              "on-secondary-fixed": "#002106",
+              "on-background": "#1a1c19",
+              "secondary-container": "#beecb9",
+              "surface-container": "#eeeee9",
+              "on-primary": "#ffffff",
+              "surface-tint": "#45664b",
+              "surface-container-high": "#e8e8e3",
+              "on-primary-fixed-variant": "#2e4e35",
+              "inverse-on-surface": "#f1f1ec",
+              "on-secondary": "#ffffff",
+              "background": "#fafaf5",
+              "tertiary-fixed": "#ccead8",
+              "primary-container": "#3a5a40",
+              "outline-variant": "#c2c8bf",
+              "primary": "#23422a",
+              "on-secondary-container": "#446c44",
+              "surface-dim": "#dadad5"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .dot-grid {
+        background-image: radial-gradient(circle, #c2c8bf 1px, transparent 1px);
+        background-size: 1.5rem 1.5rem;
+        opacity: 0.15;
+      }
+      /* Custom styles for Hero Text contrast */
+      .hero-overlay {
+        background: radial-gradient(circle at center, rgba(26, 28, 25, 0.6) 0%, rgba(26, 28, 25, 0.85) 100%);
+      }
+      .text-shadow-sm {
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary-fixed-dim selection:text-on-primary-fixed">
+<!-- Header & TopNavBar -->
+<header class="w-full absolute top-0 z-50 bg-transparent">
+<nav class="flex justify-between items-center px-8 py-6 max-w-7xl mx-auto">
+<div class="flex items-center gap-12">
+<a class="text-xl font-bold text-white tracking-tight font-headline" href="#">JaminView</a>
+<div class="hidden md:flex gap-8">
+<a class="font-manrope text-sm font-bold tracking-wide text-white border-b-2 border-primary-fixed-dim pb-1" href="#">产品功能</a>
+<a class="font-manrope text-sm font-medium tracking-wide text-white/80 hover:text-white transition-colors duration-200" href="#">模板库</a>
+<a class="font-manrope text-sm font-medium tracking-wide text-white/80 hover:text-white transition-colors duration-200" href="#">价格</a>
+<a class="font-manrope text-sm font-medium tracking-wide text-white/80 hover:text-white transition-colors duration-200" href="#">关于我们</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-5 py-2 text-sm font-medium text-white/90 hover:text-white transition-colors">登录</button>
+<button class="bg-primary text-on-primary px-6 py-2 rounded-md font-medium text-sm scale-95 active:scale-90 transition-transform shadow-lg">立即体验</button>
+</div>
+</nav>
+</header>
+<!-- Hero Section -->
+<section class="relative min-h-screen flex items-center justify-center overflow-hidden">
+<!-- Background Image -->
+<div class="absolute inset-0 z-0">
+<img alt="Professional Dark Mode Data Dashboard Background" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA6ud4lwwhTdJhLhJeTltW5xvBqXJhrD5L5V4UUr0A8v6TWWAfsib6J7f6EigFcW7sDpL4Zw44SubiHSzEL3rL28zF9wcaNMWC2N6Pp4XjtagwQZPq4G6H09qfC7Tuute8sAfgpa8gwJEI4SJGJCg5al2vOr4N-xRp_Y2Ttv52UjoLDLIiYy6pwgqHTODMOkbN2Koeaq0bb0JKXGfbOvp7r_zIiOUBARKj5gesLfxEXmfaz6kv7cyklfT2HwNaYih_uMDiRmc07j2Mi"/>
+<!-- Overlay for readability -->
+<div class="absolute inset-0 hero-overlay"></div>
+</div>
+<div class="max-w-7xl mx-auto px-8 relative z-10 text-center flex flex-col items-center -mt-20">
+<div class="max-w-3xl">
+<h1 class="font-headline font-extrabold text-5xl lg:text-7xl text-white leading-[1.1] mb-8 tracking-tight text-shadow-sm">
+<span class="bg-clip-text text-transparent bg-gradient-to-r from-white via-primary-fixed-dim to-primary-fixed">更快交付</span><br/>数据大屏
+            </h1>
+<p class="text-xl lg:text-2xl text-surface-container-low leading-relaxed mb-6 font-medium text-shadow-sm">
+                从模板出发，导入你的数据，完成编辑与发布。
+            </p>
+<p class="text-base text-white/70 mb-12 max-w-lg mx-auto leading-relaxed">
+                JaminView 面向业务团队、产品经理和交付工程师，将繁杂的代码开发转化为直观的配置过程。
+            </p>
+<div class="flex flex-wrap justify-center gap-6">
+<button class="bg-primary text-on-primary px-10 py-4 rounded font-bold text-lg shadow-2xl hover:bg-primary-container transition-all flex items-center gap-2">
+                    进入演示环境 <span class="material-symbols-outlined text-xl">arrow_forward</span>
+</button>
+<button class="bg-white/10 backdrop-blur-md border border-white/20 text-white px-10 py-4 rounded font-bold text-lg hover:bg-white/20 transition-all">
+                    浏览模板库
+                </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Product Value -->
+<section class="py-24 bg-surface-container-low border-y border-outline-variant/10">
+<div class="max-w-7xl mx-auto px-8">
+<div class="flex flex-col md:flex-row justify-between items-end gap-8 mb-16">
+<div class="max-w-2xl">
+<h2 class="font-headline font-bold text-4xl text-primary mb-6">把搭建时间花在内容上，而不是重复造页面</h2>
+<p class="text-on-surface-variant text-lg leading-relaxed">
+                    我们深知交付压力的来源。JaminView 通过高度封装的行业模板与灵活的数据映射机制，让非技术人员也能在数小时内交付出具备专业水准的数字化座舱。
+                </p>
+</div>
+<div class="flex gap-4">
+<div class="bg-surface p-6 rounded-lg shadow-sm">
+<div class="text-3xl font-bold text-primary mb-1">75%</div>
+<div class="text-xs text-on-surface-variant uppercase tracking-widest font-semibold">交付周期缩短</div>
+</div>
+<div class="bg-surface p-6 rounded-lg shadow-sm">
+<div class="text-3xl font-bold text-primary mb-1">0</div>
+<div class="text-xs text-on-surface-variant uppercase tracking-widest font-semibold">代码编写需求</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Core Capabilities (Bento Grid) -->
+<section class="py-32 bg-surface">
+<div class="max-w-7xl mx-auto px-8">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+<!-- Card 1 -->
+<div class="md:col-span-2 bg-surface-container-low p-10 flex flex-col justify-between group hover:bg-surface-container transition-colors border border-outline-variant/5">
+<div>
+<span class="material-symbols-outlined text-primary text-4xl mb-6" data-icon="dashboard_customize">dashboard_customize</span>
+<h3 class="text-2xl font-bold text-primary mb-4">模板起步</h3>
+<p class="text-on-surface-variant leading-relaxed mb-8">内置上百套覆盖智慧城市、工业互联、金融分析的预设模板。点击即刻开始，无需从零开始构思布局。</p>
+</div>
+<img class="w-full h-48 object-cover rounded shadow-md grayscale group-hover:grayscale-0 transition-all duration-500" data-alt="A clean grid layout showing multiple professional dashboard thumbnails with varying chart styles and data visualizations." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBs-MZnBbg3GMFPrUONK4K4-ZkXOEiXeKx9l8Pz2w3iW7yBCsTP_74AAP4Pdiud1IarH-HebkQ4CNZ07u5YckuJKg9xGqJ9MEmZ4JwQxukHlcE5kNMSHZeqimqN447yS2fDrA4NPk2LMohB7LOmZ3xn3DedsAgdx33fba2IbpSHTINXL5TjNiZ1FpDWF6w7jqehlaIWoxTG3fZUQ-hFdSgA2-ZXkj3c8-Y4diq5p1vPRPCn4FVNgZYRi1Xqxh9cKQsXZcVU0FdUpT24"/>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-highest p-10 flex flex-col border border-outline-variant/5">
+<span class="material-symbols-outlined text-primary text-4xl mb-6" data-icon="database">database</span>
+<h3 class="text-xl font-bold text-primary mb-4">数据导入</h3>
+<p class="text-on-surface-variant text-sm leading-relaxed mb-6">支持 Excel, CSV, API 及主流数据库的无缝接入，字段映射所见即所得。</p>
+<div class="mt-auto pt-6 border-t border-outline-variant/20">
+<div class="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-tighter">
+                        Ready for Real-time
+                    </div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-primary p-10 flex flex-col text-on-primary">
+<span class="material-symbols-outlined text-on-primary text-4xl mb-6" data-icon="edit_note">edit_note</span>
+<h3 class="text-xl font-bold mb-4">可视化编辑</h3>
+<p class="text-on-primary/80 text-sm leading-relaxed">
+                    自由拖拽组件，深度定制图表样式。支持高级 3D 地图层级下钻与动效配置。
+                </p>
+<div class="mt-auto">
+<div class="h-2 w-full bg-on-primary/10 rounded-full overflow-hidden">
+<div class="h-full bg-primary-fixed-dim w-3/4"></div>
+</div>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="md:col-span-4 bg-surface-container-low p-10 flex flex-col md:flex-row items-center gap-12 border border-outline-variant/5">
+<div class="flex-1">
+<span class="material-symbols-outlined text-primary text-4xl mb-6" data-icon="ios_share">ios_share</span>
+<h3 class="text-2xl font-bold text-primary mb-4">发布展示</h3>
+<p class="text-on-surface-variant leading-relaxed">
+                        一键生成链接或嵌入代码。支持多终端适配、私有化部署以及高安全性的权限管理体系，确保数据仅在可控范围内流动。
+                    </p>
+</div>
+<div class="flex-1 w-full grid grid-cols-3 gap-4">
+<div class="aspect-video bg-surface-container-highest rounded border border-outline-variant/10"></div>
+<div class="aspect-video bg-primary-container/20 rounded border border-primary/10"></div>
+<div class="aspect-video bg-surface-container-highest rounded border border-outline-variant/10"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Template Showcase -->
+<section class="py-24 bg-surface-container-low">
+<div class="max-w-7xl mx-auto px-8">
+<div class="text-center mb-20">
+<h2 class="font-headline font-bold text-4xl text-primary mb-4">从常见场景开始搭建</h2>
+<div class="h-1 w-20 bg-primary mx-auto"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<!-- Template 1 -->
+<div class="group cursor-pointer">
+<div class="aspect-[16/10] bg-surface-container-highest rounded-lg overflow-hidden mb-6 relative">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Dashboard template for enterprise operations with complex data widgets, KPI counters, and dark theme maps." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAxp0mpSEi8Mjx_Av4AZfhOTQ_WIPaSmsHRZFJWTZgEkUF3PiS3fCmqb8nES9qOZ3cS1SKdUyRWUc2gPj7lFdYWFw13Vn8Qn-BOtBL0jZziwujh6I0ELWQqyX6iJOCMJO_Cf4HnSnlFw7WMgsAHntbj4g-ozVrJqGVsamEHbid3MjCk1SM87XtHxfvyW7FC3jlyHgz4tO5ool9DFeDm8S0EgM0sXfNcZtGiJVdJgxdHiAjbsaZu-2yFmeAfU0QItLrjviVJsAKP9_1H"/>
+<div class="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<button class="bg-surface text-primary px-6 py-2 text-sm font-bold shadow-xl">使用此模板</button>
+</div>
+</div>
+<h4 class="text-lg font-bold text-primary">综合运营驾驶舱</h4>
+<p class="text-sm text-on-surface-variant">适用于集团全业务数据监控</p>
+</div>
+<!-- Template 2 -->
+<div class="group cursor-pointer">
+<div class="aspect-[16/10] bg-surface-container-highest rounded-lg overflow-hidden mb-6 relative">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Sales analysis dashboard showing revenue trends, regional performance heatmaps, and customer demographics charts." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqKstB9ECda8F7XF2xbtSjY01ELjms1QUcHhplAvyzsPxRi0T8WBo_l3UjfpKKMTM02yrvsdfhpJEcoD8iaVJ3zZZiFogeOt7L77lnK6gFyJjBIyn_IKMQnNGT_hInYh6q4fQSiX7N0_MSSJuiKXP4dRsxonzC7IRZqaWeZLh4_HQ4IrJ1ImK74dUKE4GDw3jzHa70NWgJYFR-G5E7PwI9f0R_0zmCeIaudx_Yymzpba1W1IZuTVMOTAqP4sdM-_7GV04Q3n4BzOZ-"/>
+<div class="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<button class="bg-surface text-primary px-6 py-2 text-sm font-bold shadow-xl">使用此模板</button>
+</div>
+</div>
+<h4 class="text-lg font-bold text-primary">销售分析大屏</h4>
+<p class="text-sm text-on-surface-variant">精准追踪销售转化与区域表现</p>
+</div>
+<!-- Template 3 -->
+<div class="group cursor-pointer">
+<div class="aspect-[16/10] bg-surface-container-highest rounded-lg overflow-hidden mb-6 relative">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="City business monitoring dashboard with 3D terrain map, traffic flow lines, and public facility status indicators." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtN1wyYU2XcWQlr9wXFFwJnP-m5lU9l1dHcXH1fEE5WFzCRTvSBisdGGGthy34tUf_Qb1zqZfT1JYEKiZhzkWlcM0IVoo4hq24-qmq8ksSVdiNO-oSppxdiRxq0mlNAS4sfPEMYg6fsyye1zkodIBtL8Ir8NVGd621lrFS5mzhdMlt9AeHUKzTvBMk0rA5D3oPuW2bnh0O-7FPsbBYqYMewWxKF-ph5wWUdSCV0V9wdDjcT1xt70U4rPPOgtI8mKmAgSkfVPQOrGWM"/>
+<div class="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<button class="bg-surface text-primary px-6 py-2 text-sm font-bold shadow-xl">使用此模板</button>
+</div>
+</div>
+<h4 class="text-lg font-bold text-primary">城市业务监控</h4>
+<p class="text-sm text-on-surface-variant">L5 级 3D 地图深度结合业务数据</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Workflow -->
+<section class="py-32 bg-surface overflow-hidden">
+<div class="max-w-7xl mx-auto px-8">
+<h2 class="font-headline font-bold text-3xl text-primary mb-20 text-center">透明且高效的工作流</h2>
+<div class="relative flex flex-col md:flex-row justify-between gap-12">
+<!-- Connective Line -->
+<div class="hidden md:block absolute top-12 left-0 w-full h-px bg-outline-variant/30 -z-10"></div>
+<div class="flex-1 flex flex-col items-center text-center">
+<div class="w-24 h-24 rounded-full bg-surface-container-highest flex items-center justify-center mb-8 border border-outline-variant/20 shadow-sm relative">
+<span class="text-2xl font-bold text-primary">1</span>
+</div>
+<h5 class="text-lg font-bold text-primary mb-3">选择模板</h5>
+<p class="text-sm text-on-surface-variant px-4">浏览行业库，锁定最接近你业务逻辑的展示布局。</p>
+</div>
+<div class="flex-1 flex flex-col items-center text-center">
+<div class="w-24 h-24 rounded-full bg-surface-container-highest flex items-center justify-center mb-8 border border-outline-variant/20 shadow-sm relative">
+<span class="text-2xl font-bold text-primary">2</span>
+</div>
+<h5 class="text-lg font-bold text-primary mb-3">导入数据</h5>
+<p class="text-sm text-on-surface-variant px-4">拖入 Excel 或连接 API，实时预览数据驱动下的组件形态。</p>
+</div>
+<div class="flex-1 flex flex-col items-center text-center">
+<div class="w-24 h-24 rounded-full bg-surface-container-highest flex items-center justify-center mb-8 border border-outline-variant/20 shadow-sm relative">
+<span class="text-2xl font-bold text-primary">3</span>
+</div>
+<h5 class="text-lg font-bold text-primary mb-3">调整组件</h5>
+<p class="text-sm text-on-surface-variant px-4">个性化修改色调、品牌标识及特殊的交互联动逻辑。</p>
+</div>
+<div class="flex-1 flex flex-col items-center text-center">
+<div class="w-24 h-24 rounded-full bg-primary flex items-center justify-center mb-8 shadow-lg relative">
+<span class="text-2xl font-bold text-on-primary">4</span>
+</div>
+<h5 class="text-lg font-bold text-primary mb-3">发布展示</h5>
+<p class="text-sm text-on-surface-variant px-4">一键推送至大屏设备或管理平台，完成任务交付。</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Usage Scenarios -->
+<section class="py-24 bg-surface-container-low border-t border-outline-variant/10">
+<div class="max-w-7xl mx-auto px-8">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
+<div>
+<h2 class="font-headline font-bold text-3xl text-primary mb-12">满足多样化的业务触达</h2>
+<ul class="space-y-4">
+<li class="flex items-center gap-4 p-4 hover:bg-surface transition-colors rounded">
+<span class="material-symbols-outlined text-primary" data-icon="auto_graph">auto_graph</span>
+<div>
+<h6 class="font-bold text-primary">日报周报看板</h6>
+<p class="text-xs text-on-surface-variant">快速聚合多维数据，替代低效的 PPT 汇报。</p>
+</div>
+</li>
+<li class="flex items-center gap-4 p-4 hover:bg-surface transition-colors rounded">
+<span class="material-symbols-outlined text-primary" data-icon="storefront">storefront</span>
+<div>
+<h6 class="font-bold text-primary">销售实况大屏</h6>
+<p class="text-xs text-on-surface-variant">实时滚动全国订单数据，激励一线团队表现。</p>
+</div>
+</li>
+<li class="flex items-center gap-4 p-4 hover:bg-surface transition-colors rounded">
+<span class="material-symbols-outlined text-primary" data-icon="visibility">visibility</span>
+<div>
+<h6 class="font-bold text-primary">企业展厅演示</h6>
+<p class="text-xs text-on-surface-variant">高逼格 3D 渲染，展现企业数字化转型实力。</p>
+</div>
+</li>
+<li class="flex items-center gap-4 p-4 hover:bg-surface transition-colors rounded">
+<span class="material-symbols-outlined text-primary" data-icon="factory">factory</span>
+<div>
+<h6 class="font-bold text-primary">生产线效能监控</h6>
+<p class="text-xs text-on-surface-variant">对接物联感知层，实时预警工业生产异常。</p>
+</div>
+</li>
+</ul>
+</div>
+<div class="relative">
+<div class="aspect-square bg-surface rounded-2xl p-1 shadow-sm overflow-hidden flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="Stylized layout showing various screen sizes from mobile to wide screen displays all showing synchronized dashboard content." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB1lAbGGIp7MyiIQxD0vFyGEKI6n4mIv9HWxhlX50SBAMIp_gmu0Mrc8B83uZZRoYTKGNqHLqLzdJLR9pSafoy-fyQFCY0bJfCfJxJV-1CO9Jd9g59yklMugxloGQ4oEb9IhtUIDQi7KrZgw5GS_pdqpgIpa0FRQ56Z0flqzga1d1wPj-ds48IpO_emzsyQLmDBfU83SR_L_QqHavD3GfNZnvVoco-FEKKcVmA3fO-Nv7OpVHk_TdveqmO-Zhou5C1b6PKtxxhAdbkQ"/>
+</div>
+<div class="absolute -bottom-6 -right-6 p-6 bg-primary text-on-primary rounded-xl shadow-xl max-w-xs">
+<p class="text-sm italic">"JaminView 将我们的交付时间从两周压缩到了两天，极大地提升了客户满意度。"</p>
+<p class="text-xs mt-4 font-bold">— 某头部咨询机构交付主管</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Final CTA -->
+<section class="py-32 bg-primary relative overflow-hidden text-center">
+<div class="absolute inset-0 dot-grid opacity-5"></div>
+<div class="max-w-4xl mx-auto px-8 relative z-10">
+<h2 class="font-headline font-bold text-4xl text-on-primary mb-8 leading-tight">先做出一张能展示的页面，<br/>再继续打磨细节</h2>
+<p class="text-lg text-on-primary/70 mb-12">立即加入 JaminView，开启你的高效可视化之旅。免费注册并使用基础版模板。</p>
+<div class="flex flex-wrap justify-center gap-6">
+<button class="bg-surface text-primary px-10 py-4 rounded font-bold text-lg hover:bg-surface-container-high transition-all shadow-xl">进入演示环境</button>
+<button class="border border-on-primary/30 text-on-primary px-10 py-4 rounded font-bold text-lg hover:bg-white/5 transition-all">浏览模板库</button>
+</div>
+</div>
+</section>
+<!-- Footer -->
+<footer class="bg-[#f4f4ef] dark:bg-[#1a1c19] w-full border-t border-[#e3e3de]/20">
+<div class="flex flex-col md:flex-row justify-between items-center px-12 py-10 max-w-7xl mx-auto gap-6">
+<div class="flex flex-col items-center md:items-start">
+<span class="font-manrope font-bold text-[#23422a] text-xl mb-2">JaminView</span>
+<p class="font-pingfang text-xs leading-relaxed text-[#424842] dark:text-[#c2c8bf] text-center md:text-left">
+                © 2024 JaminView. All rights reserved.<br/>Designed for the Intellectual Atelier.
+            </p>
+</div>
+<div class="flex flex-wrap justify-center gap-8">
+<a class="font-pingfang text-xs leading-relaxed text-[#424842] dark:text-[#c2c8bf] hover:text-[#3a5a40] transition-opacity opacity-80 hover:opacity-100" href="#">隐私政策</a>
+<a class="font-pingfang text-xs leading-relaxed text-[#424842] dark:text-[#c2c8bf] hover:text-[#3a5a40] transition-opacity opacity-80 hover:opacity-100" href="#">服务条款</a>
+<a class="font-pingfang text-xs leading-relaxed text-[#424842] dark:text-[#c2c8bf] hover:text-[#3a5a40] transition-opacity opacity-80 hover:opacity-100" href="#">开发者文档</a>
+<a class="font-pingfang text-xs leading-relaxed text-[#424842] dark:text-[#c2c8bf] hover:text-[#3a5a40] transition-opacity opacity-80 hover:opacity-100" href="#">联系我们</a>
+<a class="font-pingfang text-xs leading-relaxed text-[#424842] dark:text-[#c2c8bf] hover:text-[#3a5a40] transition-opacity opacity-80 hover:opacity-100" href="#">加入我们</a>
+</div>
+</div>
+</footer>
+</body></html>

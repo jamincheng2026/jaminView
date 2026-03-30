@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>JaminView | Q4 Global Supply Chain Monitoring</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-surface-variant": "#424842",
+              "on-primary-fixed-variant": "#2e4e35",
+              "tertiary-fixed-dim": "#b0cdbc",
+              "primary-container": "#3a5a40",
+              "surface-container-high": "#e8e8e3",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-low": "#f4f4ef",
+              "surface-tint": "#45664b",
+              "inverse-surface": "#2f312e",
+              "surface-container": "#eeeee9",
+              "primary": "#23422a",
+              "secondary": "#406840",
+              "primary-fixed": "#c7ecca",
+              "tertiary-container": "#3e584b",
+              "inverse-on-surface": "#f1f1ec",
+              "surface-variant": "#e3e3de",
+              "surface-container-highest": "#e3e3de",
+              "secondary-fixed": "#c1eebc",
+              "on-tertiary-container": "#b0cdbc",
+              "tertiary-fixed": "#ccead8",
+              "on-error": "#ffffff",
+              "on-primary-fixed": "#02210c",
+              "on-tertiary": "#ffffff",
+              "on-secondary-fixed": "#002106",
+              "on-background": "#1a1c19",
+              "surface-bright": "#fafaf5",
+              "surface": "#fafaf5",
+              "error": "#ba1a1a",
+              "surface-dim": "#dadad5",
+              "inverse-primary": "#abd0af",
+              "outline": "#727971",
+              "on-tertiary-fixed-variant": "#324c3f",
+              "primary-fixed-dim": "#abd0af",
+              "secondary-container": "#beecb9",
+              "outline-variant": "#c2c8bf",
+              "on-secondary-fixed-variant": "#284f2a",
+              "error-container": "#ffdad6",
+              "on-primary-container": "#acd0af",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#a5d2a2",
+              "on-primary": "#ffffff",
+              "tertiary": "#274134",
+              "on-tertiary-fixed": "#062015",
+              "on-surface": "#1a1c19",
+              "on-secondary-container": "#446c44",
+              "on-error-container": "#93000a",
+              "background": "#fafaf5"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            font-size: 20px;
+        }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c2c8bf; border-radius: 10px; }
+        .canvas-dot-grid {
+            background-image: radial-gradient(#c2c8bf 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface select-none overflow-hidden h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<header class="bg-[#fafaf5] dark:bg-stone-900 flex justify-between items-center w-full px-6 border-b border-[#e3e3de]/20 docked full-width top-0 h-14 z-50">
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-[#e8e8e3] rounded-md transition-colors">
+<span class="material-symbols-outlined text-[#23422a]">arrow_back</span>
+</button>
+<div class="flex flex-col">
+<span class="font-manrope text-sm font-bold tracking-tight text-[#23422a]">Project: Q4 Analytics</span>
+<span class="text-[10px] text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">cloud_done</span> All changes saved
+                </span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<div class="flex items-center bg-surface-container-low rounded p-0.5 mr-4">
+<button class="p-1.5 hover:bg-[#e8e8e3] transition-colors rounded">
+<span class="material-symbols-outlined" data-icon="undo">undo</span>
+</button>
+<button class="p-1.5 hover:bg-[#e8e8e3] transition-colors rounded">
+<span class="material-symbols-outlined" data-icon="redo">redo</span>
+</button>
+<div class="h-4 w-px bg-outline-variant/30 mx-1"></div>
+<button class="p-1.5 hover:bg-[#e8e8e3] transition-colors rounded">
+<span class="material-symbols-outlined" data-icon="zoom_out">zoom_out</span>
+</button>
+<span class="text-[11px] font-mono px-2">85%</span>
+<button class="p-1.5 hover:bg-[#e8e8e3] transition-colors rounded">
+<span class="material-symbols-outlined" data-icon="zoom_in">zoom_in</span>
+</button>
+</div>
+<button class="px-4 py-1.5 text-sm font-medium text-[#23422a] hover:bg-[#e8e8e3] rounded transition-colors">Preview</button>
+<button class="px-5 py-1.5 text-sm font-semibold bg-[#23422a] text-white rounded hover:bg-[#3a5a40] shadow-sm transition-all active:scale-95">Publish</button>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- Left Side Bar -->
+<nav class="bg-[#f4f4ef] dark:bg-stone-800 flex flex-col items-center py-4 h-full w-20 border-r border-outline-variant/10 z-40">
+<div class="flex flex-col items-center gap-6 w-full">
+<!-- Active Tab: Components -->
+<button class="group flex flex-col items-center gap-1 w-full text-[#23422a] border-r-2 border-[#23422a] bg-[#e3e3de] py-3">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">widgets</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest font-bold">Components</span>
+</button>
+<button class="group flex flex-col items-center gap-1 w-full text-[#424842] opacity-70 hover:opacity-100 hover:bg-[#e3e3de] py-3 transition-all">
+<span class="material-symbols-outlined">layers</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest">Layers</span>
+</button>
+<button class="group flex flex-col items-center gap-1 w-full text-[#424842] opacity-70 hover:opacity-100 hover:bg-[#e3e3de] py-3 transition-all">
+<span class="material-symbols-outlined">database</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest">Data</span>
+</button>
+<button class="group flex flex-col items-center gap-1 w-full text-[#424842] opacity-70 hover:opacity-100 hover:bg-[#e3e3de] py-3 transition-all">
+<span class="material-symbols-outlined">dashboard_customize</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest">Templates</span>
+</button>
+</div>
+<div class="mt-auto flex flex-col items-center gap-6 w-full pb-4">
+<button class="group flex flex-col items-center gap-1 w-full text-[#424842] opacity-70 hover:opacity-100 hover:bg-[#e3e3de] py-3 transition-all">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest">Settings</span>
+</button>
+<button class="group flex flex-col items-center gap-1 w-full text-[#424842] opacity-70 hover:opacity-100 hover:bg-[#e3e3de] py-3 transition-all">
+<span class="material-symbols-outlined">help</span>
+<span class="font-manrope text-[10px] uppercase tracking-widest">Help</span>
+</button>
+</div>
+</nav>
+<!-- Tool Shelf (Expanded Left Panel) -->
+<aside class="w-64 bg-surface-container-low border-r border-outline-variant/20 flex flex-col">
+<div class="p-4 border-b border-outline-variant/10">
+<h3 class="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">Components</h3>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-6">
+<!-- Category -->
+<div>
+<label class="text-[10px] font-bold text-outline uppercase tracking-wider mb-3 block">Charts &amp; Data</label>
+<div class="grid grid-cols-2 gap-2">
+<div class="bg-surface border border-outline-variant/40 rounded p-3 flex flex-col items-center gap-2 cursor-grab hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary">show_chart</span>
+<span class="text-[10px] font-medium">Line Chart</span>
+</div>
+<div class="bg-surface border border-outline-variant/40 rounded p-3 flex flex-col items-center gap-2 cursor-grab hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary">bar_chart</span>
+<span class="text-[10px] font-medium">Bar Chart</span>
+</div>
+<div class="bg-surface border border-outline-variant/40 rounded p-3 flex flex-col items-center gap-2 cursor-grab hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary">pie_chart</span>
+<span class="text-[10px] font-medium">Pie Chart</span>
+</div>
+<div class="bg-surface border border-outline-variant/40 rounded p-3 flex flex-col items-center gap-2 cursor-grab hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary">table_chart</span>
+<span class="text-[10px] font-medium">Data Table</span>
+</div>
+</div>
+</div>
+<div>
+<label class="text-[10px] font-bold text-outline uppercase tracking-wider mb-3 block">Geospatial</label>
+<div class="bg-surface border border-outline-variant/40 rounded p-3 flex items-center gap-3 cursor-grab hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary">public</span>
+<div class="flex flex-col">
+<span class="text-[11px] font-bold">Interactive World Map</span>
+<span class="text-[9px] text-on-surface-variant">3D Gl Layers enabled</span>
+</div>
+</div>
+</div>
+<div>
+<label class="text-[10px] font-bold text-outline uppercase tracking-wider mb-3 block">Media &amp; UI</label>
+<div class="grid grid-cols-2 gap-2">
+<div class="bg-surface border border-outline-variant/40 rounded p-3 flex flex-col items-center gap-2 cursor-grab hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary">image</span>
+<span class="text-[10px] font-medium">Image</span>
+</div>
+<div class="bg-surface border border-outline-variant/40 rounded p-3 flex flex-col items-center gap-2 cursor-grab hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary">title</span>
+<span class="text-[10px] font-medium">Text Block</span>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 bg-surface-container">
+<button class="w-full py-2 bg-primary/5 border border-primary/20 text-primary text-[11px] font-bold uppercase tracking-widest rounded hover:bg-primary/10 transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">add_circle</span> Add Source
+                </button>
+</div>
+</aside>
+<!-- Main Canvas Area -->
+<main class="flex-1 bg-surface-dim overflow-auto p-12 relative">
+<!-- The 1920x1080 Container -->
+<div class="w-[1280px] h-[720px] bg-[#fafaf5] mx-auto shadow-2xl relative canvas-dot-grid overflow-hidden border border-outline-variant/50">
+<!-- Dashboard Content Layout -->
+<div class="absolute inset-0 flex flex-col p-6">
+<!-- Dashboard Header -->
+<div class="flex justify-between items-start mb-6">
+<div>
+<h1 class="font-headline text-2xl font-extrabold text-[#23422a] tracking-tight">Global Logistics &amp; Supply Chain Real-time Center</h1>
+<p class="text-[11px] text-on-surface-variant uppercase tracking-[0.2em] font-medium">Live Intelligence Feed • Q4 Monitoring Phase</p>
+</div>
+<div class="flex items-center gap-6 text-right">
+<div class="flex flex-col items-end">
+<span class="text-xs font-bold font-mono">14:22:05 UTC</span>
+<span class="text-[10px] uppercase tracking-wider text-outline">Oct 24, 2023</span>
+</div>
+<div class="flex items-center gap-2 border-l border-outline-variant/30 pl-6">
+<span class="material-symbols-outlined text-secondary">wb_sunny</span>
+<span class="text-xs font-bold">18°C</span>
+</div>
+</div>
+</div>
+<!-- Main Grid -->
+<div class="flex-1 grid grid-cols-12 gap-4 h-full">
+<!-- Left KPIs -->
+<div class="col-span-3 space-y-4">
+<div class="bg-surface-container-low p-4 rounded flex flex-col justify-between h-32 border-l-4 border-primary shadow-sm">
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest">Active Vessels</span>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-headline font-extrabold text-primary">1,284</span>
+<span class="text-[10px] text-secondary font-bold">+4.2%</span>
+</div>
+<div class="w-full bg-outline-variant/20 h-1 mt-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[72%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-low p-4 rounded flex flex-col justify-between h-48 shadow-sm">
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest">Revenue Forecast</span>
+<div class="flex-1 mt-2">
+<img class="w-full h-full object-contain mix-blend-multiply opacity-80" data-alt="minimalist emerald green line chart showing upward trend with subtle area fill on oatmeal background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAw1tPrmhZVKqMlr047byrASBNbMYlPGO9wqtgWkT7IQz1Ggys6Q_8cxHS1Ee9GonhCpR4X_w9UNN6SDpGvUw60ZmPXE7YqPHU3_vUxJjQk83_S24pKOogWdIJwSsVfIYMm8RWOMbdPpwFKA-dpLoJZYopxTE6UoVlGnJ6nshtW0UooFf8RJR2gLEIt-S3KaF1h92qLWmlqkf-ZxdEDDP7ASWBW3myKyegtXChoAk7YXLP2pGD05G4KQrLsLOccao7v0KoQBV-ih-D1"/>
+</div>
+<div class="flex justify-between text-[9px] font-bold text-outline-variant uppercase">
+<span>Mon</span><span>Wed</span><span>Fri</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-4 rounded flex flex-col shadow-sm">
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest mb-4">Carrier Load %</span>
+<div class="flex items-center gap-4">
+<div class="w-20 h-20 rounded-full border-8 border-primary border-r-transparent border-b-transparent rotate-45"></div>
+<div class="space-y-1">
+<div class="flex items-center gap-2"><div class="w-2 h-2 bg-primary rounded-full"></div><span class="text-[10px] font-bold">Maersk 42%</span></div>
+<div class="flex items-center gap-2"><div class="w-2 h-2 bg-secondary rounded-full"></div><span class="text-[10px] font-bold">MSC 28%</span></div>
+<div class="flex items-center gap-2"><div class="w-2 h-2 bg-tertiary-fixed-dim rounded-full"></div><span class="text-[10px] font-bold">CMA 30%</span></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Center Map -->
+<div class="col-span-6 bg-surface-container-highest rounded-xl relative overflow-hidden border border-outline-variant/20 shadow-inner">
+<div class="absolute inset-0 bg-primary/5 opacity-50 z-0"></div>
+<img class="absolute inset-0 w-full h-full object-cover mix-blend-multiply opacity-90" data-alt="high-fidelity 3D geospatial map of the world in monochromatic moss green tones with glowing arcs representing shipping routes between continents" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBom0YVtg1jXR9KbQ-l5UsJjKJlaxD5JTDSz5g20XzmcjZwsdgkkEaVwxvSqtkEyRq2N-ZfGcNUErLzu-YavuBef6z3SgLFAUbCoafjW-tv7fCs8j4OtQMei5qcyL11gwpM3Sqtdheff8fmNwzrtAhZh4k0s4BFZL2Rmd4DK1iky6lnOeIY6LsHbbQot7z5IDJP_6J-gN7NUO1Wzw6LDnBaf-Pi2fDoh5UIVrxUKc3UqYw8kxtZK8trsxBO0iEVOMzQNlabZ64wKdxt"/>
+<!-- Map Overlays -->
+<div class="absolute top-4 left-4 flex gap-2">
+<div class="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] font-bold text-primary flex items-center gap-2 border border-primary/20">
+<span class="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                                    LIVE MONITORING
+                                </div>
+</div>
+<div class="absolute bottom-4 right-4 bg-white/80 backdrop-blur-md p-3 rounded border border-outline-variant/50 text-[10px] w-40">
+<div class="flex justify-between mb-2"><span>Region Heat</span> <span class="font-bold">Active</span></div>
+<div class="w-full h-1.5 bg-gradient-to-r from-primary/20 to-primary rounded-full"></div>
+<div class="flex justify-between mt-1 text-[8px] text-outline"><span>Low Density</span><span>Critical</span></div>
+</div>
+</div>
+<!-- Right KPIs & Alerts -->
+<div class="col-span-3 space-y-4">
+<div class="bg-error-container/40 p-4 rounded border-l-4 border-error shadow-sm">
+<div class="flex justify-between items-center mb-1">
+<span class="text-[10px] font-bold text-error uppercase tracking-widest">Delayed Shipments</span>
+<span class="material-symbols-outlined text-error text-sm">warning</span>
+</div>
+<span class="text-3xl font-headline font-extrabold text-error">42</span>
+<p class="text-[10px] text-error mt-2 font-medium">Critical congestion at Suez Canal route.</p>
+</div>
+<div class="bg-surface-container-low p-4 rounded flex-1 shadow-sm">
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest mb-4 block">Shipment Volume</span>
+<div class="space-y-3">
+<div class="space-y-1">
+<div class="flex justify-between text-[10px] font-bold"><span>Rotterdam</span><span>82%</span></div>
+<div class="w-full bg-outline-variant/20 h-2 rounded-full"><div class="bg-secondary h-full w-[82%]"></div></div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-[10px] font-bold"><span>Singapore</span><span>94%</span></div>
+<div class="w-full bg-outline-variant/20 h-2 rounded-full"><div class="bg-primary h-full w-[94%]"></div></div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-[10px] font-bold"><span>Shanghai</span><span>61%</span></div>
+<div class="w-full bg-outline-variant/20 h-2 rounded-full"><div class="bg-tertiary-fixed-dim h-full w-[61%]"></div></div>
+</div>
+</div>
+</div>
+<!-- Tiny Alert Feed -->
+<div class="bg-surface-container-low p-4 rounded shadow-sm flex-1 overflow-hidden">
+<span class="text-[10px] font-bold text-outline uppercase tracking-widest mb-3 block">Recent Events</span>
+<div class="space-y-2">
+<div class="text-[9px] border-b border-outline-variant/10 pb-1">
+<span class="text-primary font-bold">#4922</span> docked at Long Beach.
+                                    </div>
+<div class="text-[9px] border-b border-outline-variant/10 pb-1">
+<span class="text-error font-bold">#1022</span> rerouted due to weather.
+                                    </div>
+<div class="text-[9px]">
+<span class="text-primary font-bold">#8831</span> departed Hamburg.
+                                    </div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Data Table (Partial View) -->
+<div class="mt-4 bg-surface-container-low border border-outline-variant/20 rounded-lg overflow-hidden flex flex-col max-h-[140px]">
+<table class="w-full text-left text-[11px]">
+<thead class="bg-surface-container-high text-outline uppercase font-bold sticky top-0">
+<tr>
+<th class="px-4 py-2">ID</th>
+<th class="px-4 py-2">Destination</th>
+<th class="px-4 py-2">Cargo Type</th>
+<th class="px-4 py-2">ETA</th>
+<th class="px-4 py-2">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<tr>
+<td class="px-4 py-2 font-mono">VSL-8201</td>
+<td class="px-4 py-2">Tokyo, JP</td>
+<td class="px-4 py-2">Electronics</td>
+<td class="px-4 py-2">Oct 28</td>
+<td class="px-4 py-2"><span class="px-2 py-0.5 bg-secondary/10 text-secondary rounded-full font-bold">On Time</span></td>
+</tr>
+<tr>
+<td class="px-4 py-2 font-mono">VSL-2941</td>
+<td class="px-4 py-2">Mumbai, IN</td>
+<td class="px-4 py-2">Textiles</td>
+<td class="px-4 py-2">Nov 02</td>
+<td class="px-4 py-2"><span class="px-2 py-0.5 bg-primary/10 text-primary rounded-full font-bold">In Transit</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Hover State Anchor Indicators -->
+<div class="absolute top-1/2 left-1/4 w-4 h-4 border-2 border-primary rounded-full animate-ping opacity-75 z-20"></div>
+<div class="absolute top-1/2 left-1/4 w-2 h-2 bg-primary rounded-full z-20"></div>
+</div>
+</main>
+<!-- Right Property Panel -->
+<aside class="w-72 bg-surface border-l border-outline-variant/20 flex flex-col h-full">
+<!-- Tabs for Properties -->
+<div class="flex border-b border-outline-variant/10">
+<button class="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest text-primary border-b-2 border-primary">Style</button>
+<button class="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest text-outline hover:bg-surface-container-low">Data</button>
+<button class="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest text-outline hover:bg-surface-container-low">Config</button>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-8">
+<!-- Basic Properties -->
+<section>
+<h4 class="text-[10px] font-bold text-outline uppercase tracking-wider mb-4">Geometry &amp; Layout</h4>
+<div class="grid grid-cols-2 gap-4">
+<div class="space-y-1">
+<label class="text-[10px] font-medium text-on-surface-variant">Width (px)</label>
+<input class="w-full bg-surface-container border border-outline-variant/40 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-primary outline-none" type="number" value="768"/>
+</div>
+<div class="space-y-1">
+<label class="text-[10px] font-medium text-on-surface-variant">Height (px)</label>
+<input class="w-full bg-surface-container border border-outline-variant/40 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-primary outline-none" type="number" value="480"/>
+</div>
+<div class="space-y-1">
+<label class="text-[10px] font-medium text-on-surface-variant">X Axis</label>
+<input class="w-full bg-surface-container border border-outline-variant/40 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-primary outline-none" type="number" value="120"/>
+</div>
+<div class="space-y-1">
+<label class="text-[10px] font-medium text-on-surface-variant">Y Axis</label>
+<input class="w-full bg-surface-container border border-outline-variant/40 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-primary outline-none" type="number" value="240"/>
+</div>
+</div>
+</section>
+<!-- Appearance -->
+<section>
+<h4 class="text-[10px] font-bold text-outline uppercase tracking-wider mb-4">Appearance</h4>
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<label class="text-[11px] font-medium">Fill Color</label>
+<div class="flex items-center gap-2">
+<span class="text-[10px] font-mono text-outline">#E3E3DE</span>
+<div class="w-5 h-5 rounded bg-surface-container-highest border border-outline-variant/50"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[11px] font-medium">
+<span>Opacity</span>
+<span>100%</span>
+</div>
+<input class="w-full accent-primary" type="range"/>
+</div>
+<div class="flex items-center justify-between">
+<label class="text-[11px] font-medium">Stroke Width</label>
+<select class="bg-surface-container border-none text-[11px] py-1 rounded">
+<option>None</option>
+<option>1px Solid</option>
+<option selected="">2px Dotted</option>
+</select>
+</div>
+</div>
+</section>
+<!-- Map Specific -->
+<section class="bg-surface-container-low p-3 rounded border border-outline-variant/20">
+<h4 class="text-[10px] font-bold text-primary uppercase tracking-wider mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">settings_input_component</span>
+                        Map Parameters
+                    </h4>
+<div class="space-y-3">
+<div class="flex items-center justify-between">
+<span class="text-[11px]">Show Labels</span>
+<div class="w-8 h-4 bg-primary rounded-full relative">
+<div class="absolute right-1 top-1 w-2 h-2 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-[11px]">3D Arcs</span>
+<div class="w-8 h-4 bg-primary rounded-full relative">
+<div class="absolute right-1 top-1 w-2 h-2 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="space-y-1">
+<label class="text-[10px] font-medium text-on-surface-variant">Default Zoom</label>
+<div class="flex items-center gap-2">
+<input class="flex-1 accent-primary" type="range" value="40"/>
+<span class="text-[10px] font-mono">2.4x</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Context Footer -->
+<div class="p-4 border-t border-outline-variant/20 bg-surface-container-lowest">
+<div class="flex items-center justify-between text-[11px]">
+<span class="text-on-surface-variant">Element ID</span>
+<span class="font-mono text-primary font-bold">geo_layer_01</span>
+</div>
+</div>
+</aside>
+</div>
+</body></html>

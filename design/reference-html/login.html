@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>登录 JaminView - 重塑地理数据的商业价值</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-primary-fixed-variant": "#2e4e35",
+              "on-surface-variant": "#424842",
+              "inverse-on-surface": "#f1f1ec",
+              "on-secondary": "#ffffff",
+              "tertiary-fixed": "#ccead8",
+              "surface-container": "#eeeee9",
+              "on-background": "#1a1c19",
+              "inverse-primary": "#abd0af",
+              "primary-fixed": "#c7ecca",
+              "tertiary-container": "#3e584b",
+              "surface-container-lowest": "#ffffff",
+              "surface": "#fafaf5",
+              "on-primary": "#ffffff",
+              "inverse-surface": "#2f312e",
+              "surface-dim": "#dadad5",
+              "outline-variant": "#c2c8bf",
+              "on-tertiary": "#ffffff",
+              "surface-tint": "#45664b",
+              "on-secondary-container": "#446c44",
+              "error-container": "#ffdad6",
+              "surface-container-high": "#e8e8e3",
+              "on-secondary-fixed-variant": "#284f2a",
+              "on-secondary-fixed": "#002106",
+              "surface-bright": "#fafaf5",
+              "secondary-container": "#beecb9",
+              "secondary": "#406840",
+              "on-tertiary-container": "#b0cdbc",
+              "secondary-fixed-dim": "#a5d2a2",
+              "on-surface": "#1a1c19",
+              "background": "#fafaf5",
+              "on-primary-container": "#acd0af",
+              "error": "#ba1a1a",
+              "on-tertiary-fixed": "#062015",
+              "secondary-fixed": "#c1eebc",
+              "primary": "#23422a",
+              "primary-fixed-dim": "#abd0af",
+              "on-tertiary-fixed-variant": "#324c3f",
+              "surface-container-low": "#f4f4ef",
+              "tertiary-fixed-dim": "#b0cdbc",
+              "outline": "#727971",
+              "surface-container-highest": "#e3e3de",
+              "primary-container": "#3a5a40",
+              "on-error-container": "#93000a",
+              "tertiary": "#274134",
+              "surface-variant": "#e3e3de",
+              "on-primary-fixed": "#02210c",
+              "on-error": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["Manrope", "PingFang SC", "sans-serif"],
+              "body": ["Inter", "PingFang SC", "sans-serif"],
+              "label": ["Inter", "PingFang SC", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        vertical-align: middle;
+      }
+      .editor-canvas-grid {
+        background-image: radial-gradient(#c2c8bf 0.5px, transparent 0.5px);
+        background-size: 1.2rem 1.2rem;
+      }
+      input:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px #23422a, 0 0 4px 0 rgba(35, 66, 42, 0.15);
+      }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface antialiased">
+<main class="min-h-screen flex overflow-hidden">
+<!-- Left Section: Visual Narrative (Evergreen Logic) -->
+<section class="hidden lg:flex lg:w-7/12 relative bg-primary flex-col justify-between p-12 overflow-hidden">
+<!-- Branding -->
+<div class="relative z-20">
+<span class="font-headline text-2xl font-extrabold tracking-tight text-primary-fixed">JaminView</span>
+</div>
+<!-- Abstract Editor Showcase: Intentional Asymmetry -->
+<div class="relative z-10 flex-grow flex items-center justify-center -mr-32 mt-12">
+<div class="w-full max-w-4xl bg-inverse-surface rounded-xl shadow-2xl overflow-hidden border border-outline-variant/10">
+<!-- Fake Editor Header -->
+<div class="h-8 bg-surface-container-low/10 flex items-center px-4 space-x-2">
+<div class="w-2 h-2 rounded-full bg-error/40"></div>
+<div class="w-2 h-2 rounded-full bg-outline-variant/40"></div>
+<div class="w-2 h-2 rounded-full bg-primary-fixed-dim/40"></div>
+<div class="ml-4 text-[10px] text-outline-variant/50 font-label tracking-widest uppercase">Workspace / Project_A1</div>
+</div>
+<!-- Fake Editor Body -->
+<div class="flex h-[480px]">
+<!-- Editor Sidebar -->
+<div class="w-56 bg-surface-container-low/5 border-r border-outline-variant/10 p-4 space-y-6">
+<div class="space-y-2">
+<div class="h-2 w-16 bg-primary-fixed-dim/20 rounded"></div>
+<div class="h-4 w-32 bg-primary-fixed-dim/10 rounded"></div>
+<div class="h-4 w-28 bg-primary-fixed-dim/10 rounded"></div>
+</div>
+<div class="space-y-2 pt-4 border-t border-outline-variant/10">
+<div class="h-2 w-20 bg-primary-fixed-dim/20 rounded"></div>
+<div class="h-32 w-full bg-primary-fixed-dim/5 rounded-lg border border-outline-variant/5"></div>
+</div>
+</div>
+<!-- Main Canvas (Visual Focus) -->
+<div class="flex-grow editor-canvas-grid relative p-8">
+<div class="absolute inset-0 bg-gradient-to-tr from-inverse-surface via-transparent to-primary/10"></div>
+<div class="relative w-full h-full border border-primary-fixed-dim/20 rounded-lg flex items-center justify-center bg-inverse-surface/40 backdrop-blur-sm">
+<img alt="3D Geospatial Visualization" class="w-full h-full object-cover opacity-60 mix-blend-screen grayscale-[30%]" data-alt="high-detail 3D geospatial data visualization with dark theme, neon green data points over a stylized map, professional analytics UI" src="https://lh3.googleusercontent.com/aida-public/AB6AXuALFfDYnK-zDcPlvgADqbpdwV2COvKtJn3EjtR4AGS6Y7TPthhRgJZuFxnfJlob4PnCVyPXCtTejHzKHGLemOezmFGhnpRKx9UAqOznzPyoES5CCBYo3CgHxk7J2Cb5QkgGiJGXLfCF8YqT4QXJC-Cvi4IQCd61L8syv7N0Qh-VqNUIngyyidhJ25bNl8tClme8b21FJ4PIwtSgkmSpNiWhxqq4LTGF0y11J-3qlLuKV9hvs1V4q5BSlvaC942NpPLH5-Pps0P6ESZy"/>
+<div class="absolute top-4 right-4 bg-primary/80 backdrop-blur px-3 py-1.5 rounded-sm border border-primary-fixed-dim/30">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-primary-fixed-dim text-xs">monitoring</span>
+<span class="text-[10px] text-primary-fixed font-medium uppercase tracking-tighter">Live Rendering</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Narrative -->
+<div class="relative z-20 mt-auto pt-12">
+<h1 class="font-headline text-3xl font-bold text-on-primary-fixed tracking-tight leading-tight max-w-sm">
+                    重塑地理数据的<br/>商业价值
+                </h1>
+<p class="mt-4 font-body text-sm text-primary-fixed-dim/80 max-w-xs leading-relaxed">
+                    为专业决策者打造的下一代地理空间分析平台。深度融合 3D 渲染引擎与实时业务数据。
+                </p>
+</div>
+<!-- Background Elements (Evergreen Logic Palette) -->
+<div class="absolute top-0 right-0 w-[800px] h-[800px] bg-primary-container/20 rounded-full blur-[120px] -mr-96 -mt-96"></div>
+<div class="absolute bottom-0 left-0 w-64 h-64 bg-secondary-container/10 rounded-full blur-[80px] -ml-32 -mb-32"></div>
+</section>
+<!-- Right Section: Login Form (Oatmeal White) -->
+<section class="w-full lg:w-5/12 bg-surface-container-low flex flex-col justify-center px-8 sm:px-16 lg:px-20 relative">
+<div class="max-w-sm w-full mx-auto space-y-10">
+<!-- Header -->
+<div class="text-center space-y-3">
+<h2 class="font-headline text-2xl font-extrabold text-on-surface tracking-tight">登录 JaminView</h2>
+<p class="font-body text-sm text-on-surface-variant">进入数据大屏工作台</p>
+</div>
+<!-- Form -->
+<form class="space-y-6">
+<div class="space-y-5">
+<div class="group">
+<label class="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-2 ml-1" for="email">
+                                电子邮箱
+                            </label>
+<input class="w-full bg-surface border-none ring-1 ring-outline-variant/30 px-4 py-3 rounded text-sm transition-all placeholder:text-outline-variant focus:ring-2 focus:ring-primary" id="email" name="email" placeholder="name@company.com" type="email"/>
+</div>
+<div class="group">
+<div class="flex justify-between items-end mb-2 ml-1">
+<label class="block text-[11px] font-bold uppercase tracking-widest text-on-surface-variant" for="password">
+                                    访问密码
+                                </label>
+<a class="text-[10px] text-primary hover:underline font-medium" href="#">忘记密码？</a>
+</div>
+<input class="w-full bg-surface border-none ring-1 ring-outline-variant/30 px-4 py-3 rounded text-sm transition-all placeholder:text-outline-variant focus:ring-2 focus:ring-primary" id="password" name="password" placeholder="••••••••" type="password"/>
+</div>
+</div>
+<div class="flex items-center">
+<input class="w-4 h-4 text-primary bg-surface border-outline-variant rounded-sm focus:ring-primary" id="remember" type="checkbox"/>
+<label class="ml-2 text-xs text-on-surface-variant font-medium" for="remember">保持登录状态</label>
+</div>
+<button class="w-full py-3.5 px-4 bg-primary text-on-primary font-headline text-sm font-bold rounded shadow-sm hover:bg-primary-container active:scale-[0.98] transition-all duration-200" type="submit">
+                        立即登录
+                    </button>
+</form>
+<!-- Demo Account Section: Refined Utility -->
+<div class="p-5 rounded bg-surface border border-outline-variant/20 space-y-3">
+<div class="flex items-center space-x-2 text-primary">
+<span class="material-symbols-outlined text-[18px]">contact_support</span>
+<span class="text-xs font-bold tracking-tight">演示账号体验</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="space-y-0.5">
+<p class="text-[11px] text-on-surface-variant/60 font-label uppercase tracking-wider">Account ID</p>
+<p class="text-xs font-medium font-body">demo@jaminview.ai</p>
+</div>
+<button class="px-3 py-1.5 text-[11px] font-bold text-primary bg-primary-fixed/30 hover:bg-primary-fixed/50 rounded transition-colors uppercase tracking-widest">
+                            快速填入
+                        </button>
+</div>
+</div>
+<!-- Footer Links -->
+<div class="text-center pt-4">
+<p class="text-xs text-on-surface-variant">
+                        还没有账号？ 
+                        <a class="text-primary font-bold ml-1 hover:underline" href="#">立即注册体验</a>
+</p>
+</div>
+</div>
+<!-- Absolute Footer (Legal) -->
+<div class="absolute bottom-8 left-0 w-full flex justify-center space-x-6">
+<a class="text-[10px] font-label uppercase tracking-widest text-outline-variant hover:text-on-surface-variant transition-colors" href="#">隐私政策</a>
+<a class="text-[10px] font-label uppercase tracking-widest text-outline-variant hover:text-on-surface-variant transition-colors" href="#">服务条款</a>
+<a class="text-[10px] font-label uppercase tracking-widest text-outline-variant hover:text-on-surface-variant transition-colors" href="#">联系支持</a>
+</div>
+</section>
+</main>
+</body></html>

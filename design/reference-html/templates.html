@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Explore Templates | JaminView</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "background": "#fafaf5",
+              "on-background": "#1a1c19",
+              "surface-container-low": "#f4f4ef",
+              "on-secondary-container": "#446c44",
+              "surface-variant": "#e3e3de",
+              "surface-container": "#eeeee9",
+              "on-secondary": "#ffffff",
+              "tertiary-fixed-dim": "#b0cdbc",
+              "surface-container-high": "#e8e8e3",
+              "on-surface-variant": "#424842",
+              "on-tertiary": "#ffffff",
+              "error-container": "#ffdad6",
+              "on-error": "#ffffff",
+              "secondary-fixed-dim": "#a5d2a2",
+              "on-primary-fixed": "#02210c",
+              "surface-container-highest": "#e3e3de",
+              "primary-container": "#3a5a40",
+              "tertiary": "#274134",
+              "primary-fixed-dim": "#abd0af",
+              "inverse-surface": "#2f312e",
+              "primary": "#23422a",
+              "surface": "#fafaf5",
+              "on-tertiary-container": "#b0cdbc",
+              "outline-variant": "#c2c8bf",
+              "error": "#ba1a1a",
+              "tertiary-fixed": "#ccead8",
+              "inverse-on-surface": "#f1f1ec",
+              "secondary-fixed": "#c1eebc",
+              "inverse-primary": "#abd0af",
+              "outline": "#727971",
+              "surface-bright": "#fafaf5",
+              "on-primary-fixed-variant": "#2e4e35",
+              "on-secondary-fixed-variant": "#284f2a",
+              "secondary-container": "#beecb9",
+              "surface-dim": "#dadad5",
+              "on-error-container": "#93000a",
+              "on-surface": "#1a1c19",
+              "on-primary-container": "#acd0af",
+              "surface-container-lowest": "#ffffff",
+              "on-secondary-fixed": "#002106",
+              "tertiary-container": "#3e584b",
+              "primary-fixed": "#c7ecca",
+              "on-tertiary-fixed-variant": "#324c3f",
+              "secondary": "#406840",
+              "surface-tint": "#45664b",
+              "on-tertiary-fixed": "#062015",
+              "on-primary": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fafaf5;
+            color: #1a1c19;
+        }
+        .canvas-grid {
+            background-image: radial-gradient(#c2c8bf 1px, transparent 1px);
+            background-size: 0.9rem 0.9rem;
+        }
+    </style>
+</head>
+<body class="antialiased">
+<!-- TopNavBar -->
+<header class="bg-[#fafaf5] dark:bg-[#1a1c19] font-['Manrope'] antialiased text-sm tracking-wide docked full-width top-0 z-50 flat no shadows flex items-center justify-between px-6 h-16 w-full sticky top-0 border-b border-transparent">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tighter text-[#23422a] dark:text-[#abd0af]">JaminView</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-[#424842] dark:text-[#c2c8bf] hover:text-[#23422a] hover:bg-[#e8e8e3] dark:hover:bg-[#3a5a40]/20 transition-colors duration-200 ease-in-out" href="#">Projects</a>
+<a class="text-[#23422a] dark:text-[#abd0af] font-bold border-b-2 border-[#23422a] dark:border-[#abd0af] pb-1 duration-200 ease-in-out" href="#">Templates</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50">search</span>
+<input class="bg-surface-container-low border-none rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 w-64 transition-all" placeholder="Search templates..." type="text"/>
+</div>
+<button class="p-2 text-[#424842] dark:text-[#c2c8bf] hover:bg-[#e8e8e3] rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline-variant/30">
+<img alt="User Profile" data-alt="Close-up portrait of a professional woman with a minimalist aesthetic and soft natural lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDafkllHYmWtsh2JBhYva0RE7iiXX4DtBNlwM0Sc8gvRjaPSdcW3sdZTh_ypEE8AWdAZdUOCZSA-DA-9IwFXNwic3pMp9t8fEMNaSzXQZb2mU9DQ0r8B8VFQwMyeDZRWLlIIP_KpBe16B6k7mZFHDcy_zc13FFSYW6UQHrUyqWZBnuCxUGgl8XrR998K12XG0t43kKkDSI9qURIJJzr255pEt18964haPyjvUGD6eA84UETwF-Md0QdIjWYlvwBHnLDXVyIMSQuQrfC"/>
+</div>
+</div>
+</header>
+<div class="flex h-[calc(100vh-4rem)]">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col h-full py-4 px-3 space-y-2 border-r border-transparent bg-[#f4f4ef] dark:bg-[#1a1c19] text-[#23422a] dark:text-[#abd0af] font-['PingFang_SC'] text-xs font-medium w-64 shrink-0 overflow-y-auto">
+<div class="mb-6 px-3">
+<div class="flex items-center gap-3 mb-1">
+<div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-lg" data-icon="auto_awesome_motion">auto_awesome_motion</span>
+</div>
+<div>
+<h3 class="text-sm font-bold text-on-surface">Categories</h3>
+<p class="text-[10px] text-on-surface-variant opacity-70 uppercase tracking-widest">Library Filter</p>
+</div>
+</div>
+</div>
+<div class="space-y-1">
+<a class="flex items-center gap-3 bg-[#e3e3de] dark:bg-[#3a5a40] text-[#23422a] dark:text-[#ffffff] rounded-md px-3 py-2 transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>All Templates</span>
+</a>
+<a class="flex items-center gap-3 text-[#424842] dark:text-[#c2c8bf] px-3 py-2 hover:bg-[#e8e8e3] dark:hover:bg-[#2f312e] transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span>Data Analysis</span>
+</a>
+<a class="flex items-center gap-3 text-[#424842] dark:text-[#c2c8bf] px-3 py-2 hover:bg-[#e8e8e3] dark:hover:bg-[#2f312e] transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="architecture">architecture</span>
+<span>Architectural Drafting</span>
+</a>
+<a class="flex items-center gap-3 text-[#424842] dark:text-[#c2c8bf] px-3 py-2 hover:bg-[#e8e8e3] dark:hover:bg-[#2f312e] transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="edit_document">edit_document</span>
+<span>Editorial Layouts</span>
+</a>
+<a class="flex items-center gap-3 text-[#424842] dark:text-[#c2c8bf] px-3 py-2 hover:bg-[#e8e8e3] dark:hover:bg-[#2f312e] transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span>Project Archives</span>
+</a>
+</div>
+<div class="pt-6 mt-auto">
+<p class="px-3 mb-2 text-[10px] uppercase tracking-widest text-on-surface-variant/60">Preferences</p>
+<a class="flex items-center gap-3 text-[#424842] dark:text-[#c2c8bf] px-3 py-2 hover:bg-[#e8e8e3] dark:hover:bg-[#2f312e] transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+<a class="flex items-center gap-3 text-[#424842] dark:text-[#c2c8bf] px-3 py-2 hover:bg-[#e8e8e3] dark:hover:bg-[#2f312e] transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span>Help Center</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 overflow-y-auto bg-surface relative">
+<div class="p-8 max-w-7xl mx-auto">
+<!-- Header Section -->
+<header class="mb-12">
+<h1 class="font-headline text-4xl font-extrabold tracking-tight text-primary mb-3">Explore Templates</h1>
+<p class="font-body text-on-surface-variant max-w-2xl leading-relaxed">
+                        Kickstart your next analytical masterpiece with our curated library of professional drafting environments, data visualization canvases, and editorial frameworks.
+                    </p>
+</header>
+<!-- Bento Grid Layout for Featured and Regular Templates -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Featured Template (Large Bento Card) -->
+<div class="md:col-span-8 group relative overflow-hidden rounded-xl bg-surface-container-low border border-transparent hover:border-outline-variant/30 transition-all duration-300">
+<div class="aspect-[16/7] overflow-hidden relative">
+<img class="w-full h-full object-cover grayscale opacity-80 group-hover:scale-105 group-hover:grayscale-0 transition-all duration-700" data-alt="Sophisticated minimalist digital art with sweeping curves in moss green and sand tones, textured paper feel" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZbMU0hrUv_TQdshNLUFzR2VB20cmTThZdFNyTWZFaTyY-c9zRSGiM4JeT4IKp5eEApN7oir40-RxNvWay5uBp9HAWSGdK5STIorbwjSTcA7bvw9j3ehQ8WBOm2sUBRLFbilPo4_JU7gxsoaw3Ax4yWhf90waEZE_i73DV9YaoCN7L_kOqnfyLaW_8g4oZ5T5WVx4Z6p6-OG_Li2GgplHuQQGbz-5pc82zV9tFDQd-8RE12LQTrtk0Ti_QECiWYuXm0uzB-tItx7gX"/>
+<div class="absolute top-4 left-4">
+<span class="bg-primary px-3 py-1 text-[10px] font-bold text-on-primary uppercase tracking-widest rounded">Featured</span>
+</div>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h3 class="font-headline text-2xl font-bold text-on-background mb-1">Architectural Site Analysis</h3>
+<p class="text-on-surface-variant font-body text-sm">Comprehensive multi-layer framework for environmental and spatial mapping.</p>
+</div>
+<button class="bg-primary text-on-primary px-6 py-2.5 rounded-md font-semibold text-sm hover:shadow-lg transition-all flex items-center gap-2">
+                                    Use Template <span class="material-symbols-outlined text-base">arrow_forward</span>
+</button>
+</div>
+<div class="flex gap-4 text-[11px] font-medium uppercase tracking-wider text-on-surface-variant/60">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">layers</span> 12 Layers</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm">history</span> Updated 2d ago</span>
+</div>
+</div>
+</div>
+<!-- Side Card 1 -->
+<div class="md:col-span-4 group bg-surface-container-highest rounded-xl p-6 flex flex-col transition-all border border-transparent hover:bg-surface-container-high">
+<div class="mb-4 aspect-square bg-surface rounded-lg overflow-hidden border border-outline-variant/10">
+<img class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" data-alt="Clean top-down view of an organized desk with drafting tools and an open analytical notebook" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDs5jQr0FpKVPjkH7e3H9dT4xhXs5zBQiy0UUg3_BTzyocCXA8uCnVzIR4vn_1puRlq9Db0T-wsrOUuR-vyRW4G75Gg-sZqocqn_5CcUofT8toYbQdg1J65abQc2Nx8iQ441UYZMVWYVumByvo3Fn0tPpZ0gdwL7EQHxRWcbsD4MXZ3qHCGGaU4YEPM--uEaz0GP-fhyFdRaL5bWkhK0G8iMK-KJu0Hk7BsOQihxv67u7QffzjZr4lpazJi6ybK6xBPZr2N4fDTCCBJ"/>
+</div>
+<div class="mt-auto">
+<span class="text-[10px] font-bold text-primary-container uppercase tracking-widest mb-2 block">Quick Start</span>
+<h4 class="font-headline text-lg font-bold text-on-background mb-2">Basic Data Grid</h4>
+<p class="text-on-surface-variant font-body text-xs mb-4 line-clamp-2">Standardized grid for rapid data input and basic trend visualization.</p>
+<button class="w-full py-2 border border-primary text-primary text-xs font-bold rounded-md hover:bg-primary hover:text-on-primary transition-colors">Select Framework</button>
+</div>
+</div>
+<!-- Regular Grid Items -->
+<div class="md:col-span-4 group bg-surface-container-low rounded-xl overflow-hidden hover:shadow-sm transition-all">
+<div class="h-40 bg-surface-variant relative overflow-hidden">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" data-alt="Close-up of a high-resolution financial chart with clean lines and moss green accents" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZXM4FpENfYknY_wZky2OWrsZAVxc6NqENFmgSe2532zghhgUYqH1RND-sXz2o0fcB1jm-PnvlNXTbRKruq2Ib9gXmh41_xp7PXa0NaYRaiJlnajqob8gHdNkSPYIfh8jQNed7ZGPsguimoQtwJuV0VAh5m9SaOfcRPNRmo9hOk-Vd8jii6mo8_-P5J53ndLw-s3LDbhHW4ImCuhJVlX-JK0ctwStEjTIJC7YtSxHuUkFmbouDxcyzPLj9ER-uVCkaWmLmvZyhbS0g"/>
+</div>
+<div class="p-5">
+<h4 class="font-headline font-bold text-on-background">Portfolio Overview</h4>
+<p class="text-xs text-on-surface-variant mt-1 mb-4">Investment tracking with real-time volatility overlays.</p>
+<div class="flex items-center justify-between">
+<span class="text-[10px] px-2 py-0.5 bg-outline-variant/20 rounded-full font-bold text-on-surface-variant uppercase">Finance</span>
+<span class="material-symbols-outlined text-primary cursor-pointer hover:scale-110 transition-transform">add_circle</span>
+</div>
+</div>
+</div>
+<div class="md:col-span-4 group bg-surface-container-low rounded-xl overflow-hidden hover:shadow-sm transition-all">
+<div class="h-40 bg-surface-variant relative overflow-hidden">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" data-alt="Architectural sketch on vellum paper with precise technical lines and mathematical annotations" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDaAh88jD_V7zfKdSuqYqqIoPd143p5geFvum6IIkCSawtMUEn8DaZQ4jfqtvIfvp9xxNlmkPb_imPeHXPmqWl5z3YD2Qdxfyh8LiypHdnWKTIHiHYtz-K_aEGhIUPYrZxbqPD62Q6KL0J4Jir7APSSHdqxBSSPaa8T4l1MZZQFeazsBsjZJRP4vg88CjHrRKkFbbGI_svV74wBZlXGv2RLuceUkkxhafgviq33X6585j94LjvW6p1teQrx0yLrjwZ0MqdBLvDZBGdG"/>
+</div>
+<div class="p-5">
+<h4 class="font-headline font-bold text-on-background">Editorial Journal</h4>
+<p class="text-xs text-on-surface-variant mt-1 mb-4">Typography-first layout for deep research publication.</p>
+<div class="flex items-center justify-between">
+<span class="text-[10px] px-2 py-0.5 bg-outline-variant/20 rounded-full font-bold text-on-surface-variant uppercase">Publication</span>
+<span class="material-symbols-outlined text-primary cursor-pointer hover:scale-110 transition-transform">add_circle</span>
+</div>
+</div>
+</div>
+<div class="md:col-span-4 group bg-surface-container-low rounded-xl overflow-hidden hover:shadow-sm transition-all">
+<div class="h-40 bg-surface-variant relative overflow-hidden">
+<img class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" data-alt="A modern laboratory setting with soft focus equipment and clean green-tinted glassware" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlhLNE_sgCfp9QRIZFTDDwvWb4Qazt0wN0s_hcIfZoyksiD2MSX3DXEcFX-hzQgRSzI6n4icAM0SmW2dF_cV7Q1zMJW2znwzZuOy_5Ad1DnTiI03tpO_sYVoH2PQfq9y_QTn1hftbHvWEmNzOwIrkoBbX7QD8eNu7XHq0AUJTe1HrcFgvR0GqmYK_MO6A_t-7MlcsL3pMKb3zi08fhKHYP9tis0CHVqktN-G9okaF9SlMdy3tAgEVCzkYD0BwKL3QdUmiX92HD2FGu"/>
+</div>
+<div class="p-5">
+<h4 class="font-headline font-bold text-on-background">Scientific Logbook</h4>
+<p class="text-xs text-on-surface-variant mt-1 mb-4">Rigid structure for experimental tracking and observations.</p>
+<div class="flex items-center justify-between">
+<span class="text-[10px] px-2 py-0.5 bg-outline-variant/20 rounded-full font-bold text-on-surface-variant uppercase">Science</span>
+<span class="material-symbols-outlined text-primary cursor-pointer hover:scale-110 transition-transform">add_circle</span>
+</div>
+</div>
+</div>
+<!-- Asymmetric Section for Empty State or Call to Action -->
+<div class="md:col-span-12 mt-12 mb-8 bg-inverse-surface rounded-xl p-8 flex flex-col md:flex-row items-center gap-8">
+<div class="flex-1">
+<h3 class="text-surface font-headline text-2xl font-bold mb-2">Can't find what you need?</h3>
+<p class="text-primary-fixed-dim font-body text-sm max-w-lg">Our design team can craft a bespoke drafting environment tailored to your specific analytical workflow. Start a custom template request today.</p>
+</div>
+<div class="flex gap-4">
+<button class="bg-primary-fixed-dim text-primary font-bold px-6 py-3 rounded-md hover:bg-white transition-all text-sm">Request Custom</button>
+<button class="text-surface border border-surface/30 px-6 py-3 rounded-md hover:bg-surface/10 transition-all text-sm">Contact Support</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Subtle Canvas Grid Overlay for Technical Feel -->
+<div class="absolute inset-0 pointer-events-none opacity-[0.03] canvas-grid z-[-1]"></div>
+</main>
+</div>
+<!-- Mobile Bottom Navigation Shell -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-[#f4f4ef] dark:bg-[#1a1c19] h-16 flex items-center justify-around z-50 border-t border-transparent">
+<button class="flex flex-col items-center justify-center text-[#424842] dark:text-[#c2c8bf]">
+<span class="material-symbols-outlined">edit_note</span>
+<span class="text-[10px] mt-1">Editor</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#23422a] dark:text-[#abd0af] font-bold">
+<span class="material-symbols-outlined" data-weight="fill">auto_awesome_motion</span>
+<span class="text-[10px] mt-1">Templates</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#424842] dark:text-[#c2c8bf]">
+<span class="material-symbols-outlined">folder</span>
+<span class="text-[10px] mt-1">Folders</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#424842] dark:text-[#c2c8bf]">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] mt-1">Settings</span>
+</button>
+</nav>
+</body></html>

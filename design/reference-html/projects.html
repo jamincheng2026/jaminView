@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>JaminView | Project List</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@500;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-surface-variant": "#424842",
+              "inverse-primary": "#abd0af",
+              "error": "#ba1a1a",
+              "surface-container-high": "#e8e8e3",
+              "on-secondary-container": "#446c44",
+              "on-tertiary-container": "#b0cdbc",
+              "on-primary-container": "#acd0af",
+              "secondary": "#406840",
+              "tertiary-fixed": "#ccead8",
+              "surface-variant": "#e3e3de",
+              "tertiary-container": "#3e584b",
+              "primary": "#23422a",
+              "error-container": "#ffdad6",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-fixed": "#062015",
+              "primary-fixed-dim": "#abd0af",
+              "inverse-surface": "#2f312e",
+              "inverse-on-surface": "#f1f1ec",
+              "surface": "#fafaf5",
+              "on-tertiary": "#ffffff",
+              "on-background": "#1a1c19",
+              "on-secondary": "#ffffff",
+              "on-error-container": "#93000a",
+              "background": "#fafaf5",
+              "on-surface": "#1a1c19",
+              "on-secondary-fixed": "#002106",
+              "outline": "#727971",
+              "on-error": "#ffffff",
+              "secondary-fixed": "#c1eebc",
+              "surface-container": "#eeeee9",
+              "on-tertiary-fixed-variant": "#324c3f",
+              "surface-tint": "#45664b",
+              "surface-container-low": "#f4f4ef",
+              "secondary-container": "#beecb9",
+              "on-primary": "#ffffff",
+              "surface-container-highest": "#e3e3de",
+              "surface-bright": "#fafaf5",
+              "secondary-fixed-dim": "#a5d2a2",
+              "on-primary-fixed": "#02210c",
+              "primary-fixed": "#c7ecca",
+              "tertiary-fixed-dim": "#b0cdbc",
+              "surface-dim": "#dadad5",
+              "on-secondary-fixed-variant": "#284f2a",
+              "primary-container": "#3a5a40",
+              "outline-variant": "#c2c8bf",
+              "tertiary": "#274134",
+              "on-primary-fixed-variant": "#2e4e35"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #fafaf5;
+      }
+      .font-headline { font-family: 'Manrope', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- TopNavBar Implementation from Shared Components JSON -->
+<nav class="bg-[#fafaf5] dark:bg-[#1a1c19] text-[#23422a] dark:text-[#abd0af] font-['Manrope'] font-medium text-sm docked full-width top-0 z-50 flex justify-between items-center w-full px-6 py-3 max-w-full">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold text-[#23422a] dark:text-[#abd0af] tracking-tight">JaminView</span>
+<div class="hidden md:flex items-center gap-6">
+<!-- Active Navigation: Projects -->
+<a class="text-[#23422a] dark:text-[#abd0af] border-b-2 border-[#23422a] dark:border-[#abd0af] pb-1" href="#">Projects</a>
+<a class="text-[#424842] dark:text-[#c2c8bf] hover:text-[#23422a] transition-colors duration-200" href="#">Assets</a>
+<a class="text-[#424842] dark:text-[#c2c8bf] hover:text-[#23422a] transition-colors duration-200" href="#">Analytics</a>
+<a class="text-[#424842] dark:text-[#c2c8bf] hover:text-[#23422a] transition-colors duration-200" href="#">Settings</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-[#e8e8e3] dark:hover:bg-[#3a5a40]/20 rounded-full transition-colors duration-200 active:opacity-80 active:scale-[0.98]">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 hover:bg-[#e8e8e3] dark:hover:bg-[#3a5a40]/20 rounded-full transition-colors duration-200 active:opacity-80 active:scale-[0.98]">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden ml-2">
+<img alt="User Profile" data-alt="Close-up headshot of a professional man in a minimalist studio setting with soft natural window lighting and a neutral background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDFxx7547d9uf0b2bexsGHopimCvTA0GV4tD-Rw_4Tn7u_IjiyAN362bh7VmQNWWcjaQW9y8YCHFwgN439wmgInSnjmcIR4lSVkROZ8AUzVzusq5xNKsCJrjkgkffuBeWgSDgSVYR8s41ClbdAhXZg3DmtB0auQH4mGcq1Umew3lHkXPyh__R7M5n6SJdLi2gKCRurcWN5GfnK7eNkFLadljtZdsiQwV8icOjcgc9OCEUpTfonjva2Wq1QQ02X2TJbvO7noE1H1nJYl"/>
+</div>
+</div>
+</nav>
+<div class="bg-[#f4f4ef] dark:bg-[#2f312e] h-[1px] w-full"></div>
+<div class="flex min-h-[calc(100vh-57px)]">
+<!-- SideNavBar Implementation from Shared Components JSON -->
+<aside class="hidden lg:flex flex-col h-full py-6 bg-[#f4f4ef] dark:bg-[#1a1c19] text-[#23422a] dark:text-[#abd0af] font-['Manrope'] text-sm tracking-wide w-64 border-r border-[#e3e3de] dark:border-[#2f312e]">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined text-sm" data-icon="category">category</span>
+</div>
+<div>
+<h2 class="text-sm font-black text-[#23422a] uppercase tracking-tighter">Intellectual Atelier</h2>
+<p class="text-[10px] text-on-surface-variant leading-none">Premium Analytics</p>
+</div>
+</div>
+<div class="px-2 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 bg-[#e3e3de] dark:bg-[#3a5a40] text-[#23422a] dark:text-white font-semibold rounded-r-lg transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 text-[#424842] dark:text-[#c2c8bf] px-4 py-3 hover:bg-[#e8e8e3] dark:hover:bg-[#2f312e] transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span>Team Library</span>
+</a>
+<a class="flex items-center gap-3 text-[#424842] dark:text-[#c2c8bf] px-4 py-3 hover:bg-[#e8e8e3] dark:hover:bg-[#2f312e] transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span>Recent</span>
+</a>
+<a class="flex items-center gap-3 text-[#424842] dark:text-[#c2c8bf] px-4 py-3 hover:bg-[#e8e8e3] dark:hover:bg-[#2f312e] transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="archive">archive</span>
+<span>Archived</span>
+</a>
+<a class="flex items-center gap-3 text-[#424842] dark:text-[#c2c8bf] px-4 py-3 hover:bg-[#e8e8e3] dark:hover:bg-[#2f312e] transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+<span>Trash</span>
+</a>
+</div>
+<div class="mt-8 px-4">
+<button class="w-full bg-primary text-on-primary py-2.5 rounded font-headline font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-primary-container transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+                    New Asset
+                </button>
+</div>
+<div class="mt-auto px-2 space-y-1">
+<a class="flex items-center gap-3 text-[#424842] dark:text-[#c2c8bf] px-4 py-3 hover:bg-[#e8e8e3] dark:hover:bg-[#2f312e] transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span>Help Center</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 bg-surface-bright overflow-y-auto px-8 py-10">
+<!-- Header Section -->
+<div class="max-w-7xl mx-auto space-y-8">
+<header class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div class="space-y-1">
+<h1 class="text-4xl font-headline font-extrabold text-primary tracking-tight">My Projects</h1>
+<p class="text-on-surface-variant font-body">Manage and orchestrate your visualization workspace.</p>
+</div>
+<div class="flex items-center gap-3">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-lg" data-icon="search">search</span>
+<input class="pl-10 pr-4 py-2.5 bg-surface-container border-none rounded text-sm w-64 focus:ring-2 focus:ring-primary/20 transition-all outline-none text-on-surface" placeholder="Search projects..." type="text"/>
+</div>
+<button class="bg-primary text-on-primary px-6 py-2.5 rounded font-headline font-bold text-sm flex items-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+                            New Project
+                        </button>
+</div>
+</header>
+<!-- Filters & Sorting -->
+<div class="flex flex-wrap items-center justify-between gap-4 py-4 border-b border-surface-container-highest">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded cursor-pointer hover:bg-surface-container-high transition-colors">
+<span class="text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider">Status:</span>
+<span class="text-xs font-body text-on-surface">All Projects</span>
+<span class="material-symbols-outlined text-sm" data-icon="expand_more">expand_more</span>
+</div>
+<div class="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded cursor-pointer hover:bg-surface-container-high transition-colors">
+<span class="text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider">Type:</span>
+<span class="text-xs font-body text-on-surface">All Types</span>
+<span class="material-symbols-outlined text-sm" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider">Sort by:</span>
+<select class="bg-transparent border-none text-xs font-body text-on-surface focus:ring-0 cursor-pointer">
+<option>Last Updated</option>
+<option>Name (A-Z)</option>
+<option>Creation Date</option>
+</select>
+<div class="flex items-center bg-surface-container-high rounded p-1">
+<button class="p-1.5 bg-surface-container-lowest rounded shadow-sm text-primary">
+<span class="material-symbols-outlined text-base" data-icon="grid_view">grid_view</span>
+</button>
+<button class="p-1.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-base" data-icon="list">list</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Project Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+<!-- Project Card 1 -->
+<div class="group flex flex-col bg-surface-container-low rounded-lg overflow-hidden border border-transparent hover:border-outline-variant/30 transition-all duration-300">
+<div class="relative h-48 overflow-hidden">
+<img alt="Smart City Ops v2 Dashboard" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="High-fidelity 3D map interface of a futuristic smart city with glowing data nodes and traffic flow visualizations on a dark interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAh-28L4C8lLIHy7JMiK5-q_MPJRZnCUprMuZlsTEfECAMilqZmLwdnbgcHrZPrQEwIa2MTOFH7FhCjHaokBkzMzMD5IamBEBsic4kftvGYKj_HhJCurw5W6nSsQBiQ8QCk_yfNiI9b8kfB1enye3RAuYsjUy0UAaXXiSLDTlGeoxuzupwkcvTLUSoAF5yNJEjTxdYE2GMpK0Er2gkZS5RiSMPaXAr_i8-RwhDI16-KTxaIkUl0xDvCYznHWK9tXm-n-khPkZEhemsB"/>
+<div class="absolute top-3 left-3 flex items-center gap-2">
+<span class="px-2 py-1 bg-primary text-on-primary text-[10px] font-headline font-bold rounded uppercase tracking-widest">Live</span>
+</div>
+</div>
+<div class="p-5 flex flex-col flex-1">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h3 class="font-headline font-bold text-lg text-primary leading-tight">Smart City Ops v2</h3>
+<p class="text-xs text-on-surface-variant mt-1">Template: Urban Monitoring</p>
+</div>
+<button class="p-1 hover:bg-surface-container-high rounded transition-colors">
+<span class="material-symbols-outlined text-xl" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+<div class="mt-auto flex items-center justify-between pt-4 border-t border-surface-container-highest/50">
+<div class="flex items-center gap-2 text-[11px] text-outline">
+<span class="material-symbols-outlined text-sm" data-icon="schedule">schedule</span>
+<span>Last updated 2 hours ago</span>
+</div>
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-surface-container-highest"></div>
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-primary-fixed flex items-center justify-center text-[8px] font-bold">+2</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Project Card 2 -->
+<div class="group flex flex-col bg-surface-container-low rounded-lg overflow-hidden border border-transparent hover:border-outline-variant/30 transition-all duration-300">
+<div class="relative h-48 overflow-hidden">
+<img alt="Sales Analytics Dashboard" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Complex sales data visualization showing multiple bar charts and line graphs in a professional, light-themed analytic interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB_EgZhvbPhsbBbRemkVi06iOBNxgjYgD_fooHGmzT7F_5R1XcbZBbp9VCx-3J6n58jhY5Q7aHXr_QhC9TlxNzF-OhH-FJqj1BoiHkvh0RCFKcYDme9_k5piDyWIfHPRHv3mkKpS9YV_KZoQ3PVx1mHznbNvQHftJ83Zbp-fnkVSs-UqYh4Qd3ladq9YdoRY-RXAn_pZWoplSp62E3dwZJDKfR4PHcTyUc_Y6rzdSHiOyfWeWMV6M9r1nedK3Zm0JcqPGchHfVDCdYX"/>
+<div class="absolute top-3 left-3 flex items-center gap-2">
+<span class="px-2 py-1 bg-surface-container-highest text-on-surface-variant text-[10px] font-headline font-bold rounded uppercase tracking-widest">Draft</span>
+</div>
+</div>
+<div class="p-5 flex flex-col flex-1">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h3 class="font-headline font-bold text-lg text-primary leading-tight">Sales Analytics Dashboard</h3>
+<p class="text-xs text-on-surface-variant mt-1">Custom Project</p>
+</div>
+<button class="p-1 hover:bg-surface-container-high rounded transition-colors">
+<span class="material-symbols-outlined text-xl" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+<div class="mt-auto flex items-center justify-between pt-4 border-t border-surface-container-highest/50">
+<div class="flex items-center gap-2 text-[11px] text-outline">
+<span class="material-symbols-outlined text-sm" data-icon="schedule">schedule</span>
+<span>Last updated 5 days ago</span>
+</div>
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-surface-container-highest"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Project Card 3 -->
+<div class="group flex flex-col bg-surface-container-low rounded-lg overflow-hidden border border-transparent hover:border-outline-variant/30 transition-all duration-300">
+<div class="relative h-48 overflow-hidden">
+<img alt="IoT Device Network" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Technical network topology diagram with connected node clusters and signal strength indicators on a clean architectural background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBeqJE1uOZoQN3G3Gjha2jM7oK1fjIPQNO-UudomxV1ICO95p-VqOPkUjGIYsjoev6UDv8Ady5voadbclFdysxOCBgOincNbc2q4QL4p5QxHgAk1qWr1wgytw51qNWsKDSiUdYoJfKvkUFlTOOD032ePF8HGRdu094ueKKUKU7ldL_QVNxCwGCOnIKeCIQjbZqZh7h_WI2WNAhyycMKg-DclYw7XRH0keBsqI8X5B4C8ou44gq0zJS4VJPlvPSGPwKRjcWH4BtYeUvK"/>
+<div class="absolute top-3 left-3 flex items-center gap-2">
+<span class="px-2 py-1 bg-primary text-on-primary text-[10px] font-headline font-bold rounded uppercase tracking-widest">Live</span>
+</div>
+</div>
+<div class="p-5 flex flex-col flex-1">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h3 class="font-headline font-bold text-lg text-primary leading-tight">IoT Device Network</h3>
+<p class="text-xs text-on-surface-variant mt-1">Template: Network Topology</p>
+</div>
+<button class="p-1 hover:bg-surface-container-high rounded transition-colors">
+<span class="material-symbols-outlined text-xl" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+<div class="mt-auto flex items-center justify-between pt-4 border-t border-surface-container-highest/50">
+<div class="flex items-center gap-2 text-[11px] text-outline">
+<span class="material-symbols-outlined text-sm" data-icon="schedule">schedule</span>
+<span>Last updated 1 week ago</span>
+</div>
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-surface-container-highest"></div>
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-secondary-fixed"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Project Card 4 (Archived Style) -->
+<div class="group flex flex-col bg-surface-container-low rounded-lg overflow-hidden border border-transparent hover:border-outline-variant/30 transition-all duration-300 opacity-80">
+<div class="relative h-48 overflow-hidden grayscale group-hover:grayscale-0 transition-all">
+<img alt="Financial Forecast Q1" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Monochromatic financial forecast report with complex spreadsheets and data overlays on a neutral background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRpN3QEdSr4TdU4jnARVE1HGh4tDZwVGJY1t5ADy3qX3jg2drn38K6miFflhLkTRSjagDE1EEeQGl91Ng56Jdrv18-CSSQUIHdTOhEdkSbJ6S1jpIcr7Xba_eVfKDe1D_R3Sk5Go0NPeyxcnEBuxqsVEHE0KhzvOOPo7MLNLLjpK1Bpnqa0tf-ke6XKdttbQEkiu7rkz5XAZs5HBsRCwu28dNfQltpR4fQcTxca07JEKsl4SA5lQnKt8KrbquzdDuSfKo-FNR13hSL"/>
+<div class="absolute top-3 left-3 flex items-center gap-2">
+<span class="px-2 py-1 bg-outline text-on-primary text-[10px] font-headline font-bold rounded uppercase tracking-widest">Archived</span>
+</div>
+</div>
+<div class="p-5 flex flex-col flex-1">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h3 class="font-headline font-bold text-lg text-primary leading-tight">Financial Forecast Q1</h3>
+<p class="text-xs text-on-surface-variant mt-1">Custom Project</p>
+</div>
+<button class="p-1 hover:bg-surface-container-high rounded transition-colors">
+<span class="material-symbols-outlined text-xl" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+<div class="mt-auto flex items-center justify-between pt-4 border-t border-surface-container-highest/50">
+<div class="flex items-center gap-2 text-[11px] text-outline">
+<span class="material-symbols-outlined text-sm" data-icon="schedule">schedule</span>
+<span>Last updated 2 months ago</span>
+</div>
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-surface-container-highest"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Template Section (Empty State/Quickstart) -->
+<div class="mt-20 space-y-6">
+<div class="flex items-center justify-between border-b border-surface-container-highest pb-4">
+<h2 class="text-xl font-headline font-bold text-primary tracking-tight">Start from Template</h2>
+<a class="text-xs font-headline font-bold text-primary hover:underline uppercase tracking-widest" href="#">View all templates</a>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+<!-- Template 1 -->
+<div class="group bg-surface-container-low p-4 rounded-lg border border-outline-variant/20 hover:bg-surface-container-highest transition-all cursor-pointer">
+<div class="h-32 bg-surface-container rounded mb-4 overflow-hidden">
+<img alt="Blank Canvas" class="w-full h-full object-cover" data-alt="A clean, empty digital canvas with a subtle dot grid pattern and soft architectural lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiLBG_Zk2o_j9CiW79EcqIAB8ecp8UN5_7mTtoIBK0cpwAXdsUf2wK0YC8ZxcANxE1yCVr5QU28MwhREd8rJU71rrYamIeRv0V3X2toOz7i5y0xj2-X-NnfxTStnLELUxkBgaeR17KjdBmPcHhxZQXRdv7QieQdzmlBDG-go4a8jH8Nwyx5_cZ5FFDxvvMcVd5AbzXo_008g0xLflNcY6Ty-pUfSsqed6Oc73gCG7Hzd2YCwutCKsSQ6rLrwpP_0gu93kEiaCwHete"/>
+</div>
+<h4 class="font-headline font-bold text-sm text-primary group-hover:text-primary-container">Blank Canvas</h4>
+<p class="text-[11px] text-on-surface-variant mt-1">Start from scratch with full creative control.</p>
+</div>
+<!-- Template 2 -->
+<div class="group bg-surface-container-low p-4 rounded-lg border border-outline-variant/20 hover:bg-surface-container-highest transition-all cursor-pointer">
+<div class="h-32 bg-surface-container rounded mb-4 overflow-hidden">
+<img alt="Executive Dashboard" class="w-full h-full object-cover" data-alt="Sleek executive dashboard layout with key performance indicator cards and elegant line charts." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdniMiZUKAist3EmA_XyXf-ruJdzmk06gQLpS32bh1Qfq0dcNRbnOqoFtFRZ2X6Fcw6Vbz2TpTy1BTH4RD-bB2BhwoUiJBfhOfhez349mvBrDrQIkRort-5PbUluGZPBxHH2yt8NmKGNcOVef5UwtfP-V_tSjg21VpAgzKkuhe2bXXprhKT371LQd5gTSG38t6zijYy6TruiXbKKd9Eoh7CbICXqQnCCoK9AN6nIcsGToHlRlyFnr39mV73N1qzcJnLIqXMGvNs0fx"/>
+</div>
+<h4 class="font-headline font-bold text-sm text-primary group-hover:text-primary-container">Executive Dashboard</h4>
+<p class="text-[11px] text-on-surface-variant mt-1">High-level KPIs and business health metrics.</p>
+</div>
+<!-- Template 3 -->
+<div class="group bg-surface-container-low p-4 rounded-lg border border-outline-variant/20 hover:bg-surface-container-highest transition-all cursor-pointer">
+<div class="h-32 bg-surface-container rounded mb-4 overflow-hidden">
+<img alt="Logistics Tracker" class="w-full h-full object-cover" data-alt="Logistics map with path animations and vehicle tracking icons in a professional blue and gray palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-i_xUWuRmh_VTl7OZuCD2NBqahxJQF0zo5J0dFZOzML1PqCoalc6ly3floI0CbqdrmDlUYUHuXuzVC7zGqig-3pcXLThhq9XrO-_A8YclQrmsm5s_Rhl1WQg8df9Z3vx5C7uT0vRZAQAVgZAH-wKWsAgc4TDq84HnW5JCat1IeJDwO4G-YNVBJ9Ld3fkwows8or9a8YW3ePKA-dAQODatsZ0zido35ll6VcdObHKwHdRReKzW2KeUHWDmmJdx3IN8Ml41bhN1d_ho"/>
+</div>
+<h4 class="font-headline font-bold text-sm text-primary group-hover:text-primary-container">Logistics Tracker</h4>
+<p class="text-[11px] text-on-surface-variant mt-1">Real-time supply chain and asset tracking.</p>
+</div>
+<!-- Template 4 -->
+<div class="group bg-surface-container-low p-4 rounded-lg border border-outline-variant/20 hover:bg-surface-container-highest transition-all cursor-pointer">
+<div class="h-32 bg-surface-container rounded mb-4 overflow-hidden">
+<img alt="Scientific Research" class="w-full h-full object-cover" data-alt="Dense scientific data visualization featuring heatmaps and complex correlation scatter plots." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDe5eDjJCrwFPXALq1XtmhaSv3RmaGYHcMOy2nZ1gJhKxrzye6yegWdIUyUltOFoxdanaYmhzBrkKUejz0-gFDAPwhIM3YFLFcbq23lLtaAri89HjnM80REwbTjXPRzRrIIVLUR_dA3xXZvRFAM9kRJ8F3-9eJ7QYPrLWXekkI-bDRiDzfX6uC8R3xcNCvLooJRbcQMxFnNdK0LY4XzUgoWkJm8_M7e8oyxwdCX9iR6jnNEiLKp2hU6iZbNz0tfMgFcGomMYHJ6hrG-"/>
+</div>
+<h4 class="font-headline font-bold text-sm text-primary group-hover:text-primary-container">Scientific Research</h4>
+<p class="text-[11px] text-on-surface-variant mt-1">Advanced data exploration for research teams.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Meta -->
+<footer class="mt-24 border-t border-surface-container-highest pt-8 max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] text-outline font-headline font-bold uppercase tracking-[0.2em]">
+<div class="flex items-center gap-6">
+<a class="hover:text-primary transition-colors" href="#">Documentation</a>
+<a class="hover:text-primary transition-colors" href="#">API Reference</a>
+<a class="hover:text-primary transition-colors" href="#">Privacy</a>
+</div>
+<span>© 2024 JaminView Industrial. All rights reserved.</span>
+</footer>
+</main>
+</div>
+<!-- Mobile Bottom NavBar (Visible only on mobile) -->
+<div class="md:hidden fixed bottom-0 left-0 w-full bg-surface-container-lowest flex justify-around items-center py-3 border-t border-surface-container-high z-50">
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="text-[10px] font-headline font-bold uppercase">Projects</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="text-[10px] font-headline font-bold uppercase">Recent</span>
+</a>
+<div class="-mt-8">
+<button class="w-12 h-12 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+</div>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="text-[10px] font-headline font-bold uppercase">Team</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+<span class="text-[10px] font-headline font-bold uppercase">Profile</span>
+</a>
+</div>
+</body></html>
