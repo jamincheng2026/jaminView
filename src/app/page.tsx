@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BarChart3, Factory, Presentation, Store } from "lucide-react";
 import { Reveal } from "@/components/marketing/reveal";
+import { HeroStage } from "@/components/marketing/hero-stage";
 
 const heroBackground =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuA6ud4lwwhTdJhLhJeTltW5xvBqXJhrD5L5V4UUr0A8v6TWWAfsib6J7f6EigFcW7sDpL4Zw44SubiHSzEL3rL28zF9wcaNMWC2N6Pp4XjtagwQZPq4G6H09qfC7Tuute8sAfgpa8gwJEI4SJGJCg5al2vOr4N-xRp_Y2Ttv52UjoLDLIiYy6pwgqHTODMOkbN2Koeaq0bb0JKXGfbOvp7r_zIiOUBARKj5gesLfxEXmfaz6kv7cyklfT2HwNaYih_uMDiRmc07j2Mi";
@@ -102,8 +103,9 @@ export default function HomePage() {
           />
           <div className="hero-overlay absolute inset-0" />
         </div>
-        <div className="relative z-10 mx-auto -mt-20 flex max-w-7xl flex-col items-center px-8 text-center">
-          <div className="max-w-3xl">
+        <div className="relative z-10 mx-auto max-w-7xl px-8 pb-14 pt-28 lg:pt-20">
+          <div className="grid items-center gap-14 lg:grid-cols-[minmax(0,1fr)_620px] lg:gap-10">
+          <div className="max-w-3xl text-center lg:text-left">
             <h1 className="hero-title-enter font-headline text-shadow-sm text-5xl font-extrabold leading-[1.08] tracking-tight text-white lg:text-7xl">
               <span className="bg-gradient-to-r from-[#fffdf4] via-[#dcefb8] via-45% to-[#5fa368] bg-clip-text text-transparent">
                 更快交付
@@ -114,10 +116,10 @@ export default function HomePage() {
             <p className="hero-subtitle-enter text-shadow-sm mb-6 mt-8 text-xl font-medium leading-relaxed text-[#f4f4ef] lg:text-2xl">
               从模板出发，导入你的数据，完成编辑与发布。
             </p>
-            <p className="hero-copy-enter mx-auto mb-12 max-w-lg text-base leading-relaxed text-white/74">
+            <p className="hero-copy-enter mx-auto mb-12 max-w-lg text-base leading-relaxed text-white/74 lg:mx-0">
               JaminView 面向业务团队、产品经理和交付工程师，将繁杂的代码开发转化为直观的配置过程。
             </p>
-            <div className="hero-actions-enter flex flex-wrap justify-center gap-6">
+            <div className="hero-actions-enter flex flex-wrap justify-center gap-6 lg:justify-start">
               <Link
                 href="/projects"
                 className="flex items-center gap-2 rounded-md bg-[#23422a] px-10 py-4 text-lg font-bold text-[#f4f4ef] shadow-2xl transition duration-300 hover:-translate-y-0.5 hover:bg-[#3a5a40] hover:shadow-[0_24px_60px_rgba(35,66,42,0.45)]"
@@ -134,6 +136,8 @@ export default function HomePage() {
                 浏览模板库
               </Link>
             </div>
+          </div>
+            <HeroStage primaryImage={templateImages[2].image} />
           </div>
         </div>
       </section>
