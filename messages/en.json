@@ -1,0 +1,343 @@
+{
+  "Home": {
+    "nav": {
+      "features": "Features",
+      "templates": "Templates",
+      "pricing": "Pricing",
+      "about": "About",
+      "signIn": "Sign in",
+      "cta": "Try now"
+    },
+    "hero": {
+      "titleAccent": "Ship faster",
+      "titleMain": "data screens",
+      "subtitle": "Start from a template, bring in your data, and publish a polished screen.",
+      "description": "JaminView helps business teams, product managers, and delivery engineers turn complex screen development into a clear visual workflow.",
+      "primaryAction": "Enter demo workspace",
+      "secondaryAction": "Browse templates"
+    },
+    "value": {
+      "title": "Spend time on what you present, not on rebuilding the same layout",
+      "description": "JaminView packages industry templates and flexible data mapping into one workflow, so non-technical teams can deliver presentation-ready dashboards in hours instead of weeks.",
+      "stats": [
+        {
+          "value": "75%",
+          "label": "faster delivery cycles"
+        },
+        {
+          "value": "0",
+          "label": "lines of code required"
+        }
+      ]
+    },
+    "capabilities": {
+      "template": {
+        "title": "Template-first setup",
+        "body": "Start from curated layouts for smart city, industrial IoT, finance, and more without designing from scratch."
+      },
+      "data": {
+        "title": "Data ingestion",
+        "body": "Import Excel, CSV, APIs, and mainstream databases with direct field mapping and instant preview.",
+        "tag": "Ready for live data"
+      },
+      "editor": {
+        "title": "Visual editing",
+        "body": "Drag components freely, fine-tune chart styling, and configure immersive 3D maps and motion layers."
+      },
+      "publish": {
+        "title": "Publish & share",
+        "body": "Generate links or embeds in one click with multi-screen support, private deployment options, and strong access control."
+      }
+    },
+    "templates": {
+      "title": "Start from proven screen scenarios",
+      "items": [
+        {
+          "title": "Operations Command Center",
+          "subtitle": "Built for enterprise-wide operational visibility"
+        },
+        {
+          "title": "Sales Analytics Screen",
+          "subtitle": "Track conversion, targets, and regional performance"
+        },
+        {
+          "title": "City Operations Monitor",
+          "subtitle": "Bring 3D geo-visualization into real business workflows"
+        }
+      ],
+      "action": "Use template"
+    },
+    "workflow": {
+      "title": "A transparent workflow built for delivery teams",
+      "steps": [
+        {
+          "index": "1",
+          "title": "Choose a template",
+          "body": "Start with a layout that already matches your business scenario."
+        },
+        {
+          "index": "2",
+          "title": "Import data",
+          "body": "Drop in Excel files or connect APIs and preview how widgets respond instantly."
+        },
+        {
+          "index": "3",
+          "title": "Tune components",
+          "body": "Adjust colors, branding, motion, and presentation behavior without leaving the canvas."
+        },
+        {
+          "index": "4",
+          "title": "Publish the screen",
+          "body": "Push the final board to large displays or delivery platforms with one click."
+        }
+      ]
+    },
+    "scenarios": {
+      "title": "Built for diverse presentation scenarios",
+      "items": [
+        {
+          "title": "Weekly reporting boards",
+          "body": "Roll up multidimensional metrics and replace slow PowerPoint reporting loops."
+        },
+        {
+          "title": "Sales command screens",
+          "body": "Broadcast live national or regional orders to energize frontline teams."
+        },
+        {
+          "title": "Executive showroom demos",
+          "body": "Use cinematic 3D presentation scenes to demonstrate digital transformation impact."
+        },
+        {
+          "title": "Production monitoring",
+          "body": "Connect sensor streams and highlight manufacturing anomalies in real time."
+        }
+      ],
+      "quote": "JaminView reduced our delivery time from two weeks to two days and significantly improved client satisfaction.",
+      "quoteAuthor": "— Delivery Lead, Top-tier Consulting Firm"
+    },
+    "cta": {
+      "titleTop": "Build a screen worth presenting first,",
+      "titleBottom": "then refine the details",
+      "description": "Start with JaminView to launch your first production-grade screen with free starter templates.",
+      "primaryAction": "Enter demo workspace",
+      "secondaryAction": "Browse templates"
+    },
+    "footer": {
+      "copyrightTop": "© 2024 JaminView. All rights reserved.",
+      "copyrightBottom": "Designed for the Intellectual Atelier.",
+      "links": ["Privacy Policy", "Terms", "Developer Docs", "Contact", "Careers"]
+    }
+  },
+  "Projects": {
+    "nav": {
+      "projects": "Projects",
+      "assets": "Assets",
+      "analytics": "Analytics",
+      "settings": "Settings"
+    },
+    "sidebar": {
+      "title": "Intellectual Atelier",
+      "subtitle": "Premium Analytics",
+      "dashboard": "Dashboard",
+      "teamLibrary": "Team Library",
+      "recent": "Recent",
+      "archived": "Archived",
+      "trash": "Trash",
+      "newAsset": "New Asset",
+      "helpCenter": "Help Center"
+    },
+    "header": {
+      "title": "My Projects",
+      "description": "Manage and orchestrate your visualization workspace.",
+      "searchPlaceholder": "Search projects...",
+      "newProject": "New Project"
+    },
+    "toolbar": {
+      "status": "Status:",
+      "allProjects": "All Projects",
+      "type": "Type:",
+      "allTypes": "All Types",
+      "sortBy": "Sort by:",
+      "lastUpdated": "Last Updated",
+      "nameAZ": "Name (A-Z)",
+      "creationDate": "Creation Date"
+    },
+    "templates": {
+      "title": "Start from Template",
+      "action": "View all templates"
+    },
+    "footer": {
+      "links": ["Documentation", "API Reference", "Privacy"],
+      "copyright": "© 2024 JaminView Industrial. All rights reserved."
+    }
+  },
+  "TemplatePicker": {
+    "nav": {
+      "projects": "Projects",
+      "templates": "Templates",
+      "searchPlaceholder": "Search templates..."
+    },
+    "sidebar": {
+      "title": "Library",
+      "subtitle": "Professional Assets",
+      "custom": "My Custom",
+      "preferences": "Preferences"
+    },
+    "header": {
+      "eyebrow": "New Workflow Setup",
+      "title": "Create New Project",
+      "fieldLabel": "Project Name",
+      "fieldPlaceholder": "E.g., Global Logistics Dashboard 2026",
+      "discard": "Discard",
+      "start": "Start Building"
+    },
+    "grid": {
+      "title": "Available Templates",
+      "count": "24",
+      "useTemplate": "Use Template"
+    },
+    "fields": {
+      "industry": "Industry",
+      "complexity": "Complexity",
+      "charts": "Charts",
+      "dataSource": "Data Source"
+    }
+  },
+  "DataImport": {
+    "nav": {
+      "projects": "Projects",
+      "templates": "Templates",
+      "searchPlaceholder": "Search"
+    },
+    "sidebar": {
+      "title": "Project Workspace",
+      "subtitle": "Analytical Draft",
+      "editor": "Editor",
+      "layers": "Layers",
+      "tools": "Tools",
+      "folders": "Folders",
+      "settings": "Settings",
+      "help": "Help",
+      "archive": "Archive"
+    },
+    "modal": {
+      "title": "Import Dataset",
+      "description": "Add new structured data to your analytical draft",
+      "datasetName": "Dataset Name",
+      "storageDestination": "Storage Destination",
+      "dropTitle": "Drop your .csv or .xlsx file here",
+      "dropDescription": "Maximum file size 50MB. Large datasets may require several minutes to process.",
+      "selectFiles": "Select Files",
+      "googleDrive": "Google Drive",
+      "ready": "READY TO IMPORT",
+      "warningTitle": "Validation Warning",
+      "warningBody": "Columns Dispatch_Date contains inconsistent date formats. JaminView will attempt auto-normalization.",
+      "previewTitle": "Data Mapping Preview",
+      "advancedMapping": "Advanced Mapping Settings",
+      "fieldLabel": "Field Label",
+      "dataType": "Data Type",
+      "sampleValue": "Sample Value",
+      "privacy": "Data encrypted and private",
+      "cancel": "Cancel",
+      "import": "Import"
+    }
+  },
+  "Editor": {
+    "topbar": {
+      "projectPrefix": "Project:",
+      "saved": "All changes saved",
+      "preview": "Preview",
+      "publish": "Publish"
+    },
+    "rail": {
+      "components": "Components",
+      "layers": "Layers",
+      "data": "Data",
+      "templates": "Templates",
+      "settings": "Settings",
+      "help": "Help"
+    },
+    "leftPanel": {
+      "title": "Components",
+      "addSource": "Add Source"
+    },
+    "canvas": {
+      "live": "Live Monitoring",
+      "grid": "Grid",
+      "safeArea": "Safe Area",
+      "dashboardTitle": "Global Logistics & Supply Chain Real-time Center",
+      "dashboardSubtitle": "Live Intelligence Feed · Q4 Monitoring Phase",
+      "activeVessels": "Active Vessels",
+      "revenueForecast": "Revenue Forecast",
+      "carrierLoad": "Carrier Load %",
+      "liveMonitoring": "Live Monitoring",
+      "regionHeat": "Region Heat",
+      "active": "Active",
+      "delayedShipments": "Delayed Shipments",
+      "alertHint": "Suez route congestion",
+      "shipmentVolume": "Shipment Volume",
+      "recentEvents": "Recent Events",
+      "table": {
+        "id": "ID",
+        "destination": "Destination",
+        "cargo": "Cargo Type",
+        "eta": "ETA",
+        "status": "Status",
+        "onTime": "On Time",
+        "inTransit": "In Transit",
+        "review": "Review"
+      }
+    },
+    "rightPanel": {
+      "title": "Properties",
+      "selection": {
+        "title": "Selection",
+        "subtitle": "Interactive World Map component",
+        "badge": "Map Widget"
+      },
+      "layout": {
+        "title": "Geometry & Layout"
+      },
+      "appearance": {
+        "title": "Appearance",
+        "fillColor": "Fill Color",
+        "opacity": "Opacity",
+        "strokeWidth": "Stroke Style"
+      },
+      "dataBinding": {
+        "title": "Data Binding",
+        "dataset": "Dataset",
+        "fieldMap": "Field Mapping"
+      },
+      "map": {
+        "title": "Map Parameters",
+        "showLabels": "Show Labels",
+        "show3DAxis": "Enable 3D Axis",
+        "defaultZoom": "Default Zoom"
+      },
+      "layers": {
+        "title": "Layer List",
+        "subtitle": "Current page component structure",
+        "active": "Active",
+        "layer": "Layer"
+      }
+    }
+  },
+  "Preview": {
+    "title": "Screen Preview",
+    "publish": "Publish current version",
+    "live": "Live Preview",
+    "readOnly": "Read-only View"
+  },
+  "PublishSuccess": {
+    "badge": "Published",
+    "title": "This version is now live",
+    "description": "You can share this link with stakeholders, open it on a meeting-room display, or jump back into the editor for another refinement pass.",
+    "linkLabel": "Shareable Link",
+    "copy": "Copy",
+    "publishedAt": "Published at",
+    "draftNotice": "This share link is currently backed by a local mock snapshot.",
+    "viewPreview": "Open published preview",
+    "backToEditor": "Back to editor"
+  }
+}

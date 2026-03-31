@@ -1,0 +1,343 @@
+{
+  "Home": {
+    "nav": {
+      "features": "产品功能",
+      "templates": "模板库",
+      "pricing": "价格",
+      "about": "关于我们",
+      "signIn": "登录",
+      "cta": "立即体验"
+    },
+    "hero": {
+      "titleAccent": "更快交付",
+      "titleMain": "数据大屏",
+      "subtitle": "从模板出发，导入你的数据，完成编辑与发布。",
+      "description": "JaminView 面向业务团队、产品经理和交付工程师，将繁杂的代码开发转化为直观的配置过程。",
+      "primaryAction": "进入演示环境",
+      "secondaryAction": "浏览模板库"
+    },
+    "value": {
+      "title": "把搭建时间花在内容上，而不是重复造页面",
+      "description": "我们深知交付压力的来源。JaminView 通过高度封装的行业模板与灵活的数据映射机制，让非技术人员也能在数小时内交付出具备专业水准的数字化座舱。",
+      "stats": [
+        {
+          "value": "75%",
+          "label": "交付周期缩短"
+        },
+        {
+          "value": "0",
+          "label": "代码编写需求"
+        }
+      ]
+    },
+    "capabilities": {
+      "template": {
+        "title": "模板起步",
+        "body": "内置上百套覆盖智慧城市、工业互联、金融分析的预设模板。点击即刻开始，无需从零开始构思布局。"
+      },
+      "data": {
+        "title": "数据导入",
+        "body": "支持 Excel、CSV、API 及主流数据库的无缝接入，字段映射所见即所得。",
+        "tag": "实时接入就绪"
+      },
+      "editor": {
+        "title": "可视化编辑",
+        "body": "自由拖拽组件，深度定制图表样式。支持高级 3D 地图层级下钻与动效配置。"
+      },
+      "publish": {
+        "title": "发布展示",
+        "body": "一键生成链接或嵌入代码。支持多终端适配、私有化部署以及高安全性的权限管理体系，确保数据仅在可控范围内流动。"
+      }
+    },
+    "templates": {
+      "title": "从常见场景开始搭建",
+      "items": [
+        {
+          "title": "综合运营驾驶舱",
+          "subtitle": "适用于集团全业务数据监控"
+        },
+        {
+          "title": "销售分析大屏",
+          "subtitle": "精准追踪销售转化与区域表现"
+        },
+        {
+          "title": "城市业务监控",
+          "subtitle": "L5 级 3D 地图深度结合业务数据"
+        }
+      ],
+      "action": "使用此模板"
+    },
+    "workflow": {
+      "title": "透明且高效的工作流",
+      "steps": [
+        {
+          "index": "1",
+          "title": "选择模板",
+          "body": "浏览行业库，锁定最接近你业务逻辑的展示布局。"
+        },
+        {
+          "index": "2",
+          "title": "导入数据",
+          "body": "拖入 Excel 或连接 API，实时预览数据驱动下的组件形态。"
+        },
+        {
+          "index": "3",
+          "title": "调整组件",
+          "body": "个性化修改色调、品牌标识及特殊的交互联动逻辑。"
+        },
+        {
+          "index": "4",
+          "title": "发布展示",
+          "body": "一键推送至大屏设备或管理平台，完成任务交付。"
+        }
+      ]
+    },
+    "scenarios": {
+      "title": "满足多样化的业务触达",
+      "items": [
+        {
+          "title": "日报周报看板",
+          "body": "快速聚合多维数据，替代低效的 PPT 汇报。"
+        },
+        {
+          "title": "销售实况大屏",
+          "body": "实时滚动全国订单数据，激励一线团队表现。"
+        },
+        {
+          "title": "企业展厅演示",
+          "body": "高逼格 3D 渲染，展现企业数字化转型实力。"
+        },
+        {
+          "title": "生产线效能监控",
+          "body": "对接物联感知层，实时预警工业生产异常。"
+        }
+      ],
+      "quote": "JaminView 将我们的交付时间从两周压缩到了两天，极大地提升了客户满意度。",
+      "quoteAuthor": "— 某头部咨询机构交付主管"
+    },
+    "cta": {
+      "titleTop": "先做出一张能展示的页面，",
+      "titleBottom": "再继续打磨细节",
+      "description": "立即加入 JaminView，开启你的高效可视化之旅。免费注册并使用基础版模板。",
+      "primaryAction": "进入演示环境",
+      "secondaryAction": "浏览模板库"
+    },
+    "footer": {
+      "copyrightTop": "© 2024 JaminView. All rights reserved.",
+      "copyrightBottom": "Designed for the Intellectual Atelier.",
+      "links": ["隐私政策", "服务条款", "开发者文档", "联系我们", "加入我们"]
+    }
+  },
+  "Projects": {
+    "nav": {
+      "projects": "项目",
+      "assets": "资源",
+      "analytics": "分析",
+      "settings": "设置"
+    },
+    "sidebar": {
+      "title": "数据工作台",
+      "subtitle": "高级可视化空间",
+      "dashboard": "控制台",
+      "teamLibrary": "团队模板",
+      "recent": "最近项目",
+      "archived": "已归档",
+      "trash": "回收站",
+      "newAsset": "新建项目",
+      "helpCenter": "帮助中心"
+    },
+    "header": {
+      "title": "我的项目",
+      "description": "管理你的大屏项目、模板资产与交付进度。",
+      "searchPlaceholder": "搜索项目...",
+      "newProject": "新建项目"
+    },
+    "toolbar": {
+      "status": "状态：",
+      "allProjects": "全部项目",
+      "type": "类型：",
+      "allTypes": "全部类型",
+      "sortBy": "排序：",
+      "lastUpdated": "最近更新",
+      "nameAZ": "名称 A-Z",
+      "creationDate": "创建时间"
+    },
+    "templates": {
+      "title": "从模板开始",
+      "action": "查看全部模板"
+    },
+    "footer": {
+      "links": ["帮助文档", "API 参考", "隐私政策"],
+      "copyright": "© 2024 JaminView Industrial. 保留所有权利。"
+    }
+  },
+  "TemplatePicker": {
+    "nav": {
+      "projects": "项目",
+      "templates": "模板",
+      "searchPlaceholder": "搜索模板..."
+    },
+    "sidebar": {
+      "title": "模板库",
+      "subtitle": "专业资产",
+      "custom": "我的自定义",
+      "preferences": "偏好设置"
+    },
+    "header": {
+      "eyebrow": "新建工作流",
+      "title": "创建新项目",
+      "fieldLabel": "项目名称",
+      "fieldPlaceholder": "例如：全球物流监控大屏 2026",
+      "discard": "放弃",
+      "start": "开始搭建"
+    },
+    "grid": {
+      "title": "可用模板",
+      "count": "24",
+      "useTemplate": "使用模板"
+    },
+    "fields": {
+      "industry": "行业",
+      "complexity": "复杂度",
+      "charts": "图表",
+      "dataSource": "数据源"
+    }
+  },
+  "DataImport": {
+    "nav": {
+      "projects": "项目",
+      "templates": "模板",
+      "searchPlaceholder": "搜索"
+    },
+    "sidebar": {
+      "title": "项目工作区",
+      "subtitle": "分析草稿",
+      "editor": "编辑器",
+      "layers": "图层",
+      "tools": "工具",
+      "folders": "文件夹",
+      "settings": "设置",
+      "help": "帮助",
+      "archive": "归档"
+    },
+    "modal": {
+      "title": "导入数据集",
+      "description": "为当前分析草稿添加新的结构化数据",
+      "datasetName": "数据集名称",
+      "storageDestination": "存储位置",
+      "dropTitle": "将 .csv 或 .xlsx 文件拖到这里",
+      "dropDescription": "最大文件 50MB。较大的数据集可能需要几分钟处理时间。",
+      "selectFiles": "选择文件",
+      "googleDrive": "Google Drive",
+      "ready": "可导入",
+      "warningTitle": "校验提醒",
+      "warningBody": "字段 Dispatch_Date 存在不一致的日期格式，JaminView 将尝试自动标准化。",
+      "previewTitle": "数据映射预览",
+      "advancedMapping": "高级映射设置",
+      "fieldLabel": "字段名称",
+      "dataType": "数据类型",
+      "sampleValue": "示例值",
+      "privacy": "数据已加密并保持私有",
+      "cancel": "取消",
+      "import": "导入"
+    }
+  },
+  "Editor": {
+    "topbar": {
+      "projectPrefix": "项目：",
+      "saved": "已保存所有更改",
+      "preview": "预览",
+      "publish": "发布"
+    },
+    "rail": {
+      "components": "组件",
+      "layers": "图层",
+      "data": "数据",
+      "templates": "模板",
+      "settings": "设置",
+      "help": "帮助"
+    },
+    "leftPanel": {
+      "title": "组件库",
+      "addSource": "添加数据源"
+    },
+    "canvas": {
+      "live": "实时监控",
+      "grid": "网格",
+      "safeArea": "安全区",
+      "dashboardTitle": "全球物流与供应链实时中心",
+      "dashboardSubtitle": "实时情报流 · Q4 监控阶段",
+      "activeVessels": "活跃船只",
+      "revenueForecast": "营收预测",
+      "carrierLoad": "承运负载占比",
+      "liveMonitoring": "实时监控",
+      "regionHeat": "区域热度",
+      "active": "已启用",
+      "delayedShipments": "延迟运输",
+      "alertHint": "苏伊士航线拥堵",
+      "shipmentVolume": "港口装载率",
+      "recentEvents": "最新事件",
+      "table": {
+        "id": "编号",
+        "destination": "目的地",
+        "cargo": "货物类型",
+        "eta": "预计到达",
+        "status": "状态",
+        "onTime": "准时",
+        "inTransit": "运输中",
+        "review": "待确认"
+      }
+    },
+    "rightPanel": {
+      "title": "属性配置",
+      "selection": {
+        "title": "当前选择",
+        "subtitle": "Interactive World Map 组件",
+        "badge": "地图组件"
+      },
+      "layout": {
+        "title": "几何与布局"
+      },
+      "appearance": {
+        "title": "外观样式",
+        "fillColor": "填充颜色",
+        "opacity": "透明度",
+        "strokeWidth": "描边样式"
+      },
+      "dataBinding": {
+        "title": "数据绑定",
+        "dataset": "数据集",
+        "fieldMap": "字段映射"
+      },
+      "map": {
+        "title": "地图参数",
+        "showLabels": "显示标签",
+        "show3DAxis": "启用 3D 轴",
+        "defaultZoom": "默认缩放"
+      },
+      "layers": {
+        "title": "图层列表",
+        "subtitle": "当前页面组件结构",
+        "active": "当前",
+        "layer": "图层"
+      }
+    }
+  },
+  "Preview": {
+    "title": "预览大屏",
+    "publish": "发布当前版本",
+    "live": "实时预览",
+    "readOnly": "只读查看"
+  },
+  "PublishSuccess": {
+    "badge": "发布完成",
+    "title": "当前版本已成功发布",
+    "description": "你现在可以把这个链接交给客户、挂到会议室大屏，或者继续返回编辑器打磨内容。",
+    "linkLabel": "展示链接",
+    "copy": "复制链接",
+    "publishedAt": "发布时间",
+    "draftNotice": "当前展示链接基于刚刚发布的 mock 快照。",
+    "viewPreview": "查看展示版本",
+    "backToEditor": "返回编辑器"
+  }
+}

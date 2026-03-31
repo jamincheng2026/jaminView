@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
+import {getLocale} from "next-intl/server";
 
 import "./globals.css";
 
@@ -21,13 +22,15 @@ export const metadata: Metadata = {
   description: "模板化数据大屏平台，帮助团队更快完成项目创建、编辑与发布。",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale().catch(() => "zh-CN");
+
   return (
-    <html lang="zh-CN" className={`${inter.variable} ${manrope.variable}`}>
+    <html lang={locale} className={`${inter.variable} ${manrope.variable}`}>
       <body>{children}</body>
     </html>
   );
