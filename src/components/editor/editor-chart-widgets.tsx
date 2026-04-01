@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 
 const LineChart = dynamic(() => import("@visactor/react-vchart").then((mod) => mod.LineChart), {ssr: false});
+const AreaChart = dynamic(() => import("@visactor/react-vchart").then((mod) => mod.AreaChart), {ssr: false});
 const BarChart = dynamic(() => import("@visactor/react-vchart").then((mod) => mod.BarChart), {ssr: false});
 const PieChart = dynamic(() => import("@visactor/react-vchart").then((mod) => mod.PieChart), {ssr: false});
 
@@ -57,6 +58,37 @@ export function MiniLineChart({
         legends={[]}
         point={{visible: data.length <= 4}}
         line={{style: {lineWidth: 3, lineCap: "round"}}}
+        tooltip={{visible: false}}
+      />
+    </div>
+  );
+}
+
+export function MiniAreaChart({
+  accent = "#215637",
+  data = fallbackLineData,
+}: {
+  accent?: string;
+  data?: ChartDatum[];
+}) {
+  const source = [{id: "area-source", values: data.map((item) => ({month: item.label, value: item.value}))}];
+
+  return (
+    <div className="h-[108px] rounded-[4px] bg-[linear-gradient(180deg,#eef4ea_0%,#f8f7f1_100%)] p-2">
+      <AreaChart
+        key={`area-${accent}`}
+        data={source}
+        xField="month"
+        yField="value"
+        height={92}
+        color={[accent]}
+        padding={{top: 10, right: 8, bottom: 12, left: 8}}
+        axes={[{orient: "left", visible: false}, {orient: "bottom", visible: false}]}
+        crosshair={{xField: {visible: false}, yField: {visible: false}}}
+        legends={[]}
+        line={{style: {lineWidth: 2.5, lineCap: "round"}}}
+        area={{style: {fillOpacity: 0.22}}}
+        point={{visible: false}}
         tooltip={{visible: false}}
       />
     </div>

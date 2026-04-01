@@ -263,6 +263,7 @@
     },
     "canvas": {
       "live": "Live Monitoring",
+      "free": "Free Layout",
       "grid": "Grid",
       "safeArea": "Safe Area",
       "dashboardTitle": "Global Logistics & Supply Chain Real-time Center",
@@ -295,8 +296,47 @@
         "subtitle": "Interactive World Map component",
         "badge": "Map Widget"
       },
+      "page": {
+        "title": "Page Settings",
+        "subtitle": "Control header content and screen metadata",
+        "screenTitle": "Screen Title",
+        "screenSubtitle": "Screen Subtitle",
+        "showHeader": "Show Header",
+        "showTimestamp": "Show Time & Meta",
+        "showBadge": "Show Status Badge",
+        "badgeLabel": "Badge Label",
+        "metaLabel": "Header Label",
+        "timeText": "Time Text",
+        "dateText": "Date Text",
+        "rightPrimary": "Right Primary",
+        "rightSecondary": "Right Secondary"
+      },
+      "background": {
+        "title": "Background",
+        "subtitle": "Manage base color, gradient and hero image",
+        "mode": "Background Mode",
+        "color": "Color",
+        "gradient": "Gradient",
+        "image": "Image",
+        "baseColor": "Base Color",
+        "gradientValue": "Gradient Value",
+        "imageUrl": "Background Image URL",
+        "imageFit": "Image Fit",
+        "overlay": "Overlay"
+      },
       "layout": {
-        "title": "Geometry & Layout"
+        "title": "Geometry & Layout",
+        "width": "Width (px)",
+        "height": "Height (px)",
+        "x": "X Position",
+        "y": "Y Position",
+        "align": "Quick Align",
+        "alignLeft": "Left",
+        "alignCenter": "Center",
+        "alignRight": "Right",
+        "alignTop": "Top",
+        "alignMiddle": "Middle",
+        "alignBottom": "Bottom"
       },
       "appearance": {
         "title": "Appearance",

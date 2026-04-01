@@ -263,6 +263,7 @@
     },
     "canvas": {
       "live": "实时监控",
+      "free": "自由排布",
       "grid": "网格",
       "safeArea": "安全区",
       "dashboardTitle": "全球物流与供应链实时中心",
@@ -295,8 +296,47 @@
         "subtitle": "Interactive World Map 组件",
         "badge": "地图组件"
       },
+      "page": {
+        "title": "页面设置",
+        "subtitle": "控制大屏头部与展示信息",
+        "screenTitle": "页面标题",
+        "screenSubtitle": "页面副标题",
+        "showHeader": "显示页面头部",
+        "showTimestamp": "显示时间信息",
+        "showBadge": "显示状态徽章",
+        "badgeLabel": "徽章文案",
+        "metaLabel": "头部标签",
+        "timeText": "时间文本",
+        "dateText": "日期文本",
+        "rightPrimary": "右侧主信息",
+        "rightSecondary": "右侧次信息"
+      },
+      "background": {
+        "title": "背景设置",
+        "subtitle": "控制画布底色、渐变和背景图",
+        "mode": "背景模式",
+        "color": "纯色",
+        "gradient": "渐变",
+        "image": "图片",
+        "baseColor": "基础底色",
+        "gradientValue": "渐变值",
+        "imageUrl": "背景图片地址",
+        "imageFit": "图片填充",
+        "overlay": "遮罩强度"
+      },
       "layout": {
-        "title": "几何与布局"
+        "title": "几何与布局",
+        "width": "宽度 (px)",
+        "height": "高度 (px)",
+        "x": "X 坐标",
+        "y": "Y 坐标",
+        "align": "快速对齐",
+        "alignLeft": "左",
+        "alignCenter": "中",
+        "alignRight": "右",
+        "alignTop": "上",
+        "alignMiddle": "中线",
+        "alignBottom": "下"
       },
       "appearance": {
         "title": "外观样式",

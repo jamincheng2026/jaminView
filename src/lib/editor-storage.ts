@@ -24,10 +24,37 @@ export type DataField = {
   icon: string;
 };
 
+export type ScreenBackgroundMode = "color" | "gradient" | "image";
+export type ScreenBackgroundFit = "cover" | "contain" | "center";
+
+export type ScreenConfig = {
+  title: string;
+  subtitle: string;
+  showHeader: boolean;
+  showTimestamp: boolean;
+  showStatusBadge: boolean;
+  statusBadgeLabel: string;
+  statusMetaLabel: string;
+  timeText: string;
+  dateText: string;
+  rightMetaPrimary: string;
+  rightMetaSecondary: string;
+  backgroundMode: ScreenBackgroundMode;
+  backgroundColor: string;
+  backgroundGradient: string;
+  backgroundImage: string;
+  backgroundFit: ScreenBackgroundFit;
+  backgroundOverlay: number;
+};
+
 export type EditorDraft = {
+  projectTitle?: string;
   widgets: EditorWidget[];
   selectedWidgetId: string;
+  selectedWidgetIds?: string[];
   zoom: number;
+  screenConfig?: ScreenConfig;
+  canvasView?: "free" | "grid" | "safe";
   mapLabels: boolean;
   map3dAxis: boolean;
   mapZoom: string;
@@ -35,6 +62,9 @@ export type EditorDraft = {
   mapRouteDensity?: "low" | "balanced" | "high";
   mapMarkers?: boolean;
   mapGlow?: number;
+  mapRouteStyle?: "solid" | "dashed" | "pulse";
+  mapLabelStyle?: "pill" | "minimal";
+  mapSurfaceTone?: "soft" | "contrast";
   datasetDrafts?: Record<string, {fields: DataField[]; rows: DatasetRow[]}>;
   updatedAt: string;
 };

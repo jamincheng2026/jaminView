@@ -1,4 +1,7 @@
-import {getTranslations} from "next-intl/server";
+"use client";
+
+import {useEffect, useMemo, useState} from "react";
+import {useLocale, useTranslations} from "next-intl";
 import {
   Archive,
   Bell,
@@ -18,14 +21,52 @@ import {
 import {StarterTemplateCards} from "@/components/projects/starter-template-cards";
 import {Link} from "@/i18n/navigation";
 import {LocaleSwitch} from "@/components/ui/locale-switch";
-import {projectCards} from "@/lib/mocks/projects";
+import {
+  formatProjectUpdatedAt,
+  projectStatusLabel,
+  readProjectRecords,
+  type StoredProject,
+} from "@/lib/project-store";
 
 const profileImage =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuDFxx7547d9uf0b2bexsGHopimCvTA0GV4tD-Rw_4Tn7u_IjiyAN362bh7VmQNWWcjaQW9y8YCHFwgN439wmgInSnjmcIR4lSVkROZ8AUzVzusq5xNKsCJrjkgkffuBeWgSDgSVYR8s41ClbdAhXZg3DmtB0auQH4mGcq1Umew3lHkXPyh__R7M5n6SJdLi2gKCRurcWN5GfnK7eNkFLadljtZdsiQwV8icOjcgc9OCEUpTfonjva2Wq1QQ02X2TJbvO7noE1H1nJYl";
 
-export async function ProjectsPage() {
-  const t = await getTranslations("Projects");
+export function ProjectsPage() {
+  const t = useTranslations("Projects");
+  const locale = useLocale();
+  const [projects, setProjects] = useState<StoredProject[]>([]);
+  const [searchValue, setSearchValue] = useState("");
+  const [sortBy, setSortBy] = useState<"updated" | "name" | "created">("updated");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const footerLinks = t.raw("footer.links") as string[];
+
+  useEffect(() => {
+    setProjects(readProjectRecords());
+    const syncProjects = () => setProjects(readProjectRecords());
+    window.addEventListener("storage", syncProjects);
+    return () => window.removeEventListener("storage", syncProjects);
+  }, []);
+
+  const visibleProjects = useMemo(
+    () => {
+      const filtered = projects.filter((project) =>
+        [project.name, project.description].join(" ").toLowerCase().includes(searchValue.trim().toLowerCase()),
+      );
+
+      return [...filtered].sort((left, right) => {
+        if (sortBy === "name") {
+          return left.name.localeCompare(right.name, locale === "zh-CN" ? "zh-CN" : "en");
+        }
+
+        if (sortBy === "created") {
+          return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+        }
+
+        return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+      });
+    },
+    [locale, projects, searchValue, sortBy],
+  );
 
   return (
     <main className="min-h-screen bg-[#fafaf5] text-[#1a1c19]">
@@ -79,10 +120,13 @@ export async function ProjectsPage() {
           </div>
 
           <div className="mt-8 px-4">
-            <button className="flex w-full items-center justify-center gap-2 rounded bg-[#23422a] py-2.5 font-headline text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-[#3a5a40]">
+            <Link
+              href="/projects/new"
+              className="flex w-full items-center justify-center gap-2 rounded bg-[#23422a] py-2.5 font-headline text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-[#3a5a40]"
+            >
               <span className="text-base leading-none">+</span>
               {t("sidebar.newAsset")}
-            </button>
+            </Link>
           </div>
 
           <div className="mt-auto px-2">
@@ -103,6 +147,8 @@ export async function ProjectsPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#727971]" />
                   <input
+                    value={searchValue}
+                    onChange={(event) => setSearchValue(event.target.value)}
                     className="w-64 rounded border-none bg-[#eeeee9] py-2.5 pl-10 pr-4 text-sm text-[#1a1c19] outline-none ring-0 transition-all focus:ring-2 focus:ring-[#23422a]/15"
                     placeholder={t("header.searchPlaceholder")}
                     type="text"
@@ -127,34 +173,45 @@ export async function ProjectsPage() {
                 <span className="font-headline text-xs font-bold uppercase tracking-wider text-[#424842]">
                   {t("toolbar.sortBy")}
                 </span>
-                <select className="cursor-pointer border-none bg-transparent text-xs text-[#1a1c19] outline-none">
-                  <option>{t("toolbar.lastUpdated")}</option>
-                  <option>{t("toolbar.nameAZ")}</option>
-                  <option>{t("toolbar.creationDate")}</option>
+                <select
+                  value={sortBy}
+                  onChange={(event) => setSortBy(event.target.value as "updated" | "name" | "created")}
+                  className="cursor-pointer border-none bg-transparent text-xs text-[#1a1c19] outline-none"
+                >
+                  <option value="updated">{t("toolbar.lastUpdated")}</option>
+                  <option value="name">{t("toolbar.nameAZ")}</option>
+                  <option value="created">{t("toolbar.creationDate")}</option>
                 </select>
                 <div className="flex items-center rounded bg-[#e8e8e3] p-1">
-                  <button className="rounded bg-white p-1.5 text-[#23422a] shadow-sm">
+                  <button
+                    onClick={() => setViewMode("grid")}
+                    className={`rounded p-1.5 ${viewMode === "grid" ? "bg-white text-[#23422a] shadow-sm" : "text-[#424842]"}`}
+                  >
                     <Grid2x2 className="h-4 w-4" />
                   </button>
-                  <button className="p-1.5 text-[#424842]">
+                  <button
+                    onClick={() => setViewMode("list")}
+                    className={`p-1.5 ${viewMode === "list" ? "rounded bg-white text-[#23422a] shadow-sm" : "text-[#424842]"}`}
+                  >
                     <List className="h-4 w-4" />
                   </button>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
-              {projectCards.map((project) => (
-                <article
+            <div className={viewMode === "grid" ? "grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3" : "space-y-4"}>
+              {visibleProjects.map((project) => (
+                <Link
                   key={project.id}
-                  className={`group flex flex-col overflow-hidden rounded-lg border border-transparent bg-[#f4f4ef] transition-all duration-300 hover:border-[#c2c8bf]/30 ${
+                  href={`/editor/${project.id}`}
+                  className={`group overflow-hidden rounded-lg border border-transparent bg-[#f4f4ef] transition-all duration-300 hover:border-[#c2c8bf]/30 ${
                     project.status === "ARCHIVED" ? "opacity-80" : ""
-                  }`}
+                  } ${viewMode === "grid" ? "flex flex-col" : "flex items-stretch gap-4"}`}
                 >
                   <div
-                    className={`relative h-48 overflow-hidden ${
+                    className={`relative overflow-hidden ${
                       project.status === "ARCHIVED" ? "grayscale group-hover:grayscale-0" : ""
-                    }`}
+                    } ${viewMode === "grid" ? "h-48" : "h-auto w-72 shrink-0"}`}
                   >
                     <img
                       src={project.image}
@@ -162,7 +219,7 @@ export async function ProjectsPage() {
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     <div className="absolute left-3 top-3 flex items-center gap-2">
-                      <span className={statusClass(project.status)}>{project.label}</span>
+                      <span className={statusClass(project.status)}>{projectStatusLabel(project.status)}</span>
                     </div>
                   </div>
                   <div className="flex flex-1 flex-col p-5">
@@ -173,14 +230,14 @@ export async function ProjectsPage() {
                         </h3>
                         <p className="mt-1 text-xs text-[#424842]">{project.description}</p>
                       </div>
-                      <button className="rounded p-1 transition-colors hover:bg-[#e8e8e3]">
+                      <span className="rounded p-1 text-[#424842]">
                         <MoreVertical className="h-5 w-5 text-[#424842]" />
-                      </button>
+                      </span>
                     </div>
                     <div className="mt-auto flex items-center justify-between border-t border-[#e8e8e3]/80 pt-4 text-[11px] text-[#727971]">
                       <div className="flex items-center gap-2">
                         <span className="text-sm">◷</span>
-                        <span>{project.updatedAt}</span>
+                        <span>{formatProjectUpdatedAt(project.updatedAt, locale)}</span>
                       </div>
                       <div className="flex -space-x-2">
                         <div className="h-6 w-6 rounded-full border-2 border-[#fafaf5] bg-[#e3e3de]" />
@@ -192,7 +249,7 @@ export async function ProjectsPage() {
                       </div>
                     </div>
                   </div>
-                </article>
+                </Link>
               ))}
             </div>
 

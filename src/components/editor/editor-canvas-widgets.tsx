@@ -1,6 +1,7 @@
 "use client";
 
-import {MiniBarChart, MiniLineChart, MiniPieChart} from "@/components/editor/editor-chart-widgets";
+import {MiniAreaChart, MiniBarChart, MiniLineChart, MiniPieChart} from "@/components/editor/editor-chart-widgets";
+import {EditorMapWidget} from "@/components/editor/editor-map-widget";
 import {
   categoricalSeries,
   eventSnapshot,
@@ -9,10 +10,7 @@ import {
   tableSnapshot,
   type WidgetDataset,
 } from "@/lib/editor-widget-data";
-import type {EditorWidget} from "@/lib/mocks/editor";
-
-const worldMapImage =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuBom0YVtg1jXR9KbQ-l5UsJjKJlaxD5JTDSz5g20XzmcjZwsdgkkEaVwxvSqtkEyRq2N-ZfGcNUErLzu-YavuBef6z3SgLFAUbCoafjW-tv7fCs8j4OtQMei5qcyL11gwpM3Sqtdheff8fmNwzrtAhZh4k0s4BFZL2Rmd4DK1iky6lnOeIY6LsHbbQot7z5IDJP_6J-gN7NUO1Wzw6LDnBaf-Pi2fDoh5UIVrxUKc3UqYw8kxtZK8trsxBO0iEVOMzQNlabZ64wKdxt";
+import {EDITOR_CANVAS_HEIGHT, EDITOR_CANVAS_WIDTH, type EditorWidget} from "@/lib/mocks/editor";
 
 type EditorCanvasWidgetProps = {
   widget: EditorWidget;
@@ -24,41 +22,20 @@ type EditorCanvasWidgetProps = {
   mapRouteDensity?: "low" | "balanced" | "high";
   mapMarkers?: boolean;
   mapGlow?: number;
+  mapRouteStyle?: "solid" | "dashed" | "pulse";
+  mapLabelStyle?: "pill" | "minimal";
+  mapSurfaceTone?: "soft" | "contrast";
   dataset?: WidgetDataset;
   onSelect?: () => void;
 };
 
-export function editorWidgetGridSpan(span: number) {
-  if (span >= 12) return "col-span-12";
-  if (span >= 9) return "col-span-9";
-  if (span >= 8) return "col-span-8";
-  if (span >= 7) return "col-span-7";
-  if (span >= 6) return "col-span-6";
-  if (span >= 5) return "col-span-5";
-  if (span >= 4) return "col-span-4";
-  if (span >= 3) return "col-span-3";
-  if (span >= 2) return "col-span-2";
-  return "col-span-1";
-}
-
-export function editorWidgetRowSpan(span: number) {
-  if (span >= 6) return "row-span-6";
-  if (span >= 5) return "row-span-5";
-  if (span >= 4) return "row-span-4";
-  if (span >= 3) return "row-span-3";
-  if (span >= 2) return "row-span-2";
-  return "row-span-1";
-}
-
 export function editorWidgetPlacement(widget: EditorWidget) {
-  const colStart = Math.max(1, Math.min(12, widget.x + 1));
-  const rowStart = Math.max(1, widget.y + 1);
-  const colSpan = Math.max(1, Math.min(widget.width, 13 - colStart));
-  const rowSpan = Math.max(1, widget.height);
-
   return {
-    gridColumn: `${colStart} / span ${colSpan}`,
-    gridRow: `${rowStart} / span ${rowSpan}`,
+    left: `${clampDimension(widget.x, 0, EDITOR_CANVAS_WIDTH)}px`,
+    top: `${clampDimension(widget.y, 0, EDITOR_CANVAS_HEIGHT)}px`,
+    width: `${clampDimension(widget.width, 1, EDITOR_CANVAS_WIDTH)}px`,
+    height: `${clampDimension(widget.height, 1, EDITOR_CANVAS_HEIGHT)}px`,
+    zIndex: widget.zIndex ?? 1,
   };
 }
 
@@ -72,6 +49,9 @@ export function EditorCanvasWidget({
   mapRouteDensity = "balanced",
   mapMarkers = true,
   mapGlow = 72,
+  mapRouteStyle = "pulse",
+  mapLabelStyle = "pill",
+  mapSurfaceTone = "soft",
   dataset,
   onSelect,
 }: EditorCanvasWidgetProps) {
@@ -86,10 +66,12 @@ export function EditorCanvasWidget({
     >
       {widget.type === "metric" ? <MetricWidget widget={widget} dataset={dataset} /> : null}
       {widget.type === "line" ? <LineWidget widget={widget} dataset={dataset} /> : null}
+      {widget.type === "area" ? <AreaWidget widget={widget} dataset={dataset} /> : null}
       {widget.type === "pie" ? <PieWidget widget={widget} dataset={dataset} /> : null}
       {widget.type === "map" ? (
-        <MapWidget
+        <EditorMapWidget
           widget={widget}
+          dataset={dataset}
           mapLabels={mapLabels}
           map3dAxis={map3dAxis}
           mapZoom={mapZoom}
@@ -97,11 +79,15 @@ export function EditorCanvasWidget({
           mapRouteDensity={mapRouteDensity}
           mapMarkers={mapMarkers}
           mapGlow={mapGlow}
+          mapRouteStyle={mapRouteStyle}
+          mapLabelStyle={mapLabelStyle}
+          mapSurfaceTone={mapSurfaceTone}
         />
       ) : null}
       {widget.type === "bar" ? <BarWidget widget={widget} dataset={dataset} /> : null}
       {widget.type === "events" ? <EventsWidget widget={widget} dataset={dataset} /> : null}
       {widget.type === "table" ? <TableWidget widget={widget} dataset={dataset} /> : null}
+      {widget.type === "rank" ? <RankWidget widget={widget} dataset={dataset} /> : null}
       {widget.type === "text" ? <TextWidget widget={widget} /> : null}
       {widget.type === "image" ? <ImageWidget widget={widget} /> : null}
     </div>
@@ -124,14 +110,14 @@ function MetricWidget({widget, dataset}: {widget: EditorWidget; dataset?: Widget
   const hint = widget.hint ?? data.hint;
   return (
     <div
-      className={`rounded-[4px] border p-4 shadow-sm ${
+      className={`border ${
         alert
           ? "border-[#f4b6af] border-l-[3px] border-l-[#ba1a1a] bg-[#ffdad6]/40"
           : "border-[#c2c8bf]/40 border-l-[3px] border-l-[#23422a] bg-[#fafaf5]"
       }`}
-      style={{background: widget.fill}}
+      style={widgetCardStyle(widget)}
     >
-      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971]">{widget.title}</div>
+      <WidgetTitle widget={widget} />
       <div className="mt-3 flex items-end gap-2">
         <div className={`font-headline text-3xl font-extrabold ${alert ? "text-[#ba1a1a]" : ""}`} style={!alert ? {color: accent} : undefined}>
           {value}
@@ -150,10 +136,23 @@ function LineWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDa
   const accent = widget.accent ?? "#215637";
   const data = lineSeries(dataset, widget.fieldMap);
   return (
-    <div className="h-full rounded-[4px] border border-[#c2c8bf]/40 bg-[#fafaf5] p-4 shadow-sm" style={{background: widget.fill}}>
-      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971]">{widget.title}</div>
+    <div className="h-full border border-[#c2c8bf]/40" style={widgetCardStyle(widget)}>
+      <WidgetTitle widget={widget} />
       <div className="mt-3">
         <MiniLineChart accent={accent} data={data.length ? data : undefined} />
+      </div>
+    </div>
+  );
+}
+
+function AreaWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
+  const accent = widget.accent ?? "#2f6d48";
+  const data = lineSeries(dataset, widget.fieldMap);
+  return (
+    <div className="h-full border border-[#c2c8bf]/40" style={widgetCardStyle(widget)}>
+      <WidgetTitle widget={widget} />
+      <div className="mt-3">
+        <MiniAreaChart accent={accent} data={data.length ? data : undefined} />
       </div>
     </div>
   );
@@ -163,8 +162,8 @@ function PieWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDat
   const accent = widget.accent ?? "#23422a";
   const data = categoricalSeries(dataset, widget.fieldMap);
   return (
-    <div className="h-full rounded-[4px] border border-[#c2c8bf]/40 bg-[#fafaf5] p-4 shadow-sm" style={{background: widget.fill}}>
-      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971]">{widget.title}</div>
+    <div className="h-full border border-[#c2c8bf]/40" style={widgetCardStyle(widget)}>
+      <WidgetTitle widget={widget} />
       <div className="mt-3">
         <MiniPieChart accent={accent} data={data.length ? data : undefined} />
       </div>
@@ -172,165 +171,11 @@ function PieWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDat
   );
 }
 
-function MapWidget({
-  widget,
-  mapLabels,
-  map3dAxis,
-  mapZoom,
-  mapTheme,
-  mapRouteDensity,
-  mapMarkers,
-  mapGlow,
-}: {
-  widget: EditorWidget;
-  mapLabels: boolean;
-  map3dAxis: boolean;
-  mapZoom: string;
-  mapTheme: "emerald" | "midnight" | "amber";
-  mapRouteDensity: "low" | "balanced" | "high";
-  mapMarkers: boolean;
-  mapGlow: number;
-}) {
-  const zoomFactor = clampNumber(Number.parseFloat(mapZoom.replace("x", "")), 1, 3);
-  const worldScale = 0.92 + (zoomFactor - 1) * 0.14;
-  const theme = mapThemes[mapTheme];
-  const routes = mapRouteDensity === "low" ? mapRoutes.slice(0, 2) : mapRouteDensity === "balanced" ? mapRoutes.slice(0, 4) : mapRoutes;
-  const glowOpacity = clampNumber(mapGlow / 100, 0, 1);
-
-  return (
-    <div className="relative h-full overflow-hidden border border-[#c2c8bf]/40" style={{background: theme.base}}>
-      <div className="absolute inset-0 transition-transform duration-300" style={{transform: `scale(${worldScale})`}}>
-        <img
-          src={worldMapImage}
-          alt="World logistics map"
-          className="absolute inset-0 h-full w-full object-cover mix-blend-screen"
-          style={{opacity: theme.imageOpacity}}
-        />
-        <div
-          className="absolute inset-0"
-          style={{
-            background: `radial-gradient(circle at 50% 50%, ${theme.glow} ${Math.round(glowOpacity * 100)}%, transparent 48%)`,
-            opacity: glowOpacity,
-          }}
-        />
-        <div
-          className="absolute inset-0"
-          style={{
-            background: theme.overlay,
-          }}
-        />
-        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {routes.map((route) => (
-            <path
-              key={route.id}
-              d={route.path}
-              fill="none"
-              stroke={theme.route}
-              strokeOpacity={route.opacity}
-              strokeWidth={route.stroke}
-              strokeDasharray={route.dash ? "2.6 2.2" : undefined}
-            />
-          ))}
-          {mapMarkers
-            ? mapMarkersData.map((marker) => (
-                <g key={marker.id}>
-                  <circle cx={marker.cx} cy={marker.cy} r="1.8" fill={theme.markerGlow} opacity={0.28 + glowOpacity * 0.22} />
-                  <circle cx={marker.cx} cy={marker.cy} r="0.7" fill={theme.marker} />
-                </g>
-              ))
-            : null}
-        </svg>
-      </div>
-      <div className="absolute left-4 top-4 rounded-full border border-white/20 bg-white/90 px-3 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-[#23422a] backdrop-blur-sm">
-        Live Monitoring
-      </div>
-      {mapLabels ? (
-        <>
-          <span className="absolute left-[18%] top-[34%] rounded bg-white/80 px-2 py-1 text-[8px] font-semibold text-[#20302a]">Vancouver</span>
-          <span className="absolute right-[18%] top-[28%] rounded bg-white/80 px-2 py-1 text-[8px] font-semibold text-[#20302a]">Hamburg</span>
-          <span className="absolute right-[28%] bottom-[20%] rounded bg-white/80 px-2 py-1 text-[8px] font-semibold text-[#20302a]">Singapore</span>
-        </>
-      ) : null}
-      {map3dAxis ? (
-        <div className="absolute inset-x-12 bottom-16 h-px" style={{background: `linear-gradient(90deg,transparent,${theme.axis},transparent)`}} />
-      ) : null}
-      <div className="absolute bottom-3 right-3 w-40 rounded-[4px] border border-white/20 bg-white/88 p-3 text-[9px] shadow-sm backdrop-blur-sm">
-        <div className="mb-2 flex justify-between">
-          <span>Region Heat</span>
-          <span className="font-bold">{mapZoom}</span>
-        </div>
-        <div className="h-1.5 rounded-full" style={{background: `linear-gradient(90deg, ${theme.heatLow}, ${theme.heatHigh})`}} />
-      </div>
-      {widget.hint ? (
-        <div className="absolute bottom-3 left-3 max-w-44 rounded-[4px] border border-white/15 bg-black/30 px-3 py-2 text-[8px] text-white/90 backdrop-blur-sm">
-          {widget.hint}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-const mapThemes = {
-  emerald: {
-    base: "#20302a",
-    overlay: "linear-gradient(180deg, rgba(5,18,12,0.05) 0%, rgba(11,30,20,0.12) 100%)",
-    glow: "rgba(100, 183, 120,",
-    route: "#9ad9ab",
-    axis: "rgba(255,255,255,0.35)",
-    marker: "#d7f2da",
-    markerGlow: "#8cdd9d",
-    heatLow: "rgba(33,86,55,0.18)",
-    heatHigh: "rgba(33,86,55,0.92)",
-    imageOpacity: 0.9,
-  },
-  midnight: {
-    base: "#142033",
-    overlay: "linear-gradient(180deg, rgba(5,18,32,0.12) 0%, rgba(5,10,20,0.3) 100%)",
-    glow: "rgba(87, 166, 255,",
-    route: "#86c3ff",
-    axis: "rgba(180,210,255,0.42)",
-    marker: "#e7f3ff",
-    markerGlow: "#60b3ff",
-    heatLow: "rgba(74,119,196,0.18)",
-    heatHigh: "rgba(74,119,196,0.92)",
-    imageOpacity: 0.84,
-  },
-  amber: {
-    base: "#3a2415",
-    overlay: "linear-gradient(180deg, rgba(32,18,8,0.06) 0%, rgba(48,22,6,0.22) 100%)",
-    glow: "rgba(255, 186, 82,",
-    route: "#ffd18a",
-    axis: "rgba(255,226,174,0.4)",
-    marker: "#fff2d7",
-    markerGlow: "#ffc66b",
-    heatLow: "rgba(196,124,54,0.18)",
-    heatHigh: "rgba(196,124,54,0.92)",
-    imageOpacity: 0.86,
-  },
-} as const;
-
-const mapRoutes = [
-  {id: "route-1", path: "M18 38 C30 20, 45 16, 63 24", stroke: 0.9, opacity: 0.9, dash: false},
-  {id: "route-2", path: "M63 24 C74 26, 82 34, 86 54", stroke: 1.1, opacity: 0.82, dash: true},
-  {id: "route-3", path: "M23 52 C35 58, 45 60, 60 63", stroke: 0.95, opacity: 0.75, dash: false},
-  {id: "route-4", path: "M60 63 C69 58, 76 55, 82 66", stroke: 0.8, opacity: 0.7, dash: true},
-  {id: "route-5", path: "M41 22 C50 30, 57 38, 64 53", stroke: 0.8, opacity: 0.66, dash: false},
-  {id: "route-6", path: "M49 40 C42 48, 38 56, 35 64", stroke: 0.75, opacity: 0.58, dash: true},
-];
-
-const mapMarkersData = [
-  {id: "vancouver", cx: 23, cy: 38},
-  {id: "hamburg", cx: 63, cy: 24},
-  {id: "singapore", cx: 82, cy: 66},
-  {id: "rotterdam", cx: 58, cy: 28},
-  {id: "long-beach", cx: 18, cy: 44},
-];
-
 function BarWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
   const data = categoricalSeries(dataset, widget.fieldMap);
   return (
-    <div className="h-full rounded-[4px] border border-[#c2c8bf]/40 bg-[#fafaf5] p-4 shadow-sm" style={{background: widget.fill}}>
-      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971]">{widget.title}</div>
+    <div className="h-full border border-[#c2c8bf]/40" style={widgetCardStyle(widget)}>
+      <WidgetTitle widget={widget} />
       <div className="mt-3">
         <MiniBarChart accent={widget.accent ?? "#406840"} data={data.length ? data : undefined} />
       </div>
@@ -339,10 +184,10 @@ function BarWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDat
 }
 
 function EventsWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
-  const rows = eventSnapshot(dataset);
+  const rows = eventSnapshot(dataset, widget.fieldMap);
   return (
-    <div className="h-full rounded-[4px] border border-[#c2c8bf]/40 bg-[#fafaf5] p-4 shadow-sm" style={{background: widget.fill}}>
-      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971]">{widget.title}</div>
+    <div className="h-full border border-[#c2c8bf]/40" style={widgetCardStyle(widget)}>
+      <WidgetTitle widget={widget} />
       {widget.hint ? <div className="mt-2 text-[8px] uppercase tracking-[0.16em] text-[#727971]">{widget.hint}</div> : null}
       <div className="mt-3 space-y-2 text-[9px]">
         {(rows.length ? rows : defaultEvents).map((row, index) => (
@@ -362,8 +207,15 @@ function TableWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetD
   const rows = snapshot.rows.length ? snapshot.rows : defaultTableRows;
 
   return (
-    <div className="overflow-hidden border border-[#c2c8bf]/40 bg-[#f4f4ef]" style={{background: widget.fill}}>
-      {widget.hint ? <div className="border-b border-[#c2c8bf]/30 px-4 py-2 text-[8px] uppercase tracking-[0.16em] text-[#727971]">{widget.hint}</div> : null}
+    <div className="h-full overflow-hidden border border-[#c2c8bf]/40" style={widgetCardStyle(widget, {padding: 0})}>
+      {widget.titleVisible !== false ? (
+        <div className="border-b border-[#c2c8bf]/30 px-4 py-3">
+          <WidgetTitle widget={widget} className="mb-0" />
+          {widget.hint ? <div className="mt-2 text-[8px] uppercase tracking-[0.16em] text-[#727971]">{widget.hint}</div> : null}
+        </div>
+      ) : widget.hint ? (
+        <div className="border-b border-[#c2c8bf]/30 px-4 py-2 text-[8px] uppercase tracking-[0.16em] text-[#727971]">{widget.hint}</div>
+      ) : null}
       <table className="w-full text-left text-[10px]">
         <thead className="bg-[#e8e8e3] text-[#727971]">
           <tr className="uppercase tracking-[0.16em]">
@@ -380,6 +232,46 @@ function TableWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetD
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function RankWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
+  const items = categoricalSeries(dataset, widget.fieldMap).slice(0, 5);
+  const rows = items.length
+    ? items
+    : [
+        {label: "Singapore", value: 94},
+        {label: "Hamburg", value: 82},
+        {label: "Rotterdam", value: 79},
+        {label: "Shanghai", value: 74},
+        {label: "Dubai", value: 68},
+      ];
+
+  return (
+    <div className="h-full border border-[#c2c8bf]/40" style={widgetCardStyle(widget)}>
+      <WidgetTitle widget={widget} />
+      <div className="mt-3 space-y-3">
+        {rows.map((item, index) => (
+          <div key={`${item.label}-${index}`} className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3 text-[11px]">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#eff4ec] text-[10px] font-bold text-[#23422a]">
+                  {index + 1}
+                </span>
+                <span className="truncate font-medium text-[#1a1c19]">{item.label}</span>
+              </div>
+              <span className="font-mono text-[#45664b]">{item.value}</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-[#edf0e8]">
+              <div
+                className="h-full rounded-full bg-[linear-gradient(90deg,#23422a_0%,#6d9572_100%)]"
+                style={{width: `${Math.max(12, Math.min(100, item.value))}%`}}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -415,14 +307,24 @@ const defaultTableRows = [
 ];
 
 function TextWidget({widget}: {widget: EditorWidget}) {
+  const textColor = widget.textColor ?? "#1a1c19";
+  const fontSize = widget.fontSize ?? 22;
+  const fontWeight = textWeight(widget.fontWeight);
+  const lineHeight = widget.lineHeight ?? 1.4;
   return (
     <div
-      className="flex h-full flex-col justify-center rounded-[4px] border border-[#c2c8bf]/40 bg-[#fafaf5] px-4 py-3 shadow-sm"
-      style={{background: widget.fill}}
+      className="flex h-full flex-col justify-center border border-[#c2c8bf]/40"
+      style={widgetCardStyle(widget)}
     >
-      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971]">{widget.title}</div>
-      <div className="mt-2 text-[22px] font-semibold leading-tight text-[#1a1c19]">{widget.value ?? "Executive summary"}</div>
-      {widget.hint ? <div className="mt-2 text-[11px] leading-5 text-[#5f665f]">{widget.hint}</div> : null}
+      <WidgetTitle widget={widget} />
+      <div className="mt-2 leading-tight" style={{fontSize: `${fontSize}px`, color: textColor, fontWeight, lineHeight}}>
+        {widget.value ?? "Executive summary"}
+      </div>
+      {widget.hint ? (
+        <div className="mt-2 text-[11px] leading-5" style={{color: textColor, opacity: 0.72}}>
+          {widget.hint}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -433,15 +335,72 @@ function ImageWidget({widget}: {widget: EditorWidget}) {
     "https://images.unsplash.com/photo-1465447142348-e9952c393450?auto=format&fit=crop&w=1200&q=80";
 
   return (
-    <div className="relative h-full overflow-hidden rounded-[4px] border border-[#c2c8bf]/40 bg-[#eef0ea] shadow-sm">
-      <img src={imageUrl} alt={widget.title} className="h-full w-full object-cover" />
+    <div className="relative h-full overflow-hidden border border-[#c2c8bf]/40" style={widgetCardStyle(widget, {padding: 0})}>
+      <img
+        src={imageUrl}
+        alt={widget.title}
+        className={`h-full w-full ${imageFitClass(widget.imageFit)}`}
+      />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_42%,rgba(17,23,20,0.68)_100%)]" />
       <div className="absolute inset-x-0 bottom-0 p-3 text-white">
-        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">{widget.title}</div>
+        {widget.titleVisible !== false ? (
+          <div className={`text-[10px] font-bold uppercase tracking-[0.18em] text-white/70 ${titleAlignClass(widget.titleAlign)}`}>{widget.title}</div>
+        ) : null}
         {widget.hint ? <div className="mt-1 text-[11px] leading-5 text-white/90">{widget.hint}</div> : null}
       </div>
     </div>
   );
+}
+
+function WidgetTitle({
+  widget,
+  className = "",
+}: {
+  widget: EditorWidget;
+  className?: string;
+}) {
+  if (widget.titleVisible === false) return null;
+
+  return (
+    <div className={`text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971] ${titleAlignClass(widget.titleAlign)} ${className}`}>
+      {widget.title}
+    </div>
+  );
+}
+
+function widgetCardStyle(widget: EditorWidget, overrides?: {padding?: number}) {
+  return {
+    background: widget.fill,
+    borderRadius: `${widget.radius ?? 8}px`,
+    padding: `${overrides?.padding ?? widget.padding ?? 16}px`,
+    boxShadow: widgetShadow(widget.shadow),
+  };
+}
+
+function widgetShadow(shadow: EditorWidget["shadow"]) {
+  if (shadow === "none") return "none";
+  if (shadow === "medium") return "0 18px 36px rgba(26,28,25,0.14)";
+  if (shadow === "strong") return "0 24px 48px rgba(26,28,25,0.2)";
+  return "0 8px 20px rgba(26,28,25,0.08)";
+}
+
+function titleAlignClass(align: EditorWidget["titleAlign"]) {
+  if (align === "center") return "text-center";
+  if (align === "right") return "text-right";
+  return "text-left";
+}
+
+function textWeight(weight: EditorWidget["fontWeight"]) {
+  if (weight === "regular") return 400;
+  if (weight === "medium") return 500;
+  if (weight === "bold") return 700;
+  return 600;
+}
+
+function imageFitClass(fit: EditorWidget["imageFit"]) {
+  if (fit === "contain") return "object-contain";
+  if (fit === "fill") return "object-fill";
+  return "object-cover";
 }
 
 function widgetOutline(stroke: string | undefined, accent = "#23422a") {
@@ -451,7 +410,6 @@ function widgetOutline(stroke: string | undefined, accent = "#23422a") {
   return stroke;
 }
 
-function clampNumber(value: number, min: number, max: number) {
-  if (Number.isNaN(value)) return min;
+function clampDimension(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }

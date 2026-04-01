@@ -31,6 +31,7 @@ import {
   writeImportedDatasets,
   type ImportedDataset,
 } from "@/lib/editor-storage";
+import {decodeRouteSegment} from "@/lib/project-utils";
 
 const profileImage =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuByefq0eg7fdBDomc8F-GMr3SfGkY_9YldcjoNcp0cZt6cVjyT-dKjOCWtzIsDSXvV11s6AR-vkurfntdQzsZ-5NhqGry-4lgy0-rxJgn32YCy-gfqCJQhmgF7L_zX12VIni9wTbLziXKdpSmx0uy2obOubVSsb854dhciDUphORDNuqWK--BekywqGPehJaq3Rp2NkpjzAE3bFJNhFhweSvRi8jSyFX3y4hxAfDK4QIrfMe71tWbTG33zJNy7pPjO3AgEuNFdZG2sr";
@@ -48,8 +49,9 @@ export function DataImportPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const projectId = searchParams.get("projectId") ?? "q4-analytics";
-  const returnTo = searchParams.get("returnTo") ?? `/${locale}/editor/${projectId}`;
+  const projectId = decodeRouteSegment(searchParams.get("projectId") ?? "q4-analytics");
+  const returnTo =
+    decodeRouteSegment(searchParams.get("returnTo") ?? "") || `/${locale}/editor/${projectId}`;
 
   const [datasetName, setDatasetName] = useState("Q4_Logistics_Operations_2023");
   const [destination, setDestination] = useState(importWorkspaceOptions[0] ?? "");

@@ -18,6 +18,9 @@
 4. [design-system-spec.md](/Users/admin/Documents/jaminview/docs/design-system-spec.md)
 5. [component-inventory.md](/Users/admin/Documents/jaminview/docs/component-inventory.md)
 6. [tech-stack-v1.md](/Users/admin/Documents/jaminview/docs/tech-stack-v1.md)
+7. [component-scope-v1.md](/Users/admin/Documents/jaminview/docs/component-scope-v1.md)
+8. [page-function-guide.md](/Users/admin/Documents/jaminview/docs/page-function-guide.md)
+9. [page-settings-spec.md](/Users/admin/Documents/jaminview/docs/page-settings-spec.md)
 
 文档说明：
 
@@ -35,6 +38,12 @@
   - 当前开发要落地的核心组件清单
 - `tech-stack-v1.md`
   - 图表、地图、表单、交互和工程栈的正式技术选型
+- `component-scope-v1.md`
+  - 当前编辑器 V1 必做组件、暂不做组件和 V2 可扩展范围
+- `page-function-guide.md`
+  - 当前页面和功能的人话版说明，帮助团队理解页面到底是干嘛的
+- `page-settings-spec.md`
+  - 页面设置、头部展示规则、背景配置这一层为什么必须补，以及 V1 具体要做到什么
 
 当前项目统一定位：
 
