@@ -17,7 +17,11 @@ export function PublishSuccessPage({projectId}: {projectId: string}) {
     setSnapshot(readPublishedSnapshot(projectId));
   }, [projectId]);
 
-  const shareLink = useMemo(() => `https://jaminview.app/s/${projectId}`, [projectId]);
+  const shareLink = useMemo(() => {
+    const sharePath = `/${locale}/screen/${projectId}`;
+    if (typeof window === "undefined") return sharePath;
+    return `${window.location.origin}${sharePath}`;
+  }, [locale, projectId]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,rgba(35,66,42,0.12),transparent_30%),#fafaf5] px-6 py-16 text-[#1a1c19]">
@@ -60,11 +64,11 @@ export function PublishSuccessPage({projectId}: {projectId: string}) {
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <button
-            onClick={() => router.push(`/${locale}/preview/${projectId}`)}
+            onClick={() => router.push(`/${locale}/screen/${projectId}`)}
             className="inline-flex h-12 items-center gap-2 rounded-xl bg-[#23422a] px-6 text-sm font-bold text-white shadow-lg shadow-[#23422a]/15 transition-all hover:-translate-y-0.5"
           >
             <ExternalLink className="h-4 w-4" />
-            <span>{t("viewPreview")}</span>
+            <span>{t("viewScreen")}</span>
           </button>
           <button
             onClick={() => router.push(`/${locale}/editor/${projectId}`)}

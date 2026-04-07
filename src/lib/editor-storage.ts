@@ -26,10 +26,19 @@ export type DataField = {
 
 export type ScreenBackgroundMode = "color" | "gradient" | "image";
 export type ScreenBackgroundFit = "cover" | "contain" | "center";
+export type ScreenCanvasPreset = "1920x1080" | "2560x1080" | "3840x1080" | "custom";
+export type ScreenHeaderVariant = "classic" | "compact" | "minimal" | "broadcast" | "signal";
+export type ScreenDisplayMode = "contain" | "fit-width" | "actual";
+export type ScreenDisplayAlign = "center" | "top";
+export type ScreenPresentationMode = "standard" | "immersive";
 
 export type ScreenConfig = {
   title: string;
   subtitle: string;
+  canvasPreset: ScreenCanvasPreset;
+  canvasWidth: number;
+  canvasHeight: number;
+  headerVariant: ScreenHeaderVariant;
   showHeader: boolean;
   showTimestamp: boolean;
   showStatusBadge: boolean;
@@ -45,6 +54,9 @@ export type ScreenConfig = {
   backgroundImage: string;
   backgroundFit: ScreenBackgroundFit;
   backgroundOverlay: number;
+  displayMode: ScreenDisplayMode;
+  displayAlign: ScreenDisplayAlign;
+  presentationMode: ScreenPresentationMode;
 };
 
 export type EditorDraft = {
@@ -65,6 +77,25 @@ export type EditorDraft = {
   mapRouteStyle?: "solid" | "dashed" | "pulse";
   mapLabelStyle?: "pill" | "minimal";
   mapSurfaceTone?: "soft" | "contrast";
+  mapPointScale?: number;
+  mapRouteWidth?: number;
+  mapLandOpacity?: number;
+  mapLabelOpacity?: number;
+  mapOceanColor?: string;
+  mapLandStartColor?: string;
+  mapLandEndColor?: string;
+  mapBorderColor?: string;
+  mapAxisColor?: string;
+  mapAxisSecondaryColor?: string;
+  mapRouteColor?: string;
+  mapRouteGlowColor?: string;
+  mapMarkerColor?: string;
+  mapMarkerHaloColor?: string;
+  mapMarkerGlowColor?: string;
+  mapLabelColor?: string;
+  mapPanelTextColor?: string;
+  mapHeatLowColor?: string;
+  mapHeatHighColor?: string;
   datasetDrafts?: Record<string, {fields: DataField[]; rows: DatasetRow[]}>;
   updatedAt: string;
 };

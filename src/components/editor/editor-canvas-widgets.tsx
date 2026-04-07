@@ -1,13 +1,18 @@
 "use client";
 
+import type {CSSProperties} from "react";
+
 import {MiniAreaChart, MiniBarChart, MiniLineChart, MiniPieChart} from "@/components/editor/editor-chart-widgets";
 import {EditorMapWidget} from "@/components/editor/editor-map-widget";
 import {
   categoricalSeries,
   eventSnapshot,
+  eventSnapshotFromRows,
   lineSeries,
   metricSnapshot,
+  parseManualWidgetData,
   tableSnapshot,
+  tableSnapshotFromRows,
   type WidgetDataset,
 } from "@/lib/editor-widget-data";
 import {EDITOR_CANVAS_HEIGHT, EDITOR_CANVAS_WIDTH, type EditorWidget} from "@/lib/mocks/editor";
@@ -25,16 +30,43 @@ type EditorCanvasWidgetProps = {
   mapRouteStyle?: "solid" | "dashed" | "pulse";
   mapLabelStyle?: "pill" | "minimal";
   mapSurfaceTone?: "soft" | "contrast";
+  mapPointScale?: number;
+  mapRouteWidth?: number;
+  mapLandOpacity?: number;
+  mapLabelOpacity?: number;
+  mapOceanColor?: string;
+  mapLandStartColor?: string;
+  mapLandEndColor?: string;
+  mapBorderColor?: string;
+  mapAxisColor?: string;
+  mapAxisSecondaryColor?: string;
+  mapRouteColor?: string;
+  mapRouteGlowColor?: string;
+  mapMarkerColor?: string;
+  mapMarkerHaloColor?: string;
+  mapMarkerGlowColor?: string;
+  mapLabelColor?: string;
+  mapPanelTextColor?: string;
+  mapHeatLowColor?: string;
+  mapHeatHighColor?: string;
   dataset?: WidgetDataset;
   onSelect?: () => void;
 };
 
 export function editorWidgetPlacement(widget: EditorWidget) {
+  return editorWidgetPlacementWithin(widget, EDITOR_CANVAS_WIDTH, EDITOR_CANVAS_HEIGHT);
+}
+
+export function editorWidgetPlacementWithin(
+  widget: EditorWidget,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
   return {
-    left: `${clampDimension(widget.x, 0, EDITOR_CANVAS_WIDTH)}px`,
-    top: `${clampDimension(widget.y, 0, EDITOR_CANVAS_HEIGHT)}px`,
-    width: `${clampDimension(widget.width, 1, EDITOR_CANVAS_WIDTH)}px`,
-    height: `${clampDimension(widget.height, 1, EDITOR_CANVAS_HEIGHT)}px`,
+    left: `${clampDimension(widget.x, 0, canvasWidth)}px`,
+    top: `${clampDimension(widget.y, 0, canvasHeight)}px`,
+    width: `${clampDimension(widget.width, 1, canvasWidth)}px`,
+    height: `${clampDimension(widget.height, 1, canvasHeight)}px`,
     zIndex: widget.zIndex ?? 1,
   };
 }
@@ -52,6 +84,25 @@ export function EditorCanvasWidget({
   mapRouteStyle = "pulse",
   mapLabelStyle = "pill",
   mapSurfaceTone = "soft",
+  mapPointScale = 100,
+  mapRouteWidth = 100,
+  mapLandOpacity = 96,
+  mapLabelOpacity = 92,
+  mapOceanColor = "#0f1915",
+  mapLandStartColor = "#23422a",
+  mapLandEndColor = "#1b3423",
+  mapBorderColor = "#4e7459",
+  mapAxisColor = "#6f8575",
+  mapAxisSecondaryColor = "#486050",
+  mapRouteColor = "#bde7c7",
+  mapRouteGlowColor = "#8ef0ae",
+  mapMarkerColor = "#dfffe7",
+  mapMarkerHaloColor = "#9ae9ae",
+  mapMarkerGlowColor = "#8ef0ae",
+  mapLabelColor = "#f5fff7",
+  mapPanelTextColor = "#243129",
+  mapHeatLowColor = "#4d8f67",
+  mapHeatHighColor = "#bde7c7",
   dataset,
   onSelect,
 }: EditorCanvasWidgetProps) {
@@ -82,6 +133,25 @@ export function EditorCanvasWidget({
           mapRouteStyle={mapRouteStyle}
           mapLabelStyle={mapLabelStyle}
           mapSurfaceTone={mapSurfaceTone}
+          mapPointScale={mapPointScale}
+          mapRouteWidth={mapRouteWidth}
+          mapLandOpacity={mapLandOpacity}
+          mapLabelOpacity={mapLabelOpacity}
+          mapOceanColor={mapOceanColor}
+          mapLandStartColor={mapLandStartColor}
+          mapLandEndColor={mapLandEndColor}
+          mapBorderColor={mapBorderColor}
+          mapAxisColor={mapAxisColor}
+          mapAxisSecondaryColor={mapAxisSecondaryColor}
+          mapRouteColor={mapRouteColor}
+          mapRouteGlowColor={mapRouteGlowColor}
+          mapMarkerColor={mapMarkerColor}
+          mapMarkerHaloColor={mapMarkerHaloColor}
+          mapMarkerGlowColor={mapMarkerGlowColor}
+          mapLabelColor={mapLabelColor}
+          mapPanelTextColor={mapPanelTextColor}
+          mapHeatLowColor={mapHeatLowColor}
+          mapHeatHighColor={mapHeatHighColor}
         />
       ) : null}
       {widget.type === "bar" ? <BarWidget widget={widget} dataset={dataset} /> : null}
@@ -105,9 +175,17 @@ export function EditorCanvasWidget({
 function MetricWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
   const alert = widget.accent === "#ba1a1a";
   const accent = widget.accent ?? "#23422a";
-  const data = metricSnapshot(dataset, widget.fieldMap);
-  const value = widget.value ?? data.value ?? "128";
-  const hint = widget.hint ?? data.hint;
+  const manualData = parseManualWidgetData(widget);
+  const data = manualData?.valid && manualData.metric ? manualData.metric : metricSnapshot(dataset, widget.fieldMap);
+  const rawValue =
+    manualData?.valid && manualData.metric
+      ? data.value
+      : widget.value ?? data.value ?? "128";
+  const value = `${widget.valuePrefix ?? ""}${rawValue}${widget.valueSuffix ?? ""}`;
+  const hint =
+    manualData?.valid && manualData.metric
+      ? data.hint
+      : widget.hint ?? data.hint;
   return (
     <div
       className={`border ${
@@ -134,12 +212,46 @@ function MetricWidget({widget, dataset}: {widget: EditorWidget; dataset?: Widget
 
 function LineWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
   const accent = widget.accent ?? "#215637";
-  const data = lineSeries(dataset, widget.fieldMap);
+  const manualData = parseManualWidgetData(widget);
+  const data = manualData?.valid && manualData.series ? manualData.series : lineSeries(dataset, widget.fieldMap);
   return (
-    <div className="h-full border border-[#c2c8bf]/40" style={widgetCardStyle(widget)}>
+    <div className={`flex h-full flex-col ${widgetShellClass(widget)}`} style={widgetCardStyle(widget)}>
       <WidgetTitle widget={widget} />
-      <div className="mt-3">
-        <MiniLineChart accent={accent} data={data.length ? data : undefined} />
+      <div className="mt-3 min-h-0 flex-1">
+        <MiniLineChart
+          accent={accent}
+          data={data.length ? data : undefined}
+          tone={widget.chartTone ?? "soft"}
+          palette={widget.chartPalette ?? "forest"}
+          paletteColors={widget.chartPaletteColors}
+          paddingMode={widget.chartPaddingMode ?? "balanced"}
+          gridStyle={widget.chartGridStyle ?? "dashed"}
+          gridOpacity={widget.chartGridOpacity ?? 42}
+          axisOpacity={widget.chartAxisOpacity ?? 56}
+          axisColor={widget.chartAxisColor}
+          gridColor={widget.chartGridColor}
+          surfaceColor={widget.fill}
+          surfaceAccentColor={widget.chartSurfaceAccentColor}
+          labelTone={widget.chartLabelTone ?? "balanced"}
+          axisLabelSize={widget.axisLabelSize ?? 8}
+          axisLabelRotate={widget.axisLabelRotate ?? 0}
+          showGrid={widget.showGrid ?? false}
+          showXAxisLabels={widget.showXAxisLabels ?? false}
+          showYAxisLabels={widget.showYAxisLabels ?? false}
+          showXAxisLine={widget.showXAxisLine ?? false}
+          showYAxisLine={widget.showYAxisLine ?? false}
+          showDataLabels={widget.showDataLabels ?? false}
+          showHighlightBadges={widget.showHighlightBadges !== false}
+          showSeriesPoints={widget.showSeriesPoints ?? data.length <= 4}
+          smooth={widget.lineSmooth !== false}
+          lineWeight={widget.lineWeight ?? 3}
+          lineStyle={widget.lineStyle ?? "solid"}
+          pointSize={widget.pointSize ?? 8}
+          labelFormat={widget.chartLabelFormat ?? "raw"}
+          decimals={widget.chartDecimals ?? 0}
+          valuePrefix={widget.valuePrefix}
+          valueSuffix={widget.valueSuffix}
+        />
       </div>
     </div>
   );
@@ -147,12 +259,44 @@ function LineWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDa
 
 function AreaWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
   const accent = widget.accent ?? "#2f6d48";
-  const data = lineSeries(dataset, widget.fieldMap);
+  const manualData = parseManualWidgetData(widget);
+  const data = manualData?.valid && manualData.series ? manualData.series : lineSeries(dataset, widget.fieldMap);
   return (
-    <div className="h-full border border-[#c2c8bf]/40" style={widgetCardStyle(widget)}>
+    <div className={`flex h-full flex-col ${widgetShellClass(widget)}`} style={widgetCardStyle(widget)}>
       <WidgetTitle widget={widget} />
-      <div className="mt-3">
-        <MiniAreaChart accent={accent} data={data.length ? data : undefined} />
+      <div className="mt-3 min-h-0 flex-1">
+        <MiniAreaChart
+          accent={accent}
+          data={data.length ? data : undefined}
+          tone={widget.chartTone ?? "soft"}
+          palette={widget.chartPalette ?? "forest"}
+          paletteColors={widget.chartPaletteColors}
+          paddingMode={widget.chartPaddingMode ?? "balanced"}
+          gridStyle={widget.chartGridStyle ?? "dashed"}
+          gridOpacity={widget.chartGridOpacity ?? 42}
+          axisOpacity={widget.chartAxisOpacity ?? 56}
+          axisColor={widget.chartAxisColor}
+          gridColor={widget.chartGridColor}
+          surfaceColor={widget.fill}
+          surfaceAccentColor={widget.chartSurfaceAccentColor}
+          labelTone={widget.chartLabelTone ?? "balanced"}
+          axisLabelSize={widget.axisLabelSize ?? 8}
+          axisLabelRotate={widget.axisLabelRotate ?? 0}
+          showGrid={widget.showGrid ?? false}
+          showXAxisLabels={widget.showXAxisLabels ?? false}
+          showYAxisLabels={widget.showYAxisLabels ?? false}
+          showXAxisLine={widget.showXAxisLine ?? false}
+          showYAxisLine={widget.showYAxisLine ?? false}
+          showDataLabels={widget.showDataLabels ?? false}
+          showHighlightBadges={widget.showHighlightBadges !== false}
+          smooth={widget.lineSmooth !== false}
+          areaOpacity={(widget.areaOpacity ?? 22) / 100}
+          lineStyle={widget.lineStyle ?? "solid"}
+          labelFormat={widget.chartLabelFormat ?? "raw"}
+          decimals={widget.chartDecimals ?? 0}
+          valuePrefix={widget.valuePrefix}
+          valueSuffix={widget.valueSuffix}
+        />
       </div>
     </div>
   );
@@ -160,31 +304,84 @@ function AreaWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDa
 
 function PieWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
   const accent = widget.accent ?? "#23422a";
-  const data = categoricalSeries(dataset, widget.fieldMap);
+  const manualData = parseManualWidgetData(widget);
+  const data = manualData?.valid && manualData.series ? manualData.series : categoricalSeries(dataset, widget.fieldMap);
   return (
-    <div className="h-full border border-[#c2c8bf]/40" style={widgetCardStyle(widget)}>
+    <div className={`flex h-full flex-col ${widgetShellClass(widget)}`} style={widgetCardStyle(widget)}>
       <WidgetTitle widget={widget} />
-      <div className="mt-3">
-        <MiniPieChart accent={accent} data={data.length ? data : undefined} />
+      <div className="mt-3 min-h-0 flex-1">
+        <MiniPieChart
+          accent={accent}
+          data={data.length ? data : undefined}
+          tone={widget.chartTone ?? "soft"}
+          palette={widget.chartPalette ?? "forest"}
+          paletteColors={widget.chartPaletteColors}
+          paddingMode={widget.chartPaddingMode ?? "balanced"}
+          legendTone={widget.chartLegendTone ?? "balanced"}
+          labelTone={widget.chartLabelTone ?? "balanced"}
+          axisColor={widget.chartAxisColor}
+          surfaceColor={widget.fill}
+          surfaceAccentColor={widget.chartSurfaceAccentColor}
+          showLegend={widget.showLegend !== false}
+          showDataLabels={widget.showDataLabels ?? false}
+          showHighlightBadges={widget.showHighlightBadges !== false}
+          innerRadius={(widget.pieInnerRadius ?? 58) / 100}
+          legendPosition={widget.legendPosition ?? "right"}
+          labelFormat={widget.chartLabelFormat ?? "percent"}
+          decimals={widget.chartDecimals ?? 0}
+          valuePrefix={widget.valuePrefix}
+          valueSuffix={widget.valueSuffix}
+        />
       </div>
     </div>
   );
 }
 
 function BarWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
-  const data = categoricalSeries(dataset, widget.fieldMap);
+  const manualData = parseManualWidgetData(widget);
+  const data = manualData?.valid && manualData.series ? manualData.series : categoricalSeries(dataset, widget.fieldMap);
   return (
-    <div className="h-full border border-[#c2c8bf]/40" style={widgetCardStyle(widget)}>
+    <div className={`flex h-full flex-col ${widgetShellClass(widget)}`} style={widgetCardStyle(widget)}>
       <WidgetTitle widget={widget} />
-      <div className="mt-3">
-        <MiniBarChart accent={widget.accent ?? "#406840"} data={data.length ? data : undefined} />
+      <div className="mt-3 min-h-0 flex-1">
+        <MiniBarChart
+          accent={widget.accent ?? "#406840"}
+          data={data.length ? data : undefined}
+          tone={widget.chartTone ?? "soft"}
+          palette={widget.chartPalette ?? "forest"}
+          paletteColors={widget.chartPaletteColors}
+          paddingMode={widget.chartPaddingMode ?? "balanced"}
+          gridStyle={widget.chartGridStyle ?? "dashed"}
+          gridOpacity={widget.chartGridOpacity ?? 42}
+          axisOpacity={widget.chartAxisOpacity ?? 56}
+          axisColor={widget.chartAxisColor}
+          gridColor={widget.chartGridColor}
+          surfaceColor={widget.fill}
+          surfaceAccentColor={widget.chartSurfaceAccentColor}
+          labelTone={widget.chartLabelTone ?? "balanced"}
+          axisLabelSize={widget.axisLabelSize ?? 8}
+          axisLabelRotate={widget.axisLabelRotate ?? 0}
+          showGrid={widget.showGrid ?? false}
+          showXAxisLabels={widget.showXAxisLabels !== false}
+          showYAxisLabels={widget.showYAxisLabels ?? false}
+          showXAxisLine={widget.showXAxisLine !== false}
+          showYAxisLine={widget.showYAxisLine ?? false}
+          showDataLabels={widget.showDataLabels ?? false}
+          showHighlightBadges={widget.showHighlightBadges !== false}
+          barRadius={widget.barRadius ?? 4}
+          labelFormat={widget.chartLabelFormat ?? "raw"}
+          decimals={widget.chartDecimals ?? 0}
+          valuePrefix={widget.valuePrefix}
+          valueSuffix={widget.valueSuffix}
+        />
       </div>
     </div>
   );
 }
 
 function EventsWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
-  const rows = eventSnapshot(dataset, widget.fieldMap);
+  const manualData = parseManualWidgetData(widget);
+  const rows = manualData?.valid && manualData.rows ? eventSnapshotFromRows(manualData.rows, widget.fieldMap) : eventSnapshot(dataset, widget.fieldMap);
   return (
     <div className="h-full border border-[#c2c8bf]/40" style={widgetCardStyle(widget)}>
       <WidgetTitle widget={widget} />
@@ -202,33 +399,118 @@ function EventsWidget({widget, dataset}: {widget: EditorWidget; dataset?: Widget
 }
 
 function TableWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
-  const snapshot = tableSnapshot(dataset);
-  const columns = snapshot.columns.length ? snapshot.columns : ["ID", "Destination", "Cargo Type", "ETA", "Status"];
+  const manualData = parseManualWidgetData(widget);
+  const snapshot = manualData?.valid && manualData.rows
+    ? tableSnapshotFromRows(manualData.rows, {
+        columns: widget.tableColumns,
+        labels: widget.tableColumnLabels,
+        widths: widget.tableColumnWidths,
+      })
+    : tableSnapshot(dataset, {
+        columns: widget.tableColumns,
+        labels: widget.tableColumnLabels,
+        widths: widget.tableColumnWidths,
+      });
+  const columns = snapshot.columns.length
+    ? snapshot.columns
+    : [
+        {key: "ID", label: "ID"},
+        {key: "Destination", label: "Destination"},
+        {key: "Cargo Type", label: "Cargo Type"},
+        {key: "ETA", label: "ETA"},
+        {key: "Status", label: "Status"},
+      ];
   const rows = snapshot.rows.length ? snapshot.rows : defaultTableRows;
+  const compact = (widget.tableDensity ?? "comfortable") === "compact";
+  const zebra = widget.tableZebra !== false;
+  const highlightFirstColumn = widget.tableHighlightFirstColumn !== false;
+  const highlightNumbers = widget.tableHighlightNumbers !== false;
+  const tableCellAlign = widget.tableCellAlign ?? "left";
+  const tableHeaderAlign = widget.tableHeaderAlign ?? "left";
+  const tableBorderColor = widget.tableBorderColor ?? "#c2c8bf";
+  const tableBorderWidth = widget.tableBorderWidth ?? 1;
+  const tableDividerColor = widget.tableDividerColor ?? "#c2c8bf";
+  const tableBodyColor = widget.tableBodyColor ?? "#fafaf5";
+  const tableHeaderBgColor = widget.tableHeaderBgColor ?? "#e8e8e3";
+  const tableHeaderTextColor = widget.tableHeaderTextColor ?? "#727971";
+  const tableHeaderMetaColor = widget.tableHeaderMetaColor ?? "#727971";
+  const tableHeaderTracking = widget.tableHeaderTracking ?? 1.8;
+  const tableHeaderSize = widget.tableHeaderSize ?? 10;
+  const tableHeaderDividerColor = widget.tableHeaderDividerColor ?? tableDividerColor;
+  const tableHeaderDividerWidth = widget.tableHeaderDividerWidth ?? 1;
+  const tableStripeColor = widget.tableStripeColor ?? "#fafaf5";
+  const tableKeyColor = widget.tableKeyColor ?? "#23422a";
+  const tableNumberColor = widget.tableNumberColor ?? "#31503a";
+  const tableMetaColor = widget.tableMetaColor ?? "#727971";
+  const tableCellSize = widget.tableCellSize ?? 10;
+  const tableRowHoverColor = widget.tableRowHoverColor ?? "#f3f5ef";
+  const tableStatusPositiveColor = widget.tableStatusPositiveColor ?? "#2f6d48";
+  const tableStatusWarningColor = widget.tableStatusWarningColor ?? "#c96b32";
+  const tableStatusCriticalColor = widget.tableStatusCriticalColor ?? "#ba1a1a";
+  const tableStatusNeutralColor = widget.tableStatusNeutralColor ?? "#5e7866";
+  const tableStatusBackgroundOpacity = (widget.tableStatusBackgroundOpacity ?? 12) / 100;
+  const tableShadowColor = widget.tableShadowColor;
+  const tableShadowOpacity = (widget.tableShadowOpacity ?? 14) / 100;
+  const tableShellStyle = {
+    ...widgetCardStyle(widget, {padding: 0}),
+    border: `${tableBorderWidth}px solid ${tableBorderColor}`,
+    boxShadow: tableShadowColor ? `0 18px 36px ${hexToRgba(tableShadowColor, tableShadowOpacity)}` : widgetCardStyle(widget, {padding: 0}).boxShadow,
+  };
 
   return (
-    <div className="h-full overflow-hidden border border-[#c2c8bf]/40" style={widgetCardStyle(widget, {padding: 0})}>
+    <div className="h-full overflow-hidden" style={tableShellStyle}>
       {widget.titleVisible !== false ? (
-        <div className="border-b border-[#c2c8bf]/30 px-4 py-3">
+        <div className="border-b px-4 py-3" style={{borderColor: tableDividerColor}}>
           <WidgetTitle widget={widget} className="mb-0" />
-          {widget.hint ? <div className="mt-2 text-[8px] uppercase tracking-[0.16em] text-[#727971]">{widget.hint}</div> : null}
+          {widget.hint ? <div className="mt-2 text-[8px] uppercase tracking-[0.16em]" style={{color: tableMetaColor}}>{widget.hint}</div> : null}
         </div>
       ) : widget.hint ? (
-        <div className="border-b border-[#c2c8bf]/30 px-4 py-2 text-[8px] uppercase tracking-[0.16em] text-[#727971]">{widget.hint}</div>
+        <div className="border-b px-4 py-2 text-[8px] uppercase tracking-[0.16em]" style={{borderColor: tableDividerColor, color: tableMetaColor}}>{widget.hint}</div>
       ) : null}
-      <table className="w-full text-left text-[10px]">
-        <thead className="bg-[#e8e8e3] text-[#727971]">
-          <tr className="uppercase tracking-[0.16em]">
+      <table className="w-full text-[10px]" style={{background: tableBodyColor}}>
+        <thead style={{background: tableHeaderBgColor, color: tableHeaderTextColor, borderBottom: `${tableHeaderDividerWidth}px solid ${tableHeaderDividerColor}`}}>
+          <tr className="uppercase" style={{letterSpacing: `${tableHeaderTracking}px`}}>
             {columns.map((column) => (
-              <th key={column} className="px-4 py-2">
-                {column}
+              <th
+                key={column.key}
+                className={`${compact ? "px-3 py-2" : "px-4 py-2.5"} ${tableAlignClass(tableHeaderAlign)}`}
+                style={
+                  column.width
+                    ? {width: `${column.width}px`, minWidth: `${column.width}px`, color: tableHeaderTextColor, fontSize: `${tableHeaderSize}px`}
+                    : {color: tableHeaderTextColor, fontSize: `${tableHeaderSize}px`}
+                }
+              >
+                {column.label}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#c2c8bf]/30 bg-white/60">
+        <tbody style={{background: tableBodyColor}}>
           {rows.map((row, rowIndex) => (
-            <DynamicTableRow key={rowIndex} row={row} columns={columns} />
+            <DynamicTableRow
+              key={rowIndex}
+              row={row}
+              columns={columns}
+              compact={compact}
+              zebra={zebra}
+              rowIndex={rowIndex}
+              highlightFirstColumn={highlightFirstColumn}
+              highlightNumbers={highlightNumbers}
+              cellAlign={tableCellAlign}
+              numberFormat={widget.tableNumberFormat ?? "raw"}
+              dividerColor={tableDividerColor}
+              stripeColor={tableStripeColor}
+              rowHoverColor={tableRowHoverColor}
+              keyColor={tableKeyColor}
+              numberColor={tableNumberColor}
+              metaColor={tableMetaColor}
+              cellSize={tableCellSize}
+              statusPositiveColor={tableStatusPositiveColor}
+              statusWarningColor={tableStatusWarningColor}
+              statusCriticalColor={tableStatusCriticalColor}
+              statusNeutralColor={tableStatusNeutralColor}
+              statusBackgroundOpacity={tableStatusBackgroundOpacity}
+            />
           ))}
         </tbody>
       </table>
@@ -237,7 +519,8 @@ function TableWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetD
 }
 
 function RankWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
-  const items = categoricalSeries(dataset, widget.fieldMap).slice(0, 5);
+  const manualData = parseManualWidgetData(widget);
+  const items = (manualData?.valid && manualData.series ? manualData.series : categoricalSeries(dataset, widget.fieldMap)).slice(0, 5);
   const rows = items.length
     ? items
     : [
@@ -276,16 +559,97 @@ function RankWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDa
   );
 }
 
-function DynamicTableRow({row, columns}: {row: Record<string, string | number>; columns: string[]}) {
+function DynamicTableRow({
+  row,
+  columns,
+  compact,
+  zebra,
+  rowIndex,
+  highlightFirstColumn,
+  highlightNumbers,
+  cellAlign,
+  numberFormat,
+  dividerColor,
+  stripeColor,
+  rowHoverColor,
+  keyColor,
+  numberColor,
+  metaColor,
+  cellSize,
+  statusPositiveColor,
+  statusWarningColor,
+  statusCriticalColor,
+  statusNeutralColor,
+  statusBackgroundOpacity,
+}: {
+  row: Record<string, string | number>;
+  columns: Array<{key: string; label: string}>;
+  compact: boolean;
+  zebra: boolean;
+  rowIndex: number;
+  highlightFirstColumn: boolean;
+  highlightNumbers: boolean;
+  cellAlign: "left" | "center" | "right";
+  numberFormat: "raw" | "compact" | "currency" | "percent";
+  dividerColor: string;
+  stripeColor: string;
+  rowHoverColor: string;
+  keyColor: string;
+  numberColor: string;
+  metaColor: string;
+  cellSize: number;
+  statusPositiveColor: string;
+  statusWarningColor: string;
+  statusCriticalColor: string;
+  statusNeutralColor: string;
+  statusBackgroundOpacity: number;
+}) {
   return (
-    <tr>
+    <tr
+      className={!dividerColor || dividerColor === "transparent" ? "" : "border-b"}
+      style={{borderColor: dividerColor, background: zebra && rowIndex % 2 === 1 ? stripeColor : undefined}}
+    >
       {columns.map((column, columnIndex) => {
-        const value = row[column];
+        const value = row[column.key];
+        const renderedValue = formatTableCellValue(value, numberFormat);
+        const isNumeric = typeof value === "number";
+        const statusTone = resolveStatusTone(column.key, value);
+        const isMetaCell =
+          !statusTone &&
+          typeof value === "string" &&
+          (column.key.toLowerCase().includes("eta") ||
+            column.key.toLowerCase().includes("time") ||
+            column.key.toLowerCase().includes("date") ||
+            column.key.toLowerCase().includes("meta"));
         const content =
-          columnIndex === 0 ? <span className="font-mono">{String(value ?? "—")}</span> : <span>{String(value ?? "—")}</span>;
+          statusTone ? (
+            <span
+              className="inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-[0.06em]"
+              style={statusBadgeStyle(statusTone, {
+                positive: statusPositiveColor,
+                warning: statusWarningColor,
+                critical: statusCriticalColor,
+                neutral: statusNeutralColor,
+              }, statusBackgroundOpacity)}
+            >
+              {renderedValue}
+            </span>
+          ) : columnIndex === 0 ? (
+            <span className={highlightFirstColumn ? "font-semibold" : "font-mono"} style={highlightFirstColumn ? {color: keyColor} : undefined}>{renderedValue}</span>
+          ) : highlightNumbers && isNumeric ? (
+            <span className="font-mono font-semibold" style={{color: numberColor}}>{renderedValue}</span>
+          ) : isMetaCell ? (
+            <span style={{color: metaColor}}>{renderedValue}</span>
+          ) : (
+            <span>{renderedValue}</span>
+          );
 
         return (
-          <td key={column} className="px-4 py-2">
+          <td
+            key={column.key}
+            className={`${compact ? "px-3 py-2" : "px-4 py-2.5"} ${tableAlignClass(cellAlign)} transition-colors hover:bg-[var(--row-hover-color)]`}
+            style={{fontSize: `${cellSize}px`, ["--row-hover-color" as string]: rowHoverColor}}
+          >
             {content}
           </td>
         );
@@ -311,17 +675,22 @@ function TextWidget({widget}: {widget: EditorWidget}) {
   const fontSize = widget.fontSize ?? 22;
   const fontWeight = textWeight(widget.fontWeight);
   const lineHeight = widget.lineHeight ?? 1.4;
+  const textAlign = widget.textAlign ?? "left";
+  const letterSpacing = widget.letterSpacing ?? 0;
   return (
     <div
       className="flex h-full flex-col justify-center border border-[#c2c8bf]/40"
       style={widgetCardStyle(widget)}
     >
       <WidgetTitle widget={widget} />
-      <div className="mt-2 leading-tight" style={{fontSize: `${fontSize}px`, color: textColor, fontWeight, lineHeight}}>
+      <div
+        className="mt-2 leading-tight"
+        style={{fontSize: `${fontSize}px`, color: textColor, fontWeight, lineHeight, letterSpacing: `${letterSpacing}px`, textAlign}}
+      >
         {widget.value ?? "Executive summary"}
       </div>
       {widget.hint ? (
-        <div className="mt-2 text-[11px] leading-5" style={{color: textColor, opacity: 0.72}}>
+        <div className="mt-2 text-[11px] leading-5" style={{color: textColor, opacity: 0.72, textAlign}}>
           {widget.hint}
         </div>
       ) : null}
@@ -333,20 +702,60 @@ function ImageWidget({widget}: {widget: EditorWidget}) {
   const imageUrl =
     widget.value ??
     "https://images.unsplash.com/photo-1465447142348-e9952c393450?auto=format&fit=crop&w=1200&q=80";
+  const overlayColor = widget.imageOverlayColor ?? "#111714";
+  const overlayOpacity = widget.imageOverlayOpacity ?? 68;
+  const overlayDirection = widget.imageOverlayDirection ?? "bottom";
+  const grayscale = widget.imageGrayscale ?? false;
+  const borderStyle = widget.imageBorderStyle ?? "soft";
+  const zoom = (widget.imageZoom ?? 100) / 100;
+  const filterStyle = buildImageFilter(widget);
+  const captionPadding = widget.imageCaptionPadding ?? 12;
+  const captionOpacity = (widget.imageCaptionOpacity ?? 82) / 100;
+  const captionBlur = widget.imageCaptionBlur ?? 0;
+  const captionRadius = widget.imageCaptionRadius ?? 18;
+  const captionShadowColor = widget.imageCaptionShadowColor ?? "#111714";
+  const captionShadowOpacity = (widget.imageCaptionShadowOpacity ?? 0) / 100;
+  const overlayBlur = widget.imageOverlayBlur ?? 0;
+  const imageShellStyle = {
+    ...widgetCardStyle(widget, {padding: 0}),
+    border: `${widget.imageBorderWidth ?? (borderStyle === "frame" ? 2 : borderStyle === "none" ? 0 : 1)}px solid ${widget.imageBorderColor ?? (borderStyle === "frame" ? "#d8dccf" : borderStyle === "none" ? "transparent" : "#c2c8bf")}`,
+    boxShadow: widget.imageShadowColor
+      ? `0 18px 40px ${hexToRgba(widget.imageShadowColor, (widget.imageShadowOpacity ?? 18) / 100)}`
+      : undefined,
+  } as CSSProperties;
 
   return (
-    <div className="relative h-full overflow-hidden border border-[#c2c8bf]/40" style={widgetCardStyle(widget, {padding: 0})}>
+    <div className={`${imageShellClass(borderStyle)} relative h-full overflow-hidden`} style={imageShellStyle}>
       <img
         src={imageUrl}
         alt={widget.title}
-        className={`h-full w-full ${imageFitClass(widget.imageFit)}`}
+        className={`h-full w-full ${imageFitClass(widget.imageFit)} ${grayscale ? "grayscale" : ""}`}
+        style={{filter: filterStyle, transform: `scale(${zoom})`}}
       />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_42%,rgba(17,23,20,0.68)_100%)]" />
-      <div className="absolute inset-x-0 bottom-0 p-3 text-white">
+      <div
+        className="absolute inset-0"
+        style={{
+          background: imageOverlayGradient(
+            overlayDirection,
+            overlayColor,
+            Math.max(0, Math.min(100, overlayOpacity)) / 100,
+          ),
+          backdropFilter: overlayBlur > 0 ? `blur(${overlayBlur}px)` : undefined,
+        }}
+      />
+      <div className="absolute inset-x-3 bottom-3" style={{
+        color: widget.imageCaptionTextColor ?? "#ffffff",
+        background: widget.imageCaptionBackgroundColor ? hexToRgba(widget.imageCaptionBackgroundColor, captionOpacity) : undefined,
+        padding: `${captionPadding}px`,
+        border: `${widget.imageCaptionBorderWidth ?? 0}px solid ${widget.imageCaptionBorderColor ?? "transparent"}`,
+        borderRadius: `${captionRadius}px`,
+        backdropFilter: captionBlur > 0 ? `blur(${captionBlur}px)` : undefined,
+        boxShadow: captionShadowOpacity > 0 ? `0 12px 28px ${hexToRgba(captionShadowColor, captionShadowOpacity)}` : undefined,
+      }}>
         {widget.titleVisible !== false ? (
-          <div className={`text-[10px] font-bold uppercase tracking-[0.18em] text-white/70 ${titleAlignClass(widget.titleAlign)}`}>{widget.title}</div>
+          <div className={`text-[10px] font-bold uppercase tracking-[0.18em] opacity-80 ${titleAlignClass(widget.titleAlign)}`}>{widget.title}</div>
         ) : null}
-        {widget.hint ? <div className="mt-1 text-[11px] leading-5 text-white/90">{widget.hint}</div> : null}
+        {widget.hint ? <div className="mt-1 text-[11px] leading-5 ">{widget.hint}</div> : null}
       </div>
     </div>
   );
@@ -361,20 +770,121 @@ function WidgetTitle({
 }) {
   if (widget.titleVisible === false) return null;
 
+  const isChartWidget = widget.type === "line" || widget.type === "area" || widget.type === "bar" || widget.type === "pie" || widget.type === "rank";
+  const accent = widget.accent ?? "#23422a";
+
+  const titleRadius = widget.chartTitleRadius ?? 999;
+  const titleBorderWidth = widget.chartTitleBorderWidth ?? 1;
+  const titleSurfaceOpacity = (widget.chartTitleSurfaceOpacity ?? 12) / 100;
+  const titleSignalSize = widget.chartTitleSignalSize ?? 10;
+  const titleDividerWidth = widget.chartTitleDividerWidth ?? 0;
+  const titlePaddingX = widget.chartTitlePaddingX ?? 10;
+  const titlePaddingY = widget.chartTitlePaddingY ?? 4;
+  const titleBackground =
+    widget.chartTitleBackgroundColor ??
+    (titleSurfaceOpacity > 0 ? hexToRgba(widget.chartTitleAccentColor ?? accent, titleSurfaceOpacity) : "transparent");
+  const titleBorderColor = widget.chartTitleBorderColor ?? hexToRgba(widget.chartTitleAccentColor ?? accent, 0.18);
+  const dividerStartColor =
+    widget.chartTitleDividerStartColor ?? widget.chartTitleBorderColor ?? hexToRgba(widget.chartTitleAccentColor ?? accent, 0.42);
+  const dividerEndColor = widget.chartTitleDividerEndColor ?? "transparent";
+  const signalHaloColor = widget.chartTitleSignalHaloColor ?? "#ffffff";
+  const titleTextColor = widget.titleColor ?? (isChartWidget ? accent : "#727971");
+  const titleLetterSpacing = `${widget.titleTracking ?? 1.8}px`;
+  const showSignal = isChartWidget && titleSignalSize > 0;
+  const showDivider = isChartWidget && titleDividerWidth > 0;
+  const showTitleSurface = isChartWidget && (titleSurfaceOpacity > 0 || titleBorderWidth > 0 || titlePaddingX > 0 || titlePaddingY > 0);
+
   return (
-    <div className={`text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971] ${titleAlignClass(widget.titleAlign)} ${className}`}>
-      {widget.title}
+    <div className={className}>
+      <div className={titleAlignClass(widget.titleAlign)}>
+        <span
+          className={`${widget.titleUppercase === false ? "" : "uppercase"} inline-flex items-center gap-2 font-bold`}
+          style={{
+            fontSize: `${widget.titleSize ?? 10}px`,
+            letterSpacing: titleLetterSpacing,
+            color: titleTextColor,
+            padding: showTitleSurface ? `${titlePaddingY}px ${titlePaddingX}px` : undefined,
+            borderRadius: showTitleSurface ? `${titleRadius}px` : undefined,
+            border: showTitleSurface ? `${titleBorderWidth}px solid ${titleBorderColor}` : undefined,
+            background: showTitleSurface ? titleBackground : undefined,
+          }}
+        >
+          {showSignal ? (
+            <span
+              className="inline-flex rounded-full"
+              style={{
+                background: widget.chartTitleAccentColor ?? accent,
+                height: `${titleSignalSize}px`,
+                width: `${titleSignalSize}px`,
+                boxShadow: `0 0 0 3px ${hexToRgba(signalHaloColor, 0.65)}`,
+              }}
+            />
+          ) : null}
+          {widget.title}
+        </span>
+      </div>
+      {showDivider ? (
+        <div
+          className="mt-2 w-full"
+          style={{
+            height: `${titleDividerWidth}px`,
+            background: `linear-gradient(90deg, ${dividerStartColor} 0%, ${dividerEndColor} 100%)`,
+          }}
+        />
+      ) : null}
     </div>
   );
 }
 
 function widgetCardStyle(widget: EditorWidget, overrides?: {padding?: number}) {
-  return {
+  const chartAccent = widget.accent ?? "#23422a";
+  const baseStyle: CSSProperties = {
     background: widget.fill,
     borderRadius: `${widget.radius ?? 8}px`,
     padding: `${overrides?.padding ?? widget.padding ?? 16}px`,
     boxShadow: widgetShadow(widget.shadow),
   };
+
+  if (widget.type === "line" || widget.type === "area" || widget.type === "bar" || widget.type === "pie" || widget.type === "rank") {
+    const borderColor = widget.chartBorderColor ?? hexToRgba(chartAccent, 0.16);
+    const borderWidth = widget.chartBorderWidth ?? 1;
+    const shadowColor = widget.chartShadowColor ?? "#1a1c19";
+    const shadowOpacity = (widget.chartShadowOpacity ?? 12) / 100;
+    const glowColor = widget.chartGlowColor ?? chartAccent;
+    const glowOpacity = (widget.chartGlowOpacity ?? 0) / 100;
+    return {
+      ...baseStyle,
+      border: `${borderWidth}px solid ${borderColor}`,
+      backgroundImage: `linear-gradient(180deg, ${hexToRgba("#ffffff", 0.18)} 0%, transparent 24%)`,
+      boxShadow: [
+        shadowOpacity > 0 ? `0 16px 32px ${hexToRgba(shadowColor, shadowOpacity)}` : null,
+        glowOpacity > 0 ? `0 0 28px ${hexToRgba(glowColor, glowOpacity)}` : null,
+        `inset 0 1px 0 ${hexToRgba(widget.chartTitleAccentColor ?? chartAccent, 0.08)}`,
+      ].filter(Boolean).join(", "),
+    };
+  }
+
+  return {
+    ...baseStyle,
+  };
+}
+
+function widgetShellClass(widget: EditorWidget) {
+  const base = "h-full border";
+
+  if (widget.type === "line" || widget.type === "area" || widget.type === "bar" || widget.type === "pie") {
+    // Chart cards need a second style layer beyond generic widget fill/radius,
+    // otherwise every chart ends up looking like the same neutral container.
+    return `${base} border-transparent`;
+  }
+
+  return `${base} border-[#c2c8bf]/40`;
+}
+
+function imageShellClass(style: EditorWidget["imageBorderStyle"]) {
+  if (style === "frame") return "border-2 border-[#d8dccf] shadow-[0_12px_28px_rgba(26,28,25,0.12)]";
+  if (style === "none") return "border border-transparent shadow-none";
+  return "border border-[#c2c8bf]/40";
 }
 
 function widgetShadow(shadow: EditorWidget["shadow"]) {
@@ -385,6 +895,12 @@ function widgetShadow(shadow: EditorWidget["shadow"]) {
 }
 
 function titleAlignClass(align: EditorWidget["titleAlign"]) {
+  if (align === "center") return "text-center";
+  if (align === "right") return "text-right";
+  return "text-left";
+}
+
+function tableAlignClass(align: EditorWidget["tableCellAlign"] | EditorWidget["tableHeaderAlign"]) {
   if (align === "center") return "text-center";
   if (align === "right") return "text-right";
   return "text-left";
@@ -401,6 +917,88 @@ function imageFitClass(fit: EditorWidget["imageFit"]) {
   if (fit === "contain") return "object-contain";
   if (fit === "fill") return "object-fill";
   return "object-cover";
+}
+
+function imageOverlayGradient(direction: EditorWidget["imageOverlayDirection"], color: string, alpha: number) {
+  if (direction === "center") {
+    return `radial-gradient(circle at center, ${hexToRgba(color, alpha * 0.72)} 0%, ${hexToRgba(color, alpha * 0.4)} 34%, transparent 72%)`;
+  }
+
+  if (direction === "full") {
+    return `linear-gradient(180deg, ${hexToRgba(color, alpha * 0.85)} 0%, ${hexToRgba(color, alpha * 0.65)} 100%)`;
+  }
+
+  return `linear-gradient(180deg, transparent 42%, ${hexToRgba(color, alpha)} 100%)`;
+}
+
+function buildImageFilter(widget: EditorWidget) {
+  const preset = widget.imageFilterPreset ?? "natural";
+  const brightness = widget.imageBrightness ?? (preset === "cinematic" ? 88 : preset === "cool" ? 96 : preset === "mono" ? 92 : 100);
+  const contrast = widget.imageContrast ?? (preset === "cinematic" ? 116 : preset === "cool" ? 108 : preset === "mono" ? 102 : 100);
+  const saturation = widget.imageSaturation ?? (preset === "cinematic" ? 88 : preset === "cool" ? 118 : preset === "mono" ? 0 : 100);
+  const hueRotate = preset === "cool" ? " hue-rotate(8deg)" : "";
+
+  return `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)${hueRotate}`;
+}
+
+function formatTableCellValue(value: string | number | undefined, format: EditorWidget["tableNumberFormat"]) {
+  if (value === undefined || value === null || value === "") return "—";
+  if (typeof value !== "number") return String(value);
+
+  if (format === "currency") {
+    return new Intl.NumberFormat("zh-CN", {style: "currency", currency: "CNY", maximumFractionDigits: 0}).format(value);
+  }
+
+  if (format === "percent") {
+    const percentValue = Math.abs(value) <= 1 ? value * 100 : value;
+    return `${percentValue.toFixed(percentValue % 1 === 0 ? 0 : 1)}%`;
+  }
+
+  if (format === "compact") {
+    return new Intl.NumberFormat("en", {notation: "compact", maximumFractionDigits: 1}).format(value);
+  }
+
+  return new Intl.NumberFormat("en", {maximumFractionDigits: 2}).format(value);
+}
+
+function resolveStatusTone(columnKey: string, value: string | number | undefined) {
+  if (typeof value !== "string") return null;
+  const key = columnKey.toLowerCase();
+  const normalized = value.toLowerCase().trim();
+  if (!/(status|state|health|level)/.test(key)) return null;
+  if (["critical", "error", "failed", "offline", "delayed", "风险", "异常", "严重", "告警"].some((token) => normalized.includes(token))) return "critical" as const;
+  if (["warning", "review", "pending", "degraded", "预警", "待处理", "审核"].some((token) => normalized.includes(token))) return "warning" as const;
+  if (["normal", "success", "healthy", "live", "正常", "在线", "完成", "on time"].some((token) => normalized.includes(token))) return "positive" as const;
+  return "neutral" as const;
+}
+
+function statusBadgeStyle(
+  tone: "positive" | "warning" | "critical" | "neutral",
+  colors: {positive: string; warning: string; critical: string; neutral: string},
+  backgroundOpacity: number,
+): CSSProperties {
+  const color = tone === "positive" ? colors.positive : tone === "warning" ? colors.warning : tone === "critical" ? colors.critical : colors.neutral;
+  return {
+    color,
+    borderColor: hexToRgba(color, Math.max(0.22, backgroundOpacity + 0.1)),
+    background: hexToRgba(color, backgroundOpacity),
+  };
+}
+
+function hexToRgba(hex: string, alpha: number) {
+  const normalized = hex.replace("#", "");
+  const safeHex =
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((token) => `${token}${token}`)
+          .join("")
+      : normalized.padEnd(6, "0").slice(0, 6);
+  const value = Number.parseInt(safeHex, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function widgetOutline(stroke: string | undefined, accent = "#23422a") {

@@ -1,4 +1,5 @@
 import type {DataField, DatasetRow, DatasetRowValue} from "@/lib/editor-storage";
+import type {EditorWidget} from "@/lib/mocks/editor";
 
 type FieldAliasMap = Record<string, string>;
 
@@ -23,6 +24,25 @@ export type MapRouteSnapshot = {
   intensity: number;
   dashed: boolean;
 };
+
+export type ManualSeriesDatum = {
+  label: string;
+  value: number;
+};
+
+export type ManualMetricDatum = {
+  value: string;
+  hint?: string;
+};
+
+export type ManualWidgetDataParseResult =
+  | {valid: false; error: string}
+  | {
+      valid: true;
+      metric?: ManualMetricDatum;
+      series?: ManualSeriesDatum[];
+      rows?: DatasetRow[];
+    };
 
 export function parseFieldMap(fieldMap?: string): FieldAliasMap {
   if (!fieldMap?.trim()) return {};
@@ -134,10 +154,28 @@ export function categoricalSeries(dataset: WidgetDataset | undefined, fieldMap?:
   }));
 }
 
-export function tableSnapshot(dataset: WidgetDataset | undefined) {
-  if (!dataset) return {columns: [], rows: [] as DatasetRow[]};
+export function tableSnapshot(
+  dataset: WidgetDataset | undefined,
+  options?: {
+    columns?: string[];
+    labels?: Record<string, string>;
+    widths?: Record<string, number>;
+  },
+) {
+  if (!dataset) return {columns: [] as Array<{key: string; label: string; width?: number}>, rows: [] as DatasetRow[]};
+  const requestedColumns = options?.columns?.filter((column) =>
+    dataset.fields.some((field) => field.field === column) || dataset.rows.some((row) => column in row),
+  );
+  const columnKeys = requestedColumns?.length
+    ? requestedColumns
+    : dataset.fields.slice(0, 5).map((field) => field.field);
+
   return {
-    columns: dataset.fields.slice(0, 5).map((field) => field.field),
+    columns: columnKeys.map((field) => ({
+      key: field,
+      label: options?.labels?.[field]?.trim() || field,
+      width: options?.widths?.[field],
+    })),
     rows: dataset.rows.slice(0, 4),
   };
 }
@@ -164,6 +202,49 @@ export function eventSnapshot(dataset: WidgetDataset | undefined, fieldMap?: str
     title: String(row[titleField] ?? `Event ${index + 1}`),
     meta: metaField ? String(row[metaField] ?? "") : "",
   }));
+}
+
+export function inferFieldsFromRows(rows: DatasetRow[]): DataField[] {
+  const firstRow = rows[0];
+  if (!firstRow) return [];
+
+  return Object.keys(firstRow).map((field) => {
+    const sampleValue = rows.find((row) => row[field] !== undefined)?.[field];
+    const type = inferValueType(sampleValue);
+    return {
+      field,
+      type,
+      sample: String(sampleValue ?? ""),
+      icon: fieldIconForType(type),
+    };
+  });
+}
+
+export function tableSnapshotFromRows(
+  rows: DatasetRow[],
+  options?: {
+    columns?: string[];
+    labels?: Record<string, string>;
+    widths?: Record<string, number>;
+  },
+) {
+  return tableSnapshot(
+    {
+      fields: inferFieldsFromRows(rows),
+      rows,
+    },
+    options,
+  );
+}
+
+export function eventSnapshotFromRows(rows: DatasetRow[], fieldMap?: string) {
+  return eventSnapshot(
+    {
+      fields: inferFieldsFromRows(rows),
+      rows,
+    },
+    fieldMap,
+  );
 }
 
 export function mapSnapshot(dataset: WidgetDataset | undefined, fieldMap?: string) {
@@ -238,8 +319,139 @@ export function mapSnapshot(dataset: WidgetDataset | undefined, fieldMap?: strin
   };
 }
 
+export function parseManualWidgetData(
+  widget: Pick<EditorWidget, "type" | "dataSourceMode" | "manualData">,
+): ManualWidgetDataParseResult | null {
+  if (widget.dataSourceMode !== "manual") return null;
+
+  const source = widget.manualData?.trim();
+  if (!source) {
+    return {
+      valid: false,
+      error: "请填写合法 JSON 数据",
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(source) as unknown;
+
+    if (widget.type === "metric") {
+      if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+        return {
+          valid: false,
+          error: "指标卡需要对象格式，例如 {\"value\":1280,\"hint\":\"较上周 +12%\"}",
+        };
+      }
+
+      const value = (parsed as Record<string, unknown>).value;
+      if (typeof value !== "string" && typeof value !== "number") {
+        return {
+          valid: false,
+          error: "指标卡 JSON 需要 value 字段，且值必须是数字或文本",
+        };
+      }
+
+      const hint = (parsed as Record<string, unknown>).hint;
+      return {
+        valid: true,
+        metric: {
+          value: String(value),
+          hint: typeof hint === "string" ? hint : undefined,
+        },
+      };
+    }
+
+    if (widget.type === "line" || widget.type === "area" || widget.type === "bar" || widget.type === "pie" || widget.type === "rank") {
+      if (!Array.isArray(parsed)) {
+        return {
+          valid: false,
+          error: "图表 JSON 需要数组格式，例如 [{\"label\":\"Jan\",\"value\":120}]",
+        };
+      }
+
+      const series = parsed.map((entry, index) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+          throw new Error(`第 ${index + 1} 项必须是对象`);
+        }
+
+        const label = (entry as Record<string, unknown>).label;
+        const value = (entry as Record<string, unknown>).value;
+        const numericValue =
+          typeof value === "number"
+            ? value
+            : typeof value === "string"
+              ? Number(value)
+              : NaN;
+
+        if (typeof label !== "string" || !Number.isFinite(numericValue)) {
+          throw new Error(`第 ${index + 1} 项需要包含 label(string) 和 value(number)`);
+        }
+
+        return {
+          label,
+          value: numericValue,
+        };
+      });
+
+      if (!series.length) {
+        return {
+          valid: false,
+          error: "图表数组不能为空",
+        };
+      }
+
+      return {
+        valid: true,
+        series,
+      };
+    }
+
+    if (widget.type === "table" || widget.type === "events") {
+      if (!Array.isArray(parsed) || parsed.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
+        return {
+          valid: false,
+          error: "表格或事件列表 JSON 需要对象数组格式",
+        };
+      }
+
+      return {
+        valid: true,
+        rows: parsed as DatasetRow[],
+      };
+    }
+
+    return {
+      valid: false,
+      error: "当前组件暂不支持手动 JSON 数据",
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      error: error instanceof Error ? error.message : "JSON 解析失败",
+    };
+  }
+}
+
 function hasField(dataset: WidgetDataset, fieldName: string) {
   return dataset.fields.some((field) => field.field === fieldName) || dataset.rows.some((row) => fieldName in row);
+}
+
+function inferValueType(value: DatasetRowValue | undefined) {
+  if (typeof value === "number") return "Numeric";
+  if (typeof value === "string") {
+    const asNumber = Number(value.replace(/[^\d.-]/g, ""));
+    if (Number.isFinite(asNumber) && value.trim() !== "") return "Numeric";
+    if (!Number.isNaN(Date.parse(value))) return "Date / Time";
+    return "Text";
+  }
+  return "Text";
+}
+
+function fieldIconForType(type: string) {
+  if (type === "Numeric") return "#";
+  if (type === "Date / Time") return "◴";
+  if (type === "Category") return "▣";
+  return "Aa";
 }
 
 function toNumber(value: DatasetRowValue | undefined) {

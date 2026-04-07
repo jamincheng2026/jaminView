@@ -9,7 +9,6 @@ import {
   BarChart3,
   Database,
   Globe2,
-  HelpCircle,
   ImageIcon,
   Lock,
   LayoutGrid,
@@ -19,7 +18,6 @@ import {
   PieChart,
   PlusCircle,
   Redo2,
-  Settings,
   Table2,
   Type,
   Undo2,
@@ -36,12 +34,14 @@ import {Select} from "@/components/ui/select";
 import {Switch} from "@/components/ui/switch";
 import {Tabs} from "@/components/ui/tabs";
 import {Textarea} from "@/components/ui/textarea";
+import {ScreenHeader} from "@/components/screen/screen-header";
 import {
   EditorCanvasWidget,
-  editorWidgetPlacement,
+  editorWidgetPlacementWithin,
 } from "@/components/editor/editor-canvas-widgets";
-import {parseFieldMap} from "@/lib/editor-widget-data";
+import {parseFieldMap, parseManualWidgetData, tableSnapshotFromRows, eventSnapshotFromRows, type ManualWidgetDataParseResult} from "@/lib/editor-widget-data";
 import {
+  canvasPresets,
   editorDatasetSchemas,
   editorDatasets as baseEditorDatasets,
   EDITOR_CANVAS_HEIGHT,
@@ -93,6 +93,25 @@ type EditorSnapshot = {
   mapRouteStyle: "solid" | "dashed" | "pulse";
   mapLabelStyle: "pill" | "minimal";
   mapSurfaceTone: "soft" | "contrast";
+  mapPointScale: number;
+  mapRouteWidth: number;
+  mapLandOpacity: number;
+  mapLabelOpacity: number;
+  mapOceanColor: string;
+  mapLandStartColor: string;
+  mapLandEndColor: string;
+  mapBorderColor: string;
+  mapAxisColor: string;
+  mapAxisSecondaryColor: string;
+  mapRouteColor: string;
+  mapRouteGlowColor: string;
+  mapMarkerColor: string;
+  mapMarkerHaloColor: string;
+  mapMarkerGlowColor: string;
+  mapLabelColor: string;
+  mapPanelTextColor: string;
+  mapHeatLowColor: string;
+  mapHeatHighColor: string;
   canvasView: CanvasView;
 };
 
@@ -117,12 +136,58 @@ type ResizeState = {
   snapshot: EditorSnapshot;
 };
 
+type MarqueeRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type MarqueeState = {
+  startX: number;
+  startY: number;
+  additive: boolean;
+};
+
+type ContextMenuState = {
+  widgetId: string;
+  x: number;
+  y: number;
+};
+
 type SnapGuides = {
   vertical?: number;
   horizontal?: number;
 };
 
 type AlignmentTarget = "left" | "center" | "right" | "top" | "middle" | "bottom";
+type DistributionAxis = "horizontal" | "vertical";
+type MatchSizeTarget = "width" | "height";
+type RightPanelMode = "component" | "page";
+type ComponentPanelTab = "content" | "data" | "style";
+
+const backgroundPresets = [
+  {
+    id: "soft-grid",
+    labelZh: "柔和网格",
+    labelEn: "Soft Grid",
+    value: "linear-gradient(180deg, #f7f5ef 0%, #eef4ea 36%, #eef2ea 100%)",
+  },
+  {
+    id: "signal-depth",
+    labelZh: "信号深场",
+    labelEn: "Signal Depth",
+    value:
+      "radial-gradient(circle at 20% 18%, rgba(74, 128, 88, 0.18), transparent 22%), linear-gradient(180deg, #f6f4ec 0%, #e7efe6 42%, #dfeadf 100%)",
+  },
+  {
+    id: "midnight-radar",
+    labelZh: "深夜雷达",
+    labelEn: "Midnight Radar",
+    value:
+      "radial-gradient(circle at 50% 18%, rgba(108, 173, 124, 0.22), transparent 24%), linear-gradient(180deg, #162119 0%, #101811 100%)",
+  },
+];
 
 export function EditorWorkbench({
   projectId,
@@ -155,6 +220,25 @@ export function EditorWorkbench({
   const [mapRouteStyle, setMapRouteStyle] = useState<"solid" | "dashed" | "pulse">("pulse");
   const [mapLabelStyle, setMapLabelStyle] = useState<"pill" | "minimal">("pill");
   const [mapSurfaceTone, setMapSurfaceTone] = useState<"soft" | "contrast">("soft");
+  const [mapPointScale, setMapPointScale] = useState(100);
+  const [mapRouteWidth, setMapRouteWidth] = useState(100);
+  const [mapLandOpacity, setMapLandOpacity] = useState(96);
+  const [mapLabelOpacity, setMapLabelOpacity] = useState(92);
+  const [mapOceanColor, setMapOceanColor] = useState("#0f1915");
+  const [mapLandStartColor, setMapLandStartColor] = useState("#23422a");
+  const [mapLandEndColor, setMapLandEndColor] = useState("#1b3423");
+  const [mapBorderColor, setMapBorderColor] = useState("#4e7459");
+  const [mapAxisColor, setMapAxisColor] = useState("#6f8575");
+  const [mapAxisSecondaryColor, setMapAxisSecondaryColor] = useState("#486050");
+  const [mapRouteColor, setMapRouteColor] = useState("#bde7c7");
+  const [mapRouteGlowColor, setMapRouteGlowColor] = useState("#8ef0ae");
+  const [mapMarkerColor, setMapMarkerColor] = useState("#dfffe7");
+  const [mapMarkerHaloColor, setMapMarkerHaloColor] = useState("#9ae9ae");
+  const [mapMarkerGlowColor, setMapMarkerGlowColor] = useState("#8ef0ae");
+  const [mapLabelColor, setMapLabelColor] = useState("#f5fff7");
+  const [mapPanelTextColor, setMapPanelTextColor] = useState("#243129");
+  const [mapHeatLowColor, setMapHeatLowColor] = useState("#4d8f67");
+  const [mapHeatHighColor, setMapHeatHighColor] = useState("#bde7c7");
   const [canvasView, setCanvasView] = useState<CanvasView>("free");
   const [importedDatasets, setImportedDatasets] = useState<ImportedDataset[]>([]);
   const [starterDatasetDrafts, setStarterDatasetDrafts] = useState<Record<string, StarterDatasetDraft>>(() =>
@@ -173,16 +257,27 @@ export function EditorWorkbench({
   const [future, setFuture] = useState<EditorSnapshot[]>([]);
   const [projectTitle, setProjectTitle] = useState(projectName?.trim() || editorProject.name);
   const [screenConfig, setScreenConfig] = useState<ScreenConfig>(defaultScreenConfig);
-  const sectionViewportRef = useRef<HTMLElement | null>(null);
+  const sectionViewportRef = useRef<HTMLDivElement | null>(null);
   const canvasGridRef = useRef<HTMLDivElement | null>(null);
+  const backgroundAssetInputRef = useRef<HTMLInputElement | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
   const resizeStateRef = useRef<ResizeState | null>(null);
+  const marqueeStateRef = useRef<MarqueeState | null>(null);
   const clipboardRef = useRef<EditorWidget[]>([]);
   const widgetsRef = useRef<EditorWidget[]>(editorWidgets);
   const seededTemplateRef = useRef(false);
   const [snapGuides, setSnapGuides] = useState<SnapGuides>({});
+  const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [fitZoom, setFitZoom] = useState(0.85);
+  const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>("component");
+  const [componentPanelTab, setComponentPanelTab] = useState<ComponentPanelTab>("content");
   const hasManualZoomRef = useRef(false);
+  const marqueeRectRef = useRef<MarqueeRect | null>(null);
+  const currentCanvasWidth = screenConfig.canvasWidth || EDITOR_CANVAS_WIDTH;
+  const currentCanvasHeight = screenConfig.canvasHeight || EDITOR_CANVAS_HEIGHT;
+  const currentCanvasLabel = `${currentCanvasWidth} × ${currentCanvasHeight}`;
+  const canvasFrameHeight = currentCanvasHeight + 78;
 
   useEffect(() => {
     // Restore the last local draft so the editor behaves like a real working file.
@@ -207,6 +302,25 @@ export function EditorWorkbench({
       setMapRouteStyle(draft.mapRouteStyle ?? "pulse");
       setMapLabelStyle(draft.mapLabelStyle ?? "pill");
       setMapSurfaceTone(draft.mapSurfaceTone ?? "soft");
+      setMapPointScale(draft.mapPointScale ?? 100);
+      setMapRouteWidth(draft.mapRouteWidth ?? 100);
+      setMapLandOpacity(draft.mapLandOpacity ?? 96);
+      setMapLabelOpacity(draft.mapLabelOpacity ?? 92);
+      setMapOceanColor(draft.mapOceanColor ?? "#0f1915");
+      setMapLandStartColor(draft.mapLandStartColor ?? "#23422a");
+      setMapLandEndColor(draft.mapLandEndColor ?? "#1b3423");
+      setMapBorderColor(draft.mapBorderColor ?? "#4e7459");
+      setMapAxisColor(draft.mapAxisColor ?? "#6f8575");
+      setMapAxisSecondaryColor(draft.mapAxisSecondaryColor ?? "#486050");
+      setMapRouteColor(draft.mapRouteColor ?? "#bde7c7");
+      setMapRouteGlowColor(draft.mapRouteGlowColor ?? "#8ef0ae");
+      setMapMarkerColor(draft.mapMarkerColor ?? "#dfffe7");
+      setMapMarkerHaloColor(draft.mapMarkerHaloColor ?? "#9ae9ae");
+      setMapMarkerGlowColor(draft.mapMarkerGlowColor ?? "#8ef0ae");
+      setMapLabelColor(draft.mapLabelColor ?? "#f5fff7");
+      setMapPanelTextColor(draft.mapPanelTextColor ?? "#243129");
+      setMapHeatLowColor(draft.mapHeatLowColor ?? "#4d8f67");
+      setMapHeatHighColor(draft.mapHeatHighColor ?? "#bde7c7");
       setCanvasView(draft.canvasView ?? "free");
       if (draft.datasetDrafts) {
         setStarterDatasetDrafts(draft.datasetDrafts);
@@ -245,18 +359,36 @@ export function EditorWorkbench({
   }, [widgets]);
 
   useEffect(() => {
+    marqueeRectRef.current = marqueeRect;
+  }, [marqueeRect]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const closeMenu = () => setContextMenu(null);
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setContextMenu(null);
+      }
+    };
+
+    window.addEventListener("pointerdown", closeMenu);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeMenu);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [contextMenu]);
+
+  useEffect(() => {
     const element = sectionViewportRef.current;
     if (!element) return;
 
     const updateFitZoom = () => {
-      const nextFitZoom = clamp(
-        Math.min(
-          (element.clientWidth - 48) / EDITOR_CANVAS_WIDTH,
-          (element.clientHeight - 48) / EDITOR_STAGE_FRAME_HEIGHT,
-        ),
-        0.42,
-        1,
-      );
+      // For wide dashboard editors, filling the horizontal workspace first is
+      // more intuitive than shrinking until both axes fit. Vertical overflow is
+      // acceptable because the workspace already supports scrolling.
+      const nextFitZoom = clamp((element.clientWidth - 24) / currentCanvasWidth, 0.38, 1);
 
       setFitZoom(nextFitZoom);
       if (!hasManualZoomRef.current) {
@@ -268,7 +400,7 @@ export function EditorWorkbench({
     const observer = new ResizeObserver(updateFitZoom);
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [currentCanvasWidth]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -317,18 +449,18 @@ export function EditorWorkbench({
           if (!activeIds.includes(widget.id) || widget.locked) return widget;
 
           if (event.key === "ArrowLeft") {
-            return {...widget, x: clamp(widget.x - step, 0, Math.max(0, EDITOR_CANVAS_WIDTH - widget.width))};
+            return {...widget, x: clamp(widget.x - step, 0, Math.max(0, currentCanvasWidth - widget.width))};
           }
 
           if (event.key === "ArrowRight") {
-            return {...widget, x: clamp(widget.x + step, 0, Math.max(0, EDITOR_CANVAS_WIDTH - widget.width))};
+            return {...widget, x: clamp(widget.x + step, 0, Math.max(0, currentCanvasWidth - widget.width))};
           }
 
           if (event.key === "ArrowUp") {
-            return {...widget, y: clamp(widget.y - step, 0, Math.max(0, EDITOR_CANVAS_HEIGHT - widget.height))};
+            return {...widget, y: clamp(widget.y - step, 0, Math.max(0, currentCanvasHeight - widget.height))};
           }
 
-          return {...widget, y: clamp(widget.y + step, 0, Math.max(0, EDITOR_CANVAS_HEIGHT - widget.height))};
+          return {...widget, y: clamp(widget.y + step, 0, Math.max(0, currentCanvasHeight - widget.height))};
         }),
       }));
     };
@@ -398,6 +530,15 @@ export function EditorWorkbench({
     () => datasetPanelItems.find((dataset) => dataset.name === selectedWidget.dataset)?.fields ?? [],
     [datasetPanelItems, selectedWidget.dataset],
   );
+  const effectiveTableColumns = useMemo(() => {
+    const preferred = selectedWidget.tableColumns?.filter((column) =>
+      selectedDatasetFields.some((field) => field.field === column),
+    );
+
+    return preferred?.length
+      ? preferred
+      : selectedDatasetFields.slice(0, 5).map((field) => field.field);
+  }, [selectedDatasetFields, selectedWidget.tableColumns]);
 
   const datasetLookup = useMemo(
     () =>
@@ -421,11 +562,49 @@ export function EditorWorkbench({
     () => buildFieldMappingOptions(selectedWidget.type, locale),
     [locale, selectedWidget.type],
   );
+  const bindingSummary = useMemo(
+    () =>
+      fieldMappingOptions.map((mapping) => {
+        const resolvedField =
+          parsedFieldMap[mapping.alias] ??
+          selectedDatasetFields.find((field) => mapping.preferredTypes.includes(field.type))?.field ??
+          "";
+
+        return {
+          ...mapping,
+          resolvedField,
+          resolvedMeta: selectedDatasetFields.find((field) => field.field === resolvedField),
+        };
+      }),
+    [fieldMappingOptions, parsedFieldMap, selectedDatasetFields],
+  );
+  const missingBindings = useMemo(
+    () =>
+      bindingSummary.filter((mapping) => {
+        if (!mapping.resolvedField) return true;
+        return !selectedDatasetFields.some((field) => field.field === mapping.resolvedField);
+      }),
+    [bindingSummary, selectedDatasetFields],
+  );
+  const isChartWidget = selectedWidget.type === "line" || selectedWidget.type === "area" || selectedWidget.type === "bar" || selectedWidget.type === "pie";
+  const supportsManualData =
+    selectedWidget.type === "metric" ||
+    selectedWidget.type === "line" ||
+    selectedWidget.type === "area" ||
+    selectedWidget.type === "bar" ||
+    selectedWidget.type === "pie" ||
+    selectedWidget.type === "rank" ||
+    selectedWidget.type === "table" ||
+    selectedWidget.type === "events";
+  const manualDataState = useMemo(
+    () => parseManualWidgetData(selectedWidget),
+    [selectedWidget],
+  );
 
   const opacityPercent = String(Math.round((selectedWidget.opacity ?? 1) * 100));
   const strokeValue = selectedWidget.stroke ?? "none";
-  const scaledCanvasWidth = Math.round(EDITOR_CANVAS_WIDTH * zoom);
-  const scaledCanvasFrameHeight = Math.round(EDITOR_STAGE_FRAME_HEIGHT * zoom);
+  const scaledCanvasWidth = Math.round(currentCanvasWidth * zoom);
+  const scaledCanvasFrameHeight = Math.round(canvasFrameHeight * zoom);
   const stageFitsViewport = zoom <= fitZoom + 0.01;
   const canvasBackgroundStyle = useMemo(
     () => buildCanvasBackgroundStyle(screenConfig),
@@ -437,7 +616,9 @@ export function EditorWorkbench({
     if (!element) return;
 
     const frame = window.requestAnimationFrame(() => {
-      element.scrollLeft = 0;
+      if (!hasManualZoomRef.current || stageFitsViewport) {
+        element.scrollLeft = 0;
+      }
     });
 
     return () => window.cancelAnimationFrame(frame);
@@ -448,6 +629,16 @@ export function EditorWorkbench({
       setSelectedDatasetName(selectedWidget.dataset);
     }
   }, [selectedWidget]);
+
+  useEffect(() => {
+    if (selectedWidgetId) {
+      setRightPanelMode("component");
+    }
+  }, [selectedWidgetId]);
+
+  useEffect(() => {
+    setComponentPanelTab("content");
+  }, [selectedWidget.type]);
 
   const visibleWidgets = widgets.filter((widget) => widget.visible);
   const orderedWidgets = useMemo(
@@ -474,6 +665,25 @@ export function EditorWorkbench({
     mapRouteStyle,
     mapLabelStyle,
     mapSurfaceTone,
+    mapPointScale,
+    mapRouteWidth,
+    mapLandOpacity,
+    mapLabelOpacity,
+    mapOceanColor,
+    mapLandStartColor,
+    mapLandEndColor,
+    mapBorderColor,
+    mapAxisColor,
+    mapAxisSecondaryColor,
+    mapRouteColor,
+    mapRouteGlowColor,
+    mapMarkerColor,
+    mapMarkerHaloColor,
+    mapMarkerGlowColor,
+    mapLabelColor,
+    mapPanelTextColor,
+    mapHeatLowColor,
+    mapHeatHighColor,
     canvasView,
   });
 
@@ -494,6 +704,25 @@ export function EditorWorkbench({
     setMapRouteStyle(snapshot.mapRouteStyle);
     setMapLabelStyle(snapshot.mapLabelStyle);
     setMapSurfaceTone(snapshot.mapSurfaceTone);
+    setMapPointScale(snapshot.mapPointScale);
+    setMapRouteWidth(snapshot.mapRouteWidth);
+    setMapLandOpacity(snapshot.mapLandOpacity);
+    setMapLabelOpacity(snapshot.mapLabelOpacity);
+    setMapOceanColor(snapshot.mapOceanColor);
+    setMapLandStartColor(snapshot.mapLandStartColor);
+    setMapLandEndColor(snapshot.mapLandEndColor);
+    setMapBorderColor(snapshot.mapBorderColor);
+    setMapAxisColor(snapshot.mapAxisColor);
+    setMapAxisSecondaryColor(snapshot.mapAxisSecondaryColor);
+    setMapRouteColor(snapshot.mapRouteColor);
+    setMapRouteGlowColor(snapshot.mapRouteGlowColor);
+    setMapMarkerColor(snapshot.mapMarkerColor);
+    setMapMarkerHaloColor(snapshot.mapMarkerHaloColor);
+    setMapMarkerGlowColor(snapshot.mapMarkerGlowColor);
+    setMapLabelColor(snapshot.mapLabelColor);
+    setMapPanelTextColor(snapshot.mapPanelTextColor);
+    setMapHeatLowColor(snapshot.mapHeatLowColor);
+    setMapHeatHighColor(snapshot.mapHeatHighColor);
     setCanvasView(snapshot.canvasView);
   };
 
@@ -532,6 +761,91 @@ export function EditorWorkbench({
     }));
   };
 
+  const applyBackgroundPreset = (value: string) => {
+    handleScreenConfigPatch({
+      backgroundMode: "gradient",
+      backgroundGradient: value,
+    });
+  };
+
+  const handleBackgroundAssetSelected = async (file?: File | null) => {
+    if (!file) return;
+
+    const readFile = () =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.onerror = () => reject(reader.error ?? new Error("Failed to read background asset"));
+        reader.readAsDataURL(file);
+      });
+
+    try {
+      const asset = await readFile();
+      if (!asset) return;
+      handleScreenConfigPatch({
+        backgroundMode: "image",
+        backgroundImage: asset,
+      });
+    } catch {
+      // Keep the editor resilient for local mock workflows.
+    } finally {
+      if (backgroundAssetInputRef.current) {
+        backgroundAssetInputRef.current.value = "";
+      }
+    }
+  };
+
+  const resizeCanvas = (
+    nextCanvasWidth: number,
+    nextCanvasHeight: number,
+    nextPreset: ScreenConfig["canvasPreset"],
+  ) => {
+    commitSnapshot((snapshot) => {
+      const previousCanvasLabel = `${snapshot.screenConfig.canvasWidth} × ${snapshot.screenConfig.canvasHeight}`;
+      const nextCanvasLabel = `${nextCanvasWidth} × ${nextCanvasHeight}`;
+      const shouldSyncBadge =
+        !snapshot.screenConfig.statusBadgeLabel ||
+        snapshot.screenConfig.statusBadgeLabel === previousCanvasLabel;
+
+      return {
+        ...snapshot,
+        widgets: snapshot.widgets.map((widget) => {
+          const width = clamp(widget.width, 120, Math.max(120, nextCanvasWidth));
+          const height = clamp(widget.height, 80, Math.max(80, nextCanvasHeight));
+          return {
+            ...widget,
+            width,
+            height,
+            x: clamp(widget.x, 0, Math.max(0, nextCanvasWidth - width)),
+            y: clamp(widget.y, 0, Math.max(0, nextCanvasHeight - height)),
+          };
+        }),
+        screenConfig: {
+          ...snapshot.screenConfig,
+          canvasPreset: nextPreset,
+          canvasWidth: nextCanvasWidth,
+          canvasHeight: nextCanvasHeight,
+          statusBadgeLabel: shouldSyncBadge ? nextCanvasLabel : snapshot.screenConfig.statusBadgeLabel,
+        },
+      };
+    });
+  };
+
+  const applyCanvasPreset = (presetId: ScreenConfig["canvasPreset"]) => {
+    const preset = canvasPresets.find((item) => item.id === presetId);
+    if (!preset) return;
+    resizeCanvas(preset.width, preset.height, preset.id);
+  };
+
+  const applyCustomCanvasDimension = (axis: "width" | "height", rawValue: string) => {
+    const nextValue = clamp(numberOr(rawValue, axis === "width" ? currentCanvasWidth : currentCanvasHeight), axis === "width" ? 1280 : 720, 5120);
+    resizeCanvas(
+      axis === "width" ? nextValue : currentCanvasWidth,
+      axis === "height" ? nextValue : currentCanvasHeight,
+      "custom",
+    );
+  };
+
   // Build a serializable draft snapshot that preview/publish can consume too.
   const buildDraft = (): EditorDraft => ({
     projectTitle,
@@ -551,6 +865,25 @@ export function EditorWorkbench({
     mapRouteStyle,
     mapLabelStyle,
     mapSurfaceTone,
+    mapPointScale,
+    mapRouteWidth,
+    mapLandOpacity,
+    mapLabelOpacity,
+    mapOceanColor,
+    mapLandStartColor,
+    mapLandEndColor,
+    mapBorderColor,
+    mapAxisColor,
+    mapAxisSecondaryColor,
+    mapRouteColor,
+    mapRouteGlowColor,
+    mapMarkerColor,
+    mapMarkerHaloColor,
+    mapMarkerGlowColor,
+    mapLabelColor,
+    mapPanelTextColor,
+    mapHeatLowColor,
+    mapHeatHighColor,
     datasetDrafts: starterDatasetDrafts,
     updatedAt: new Date().toISOString(),
   });
@@ -591,6 +924,25 @@ export function EditorWorkbench({
     });
   };
 
+  useEffect(() => {
+    const handleSaveShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "s") {
+        return;
+      }
+
+      event.preventDefault();
+      handleSave();
+    };
+
+    window.addEventListener("keydown", handleSaveShortcut);
+    return () => window.removeEventListener("keydown", handleSaveShortcut);
+  }, [projectId, projectTitle, handleSave, locale]);
+
   const openDataImport = () => {
     const normalizedReturnTo = decodeRouteSegment(pathname);
     const nextSearch = new URLSearchParams({
@@ -628,6 +980,109 @@ export function EditorWorkbench({
     updateSelection([...selectedWidgetIds, widgetId], widgetId);
   };
 
+  const handleWidgetContextMenu = (
+    widgetId: string,
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!selectedWidgetIdSet.has(widgetId)) {
+      updateSelection([widgetId], widgetId);
+    }
+
+    const viewport = sectionViewportRef.current;
+    if (!viewport) return;
+    const rect = viewport.getBoundingClientRect();
+
+    setContextMenu({
+      widgetId,
+      x: event.clientX - rect.left + viewport.scrollLeft,
+      y: event.clientY - rect.top + viewport.scrollTop,
+    });
+  };
+
+  const resolveWidgetsWithinMarquee = (rect: MarqueeRect) => {
+    const minX = rect.x;
+    const maxX = rect.x + rect.width;
+    const minY = rect.y;
+    const maxY = rect.y + rect.height;
+
+    return widgetsRef.current
+      .filter((widget) => {
+        const widgetRight = widget.x + widget.width;
+        const widgetBottom = widget.y + widget.height;
+        return widgetRight >= minX && widget.x <= maxX && widgetBottom >= minY && widget.y <= maxY;
+      })
+      .map((widget) => widget.id);
+  };
+
+  const handleCanvasMarqueeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    if (event.target !== event.currentTarget) return;
+
+    const grid = canvasGridRef.current;
+    if (!grid) return;
+
+    event.preventDefault();
+
+    const rect = grid.getBoundingClientRect();
+    const scaleX = rect.width > 0 ? currentCanvasWidth / rect.width : 1;
+    const scaleY = rect.height > 0 ? currentCanvasHeight / rect.height : 1;
+    const startX = clamp(Math.round((event.clientX - rect.left) * scaleX), 0, currentCanvasWidth);
+    const startY = clamp(Math.round((event.clientY - rect.top) * scaleY), 0, currentCanvasHeight);
+    const additive = event.shiftKey || event.metaKey || event.ctrlKey;
+
+    marqueeStateRef.current = {startX, startY, additive};
+    setMarqueeRect({x: startX, y: startY, width: 0, height: 0});
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const active = marqueeStateRef.current;
+      const nextGrid = canvasGridRef.current;
+      if (!active || !nextGrid) return;
+
+      const nextRect = nextGrid.getBoundingClientRect();
+      const nextScaleX = nextRect.width > 0 ? currentCanvasWidth / nextRect.width : 1;
+      const nextScaleY = nextRect.height > 0 ? currentCanvasHeight / nextRect.height : 1;
+      const currentX = clamp(Math.round((moveEvent.clientX - nextRect.left) * nextScaleX), 0, currentCanvasWidth);
+      const currentY = clamp(Math.round((moveEvent.clientY - nextRect.top) * nextScaleY), 0, currentCanvasHeight);
+
+      setMarqueeRect({
+        x: Math.min(active.startX, currentX),
+        y: Math.min(active.startY, currentY),
+        width: Math.abs(currentX - active.startX),
+        height: Math.abs(currentY - active.startY),
+      });
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+
+      const active = marqueeStateRef.current;
+      marqueeStateRef.current = null;
+
+      const currentRect = marqueeRectRef.current;
+      setMarqueeRect(null);
+
+      if (!active || !currentRect) return;
+      if (currentRect.width < 6 && currentRect.height < 6) return;
+
+      const hitIds = resolveWidgetsWithinMarquee(currentRect);
+      if (!hitIds.length) return;
+
+      if (active.additive) {
+        updateSelection([...selectedWidgetIds, ...hitIds], hitIds[hitIds.length - 1]);
+        return;
+      }
+
+      updateSelection(hitIds, hitIds[hitIds.length - 1]);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+  };
+
   const addWidgetFromPalette = (name: string) => {
     const type = resolveWidgetType(name);
     const nextId = `${type}-${Date.now()}`;
@@ -635,8 +1090,8 @@ export function EditorWorkbench({
       id: nextId,
       type,
       title: name,
-      x: 1360,
-      y: 620,
+      x: Math.max(24, currentCanvasWidth - (type === "table" ? 920 : type === "map" ? 760 : type === "image" ? 420 : type === "text" ? 420 : 320) - 160),
+      y: Math.max(120, currentCanvasHeight - (type === "table" ? 220 : type === "map" ? 430 : type === "image" ? 260 : type === "text" ? 190 : type === "rank" ? 250 : 160) - 180),
       width: type === "table" ? 920 : type === "map" ? 760 : type === "image" ? 420 : type === "text" ? 420 : 320,
       height:
         type === "table"
@@ -678,6 +1133,35 @@ export function EditorWorkbench({
       shadow: type === "map" ? "medium" : "soft",
       titleVisible: true,
       titleAlign: "left",
+      chartTone: type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? "soft" : undefined,
+      chartPalette: type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? "forest" : undefined,
+      chartPaletteColors:
+        type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank"
+          ? defaultChartPaletteColors("forest", "#406840")
+          : undefined,
+      chartPaddingMode: type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? "balanced" : undefined,
+      chartGridStyle: type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? "dashed" : undefined,
+      chartGridOpacity: type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? 42 : undefined,
+      chartAxisOpacity: type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? 56 : undefined,
+      chartAxisColor:
+        type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? "#727971" : undefined,
+      chartGridColor:
+        type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? "#d9d0b7" : undefined,
+      chartTitleDividerWidth:
+        type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? 1 : undefined,
+      chartTitleDividerStartColor:
+        type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? "#c7d4c8" : undefined,
+      chartTitleDividerEndColor:
+        type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? "transparent" : undefined,
+      chartTitlePaddingX:
+        type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? 0 : undefined,
+      chartTitlePaddingY:
+        type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? 0 : undefined,
+      chartTitleSignalSize:
+        type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? 0 : undefined,
+      chartLabelTone: type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? "balanced" : undefined,
+      chartBadgeLayout: type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? "split" : undefined,
+      showHighlightBadges: type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank" ? true : undefined,
       zIndex: Math.max(...widgets.map((widget) => widget.zIndex ?? 0), 0) + 10,
       locked: false,
       textColor: "#1a1c19",
@@ -685,6 +1169,14 @@ export function EditorWorkbench({
       fontWeight: type === "text" ? "semibold" : "medium",
       lineHeight: type === "text" ? 1.4 : 1.3,
       imageFit: type === "image" ? "cover" : undefined,
+      imageCaptionRadius: type === "image" ? 18 : undefined,
+      imageCaptionPadding: type === "image" ? 12 : undefined,
+      imageCaptionOpacity: type === "image" ? 82 : undefined,
+      imageCaptionBlur: type === "image" ? 0 : undefined,
+      imageOverlayBlur: type === "image" ? 0 : undefined,
+      tableHeaderTracking: type === "table" ? 1.8 : undefined,
+      tableHeaderSize: type === "table" ? 10 : undefined,
+      tableCellSize: type === "table" ? 10 : undefined,
     };
 
     commitSnapshot((snapshot) => ({
@@ -706,8 +1198,8 @@ export function EditorWorkbench({
         ...widget,
         id: `${widget.type}-${Date.now()}-${index}`,
         title: `${widget.title} Copy`,
-        x: Math.min(widget.x + 24, Math.max(0, EDITOR_CANVAS_WIDTH - widget.width)),
-        y: Math.min(widget.y + 24, Math.max(0, EDITOR_CANVAS_HEIGHT - widget.height)),
+        x: Math.min(widget.x + 24, Math.max(0, currentCanvasWidth - widget.width)),
+        y: Math.min(widget.y + 24, Math.max(0, currentCanvasHeight - widget.height)),
         zIndex: nextZIndex + index * 10,
       }));
 
@@ -730,10 +1222,10 @@ export function EditorWorkbench({
           ...widget,
           id: `${widget.type}-${Date.now()}-${index}`,
           title: `${widget.title} Copy`,
-          x: Math.min(widget.x + 24, Math.max(0, EDITOR_CANVAS_WIDTH - widget.width)),
-          y: Math.min(widget.y + 24, Math.max(0, EDITOR_CANVAS_HEIGHT - widget.height)),
-          zIndex: nextZIndex + index * 10,
-        }));
+        x: Math.min(widget.x + 24, Math.max(0, currentCanvasWidth - widget.width)),
+        y: Math.min(widget.y + 24, Math.max(0, currentCanvasHeight - widget.height)),
+        zIndex: nextZIndex + index * 10,
+      }));
 
       return {
         ...snapshot,
@@ -834,6 +1326,19 @@ export function EditorWorkbench({
     handleWidgetPatch({fieldMap: stringifyFieldMap(nextMap)});
   };
 
+  const fillManualDataTemplate = () => {
+    handleWidgetPatch({
+      dataSourceMode: "manual",
+      manualData: defaultManualDataTemplate(selectedWidget.type),
+    });
+  };
+
+  const resetToDatasetBinding = () => {
+    handleWidgetPatch({
+      dataSourceMode: "dataset",
+    });
+  };
+
   const handleDatasetFieldPatch = (
     datasetName: string,
     fieldIndex: number,
@@ -906,6 +1411,53 @@ export function EditorWorkbench({
     setSaveState("dirty");
   };
 
+  const handleTableColumnToggle = (fieldName: string) => {
+    const nextColumns = effectiveTableColumns.includes(fieldName)
+      ? effectiveTableColumns.filter((column) => column !== fieldName)
+      : [...effectiveTableColumns, fieldName];
+
+    if (!nextColumns.length) return;
+
+    handleWidgetPatch({
+      tableColumns: nextColumns,
+    });
+  };
+
+  const handleTableColumnLabelChange = (fieldName: string, label: string) => {
+    handleWidgetPatch({
+      tableColumnLabels: {
+        ...(selectedWidget.tableColumnLabels ?? {}),
+        [fieldName]: label,
+      },
+    });
+  };
+
+  const handleTableColumnMove = (fieldName: string, direction: "up" | "down") => {
+    const currentIndex = effectiveTableColumns.indexOf(fieldName);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= effectiveTableColumns.length) return;
+
+    const nextColumns = [...effectiveTableColumns];
+    const [moved] = nextColumns.splice(currentIndex, 1);
+    nextColumns.splice(targetIndex, 0, moved);
+
+    handleWidgetPatch({
+      tableColumns: nextColumns,
+    });
+  };
+
+  const handleTableColumnWidthChange = (fieldName: string, rawValue: string) => {
+    const nextWidth = clamp(numberOr(rawValue, selectedWidget.tableColumnWidths?.[fieldName] ?? 140), 80, 360);
+    handleWidgetPatch({
+      tableColumnWidths: {
+        ...(selectedWidget.tableColumnWidths ?? {}),
+        [fieldName]: nextWidth,
+      },
+    });
+  };
+
   const alignSelectedWidget = (target: AlignmentTarget) => {
     const idsToAlign = selectedWidgetIds.length ? selectedWidgetIds : [selectedWidgetId];
     commitSnapshot((snapshot) => ({
@@ -926,11 +1478,11 @@ export function EditorWorkbench({
 
           if (activeWidgets.length === 1) {
             if (target === "left") return {...widget, x: 0};
-            if (target === "center") return {...widget, x: Math.round((EDITOR_CANVAS_WIDTH - widget.width) / 2)};
-            if (target === "right") return {...widget, x: Math.max(0, EDITOR_CANVAS_WIDTH - widget.width)};
+            if (target === "center") return {...widget, x: Math.round((currentCanvasWidth - widget.width) / 2)};
+            if (target === "right") return {...widget, x: Math.max(0, currentCanvasWidth - widget.width)};
             if (target === "top") return {...widget, y: 0};
-            if (target === "middle") return {...widget, y: Math.round((EDITOR_CANVAS_HEIGHT - widget.height) / 2)};
-            return {...widget, y: Math.max(0, EDITOR_CANVAS_HEIGHT - widget.height)};
+            if (target === "middle") return {...widget, y: Math.round((currentCanvasHeight - widget.height) / 2)};
+            return {...widget, y: Math.max(0, currentCanvasHeight - widget.height)};
           }
 
           if (target === "left") return {...widget, x: minX};
@@ -941,6 +1493,78 @@ export function EditorWorkbench({
           return {...widget, y: Math.round(maxBottom - widget.height)};
         });
       })(),
+    }));
+  };
+
+  const distributeSelectedWidgets = (axis: DistributionAxis) => {
+    const idsToDistribute = selectedWidgetIds.length ? selectedWidgetIds : [selectedWidgetId];
+    if (idsToDistribute.length < 3) return;
+
+    commitSnapshot((snapshot) => {
+      const activeWidgets = snapshot.widgets
+        .filter((widget) => idsToDistribute.includes(widget.id))
+        .sort((a, b) => (axis === "horizontal" ? a.x - b.x : a.y - b.y));
+
+      if (activeWidgets.length < 3) return snapshot;
+
+      const first = activeWidgets[0];
+      const last = activeWidgets[activeWidgets.length - 1];
+      const innerWidgets = activeWidgets.slice(1, -1);
+      const totalInnerSize = innerWidgets.reduce(
+        (sum, widget) => sum + (axis === "horizontal" ? widget.width : widget.height),
+        0,
+      );
+      const span =
+        axis === "horizontal"
+          ? last.x - (first.x + first.width)
+          : last.y - (first.y + first.height);
+      const gap = innerWidgets.length ? (span - totalInnerSize) / (activeWidgets.length - 1) : 0;
+
+      if (!Number.isFinite(gap)) return snapshot;
+
+      let cursor = axis === "horizontal" ? first.x + first.width + gap : first.y + first.height + gap;
+      const nextPositions = new Map<string, {x?: number; y?: number}>();
+
+      for (const widget of innerWidgets) {
+        if (axis === "horizontal") {
+          nextPositions.set(widget.id, {x: Math.round(cursor)});
+          cursor += widget.width + gap;
+        } else {
+          nextPositions.set(widget.id, {y: Math.round(cursor)});
+          cursor += widget.height + gap;
+        }
+      }
+
+      return {
+        ...snapshot,
+        widgets: snapshot.widgets.map((widget) => {
+          const patch = nextPositions.get(widget.id);
+          return patch ? {...widget, ...patch} : widget;
+        }),
+      };
+    });
+  };
+
+  const matchSelectedWidgetSize = (target: MatchSizeTarget) => {
+    const idsToMatch = selectedWidgetIds.length ? selectedWidgetIds : [selectedWidgetId];
+    if (idsToMatch.length < 2) return;
+
+    const primaryWidget = widgets.find((widget) => widget.id === selectedWidgetId);
+    if (!primaryWidget) return;
+
+    commitSnapshot((snapshot) => ({
+      ...snapshot,
+      widgets: snapshot.widgets.map((widget) => {
+        if (!idsToMatch.includes(widget.id) || widget.id === primaryWidget.id) return widget;
+
+        if (target === "width") {
+          const width = clamp(primaryWidget.width, 120, Math.max(120, currentCanvasWidth - widget.x));
+          return {...widget, width};
+        }
+
+        const height = clamp(primaryWidget.height, 80, Math.max(80, currentCanvasHeight - widget.y));
+        return {...widget, height};
+      }),
     }));
   };
 
@@ -1042,11 +1666,11 @@ export function EditorWorkbench({
 
       const deltaX = (moveEvent.clientX - activeDrag.startClientX) / zoom;
       const deltaY = (moveEvent.clientY - activeDrag.startClientY) / zoom;
-      const clampedDeltaX = clamp(Math.round(deltaX), -minLeft, EDITOR_CANVAS_WIDTH - maxRight);
-      const clampedDeltaY = clamp(Math.round(deltaY), -minTop, EDITOR_CANVAS_HEIGHT - maxBottom);
-      const proposedX = clamp(Math.round(origin.x + clampedDeltaX), 0, Math.max(0, EDITOR_CANVAS_WIDTH - nextWidget.width));
-      const proposedY = clamp(Math.round(origin.y + clampedDeltaY), 0, Math.max(0, EDITOR_CANVAS_HEIGHT - nextWidget.height));
-      const snapped = resolveSnapForMove(widgetsRef.current, nextWidget, proposedX, proposedY, canvasView);
+      const clampedDeltaX = clamp(Math.round(deltaX), -minLeft, currentCanvasWidth - maxRight);
+      const clampedDeltaY = clamp(Math.round(deltaY), -minTop, currentCanvasHeight - maxBottom);
+      const proposedX = clamp(Math.round(origin.x + clampedDeltaX), 0, Math.max(0, currentCanvasWidth - nextWidget.width));
+      const proposedY = clamp(Math.round(origin.y + clampedDeltaY), 0, Math.max(0, currentCanvasHeight - nextWidget.height));
+      const snapped = resolveSnapForMove(widgetsRef.current, nextWidget, proposedX, proposedY, canvasView, currentCanvasWidth, currentCanvasHeight);
       const adjustedDeltaX = snapped.x - origin.x;
       const adjustedDeltaY = snapped.y - origin.y;
 
@@ -1055,8 +1679,8 @@ export function EditorWorkbench({
           activeDrag.widgetIds.includes(widget.id)
             ? {
                 ...widget,
-                x: clamp(activeDrag.originPositions[widget.id].x + adjustedDeltaX, 0, Math.max(0, EDITOR_CANVAS_WIDTH - widget.width)),
-                y: clamp(activeDrag.originPositions[widget.id].y + adjustedDeltaY, 0, Math.max(0, EDITOR_CANVAS_HEIGHT - widget.height)),
+                x: clamp(activeDrag.originPositions[widget.id].x + adjustedDeltaX, 0, Math.max(0, currentCanvasWidth - widget.width)),
+                y: clamp(activeDrag.originPositions[widget.id].y + adjustedDeltaY, 0, Math.max(0, currentCanvasHeight - widget.height)),
               }
             : widget,
         ),
@@ -1129,8 +1753,8 @@ export function EditorWorkbench({
       const deltaY = (moveEvent.clientY - activeResize.startClientY) / zoom;
       const widthDelta = Math.round(deltaX);
       const heightDelta = Math.round(deltaY);
-      const maxWidth = Math.max(120, EDITOR_CANVAS_WIDTH - nextWidget.x);
-      const maxHeight = Math.max(80, EDITOR_CANVAS_HEIGHT - nextWidget.y);
+      const maxWidth = Math.max(120, currentCanvasWidth - nextWidget.x);
+      const maxHeight = Math.max(80, currentCanvasHeight - nextWidget.y);
 
       const nextWidth =
         activeResize.direction === "s"
@@ -1146,6 +1770,8 @@ export function EditorWorkbench({
         nextWidth,
         nextHeight,
         canvasView,
+        currentCanvasWidth,
+        currentCanvasHeight,
       );
 
       setWidgets((current) =>
@@ -1236,6 +1862,13 @@ export function EditorWorkbench({
           </div>
 
           <button
+            onClick={() => handleSave()}
+            disabled={saveState === "saving"}
+            className="rounded border border-[#c2c8bf]/50 bg-[#fafaf5] px-4 py-1.5 text-sm font-medium text-[#23422a] transition-colors hover:bg-[#eef2ea] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {t("topbar.save")}
+          </button>
+          <button
             onClick={handlePreview}
             className="rounded px-4 py-1.5 text-sm font-medium text-[#23422a] transition-colors hover:bg-[#e8e8e3]"
           >
@@ -1250,7 +1883,7 @@ export function EditorWorkbench({
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="grid flex-1 grid-cols-[5rem_16rem_minmax(0,1fr)_19.25rem] overflow-hidden">
         <nav className="flex w-20 shrink-0 flex-col items-center border-r border-[#c2c8bf]/20 bg-[#f4f4ef] py-4">
           <div className="flex w-full flex-col items-center gap-6">
             <RailItem active={railTab === "components"} icon={<LayoutGrid className="h-4 w-4" />} label={t("rail.components")} onClick={() => setRailTab("components")} />
@@ -1259,9 +1892,12 @@ export function EditorWorkbench({
             <RailItem active={railTab === "templates"} icon={<LayoutGrid className="h-4 w-4" />} label={t("rail.templates")} onClick={() => setRailTab("templates")} />
           </div>
 
-          <div className="mt-auto flex w-full flex-col items-center gap-6 pb-4">
-            <RailItem icon={<Settings className="h-4 w-4" />} label={t("rail.settings")} disabled />
-            <RailItem icon={<HelpCircle className="h-4 w-4" />} label={t("rail.help")} disabled />
+          <div className="mt-auto px-3 pb-4 pt-6 text-center">
+            <div className="rounded-xl border border-dashed border-[#c2c8bf]/30 bg-[#efefe8] px-3 py-4 text-[10px] leading-5 text-[#727971]">
+              {locale === "zh-CN"
+                ? "当前聚焦编辑核心能力，设置与帮助入口将在后续版本补齐。"
+                : "This build focuses on core editing features. Settings and help will land in a later iteration."}
+            </div>
           </div>
         </nav>
 
@@ -1366,33 +2002,31 @@ export function EditorWorkbench({
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 overflow-hidden bg-[#dadad5]">
-          <div className="flex h-full w-full min-w-0">
-            <section
-              ref={sectionViewportRef}
-              onWheel={(event) => {
-                if (event.metaKey || event.ctrlKey) {
-                  event.preventDefault();
-                  handleZoomDelta(event.deltaY > 0 ? -0.04 : 0.04);
-                }
-              }}
-              className={`relative flex min-h-[780px] min-w-0 flex-1 items-start overflow-auto px-6 py-6 ${
-                stageFitsViewport ? "justify-center" : "justify-start"
-              }`}
-            >
+        <section className="relative min-w-0 overflow-hidden bg-[#dadad5]">
+          <div
+            ref={sectionViewportRef}
+            onWheel={(event) => {
+              if (event.metaKey || event.ctrlKey) {
+                event.preventDefault();
+                handleZoomDelta(event.deltaY > 0 ? -0.04 : 0.04);
+              }
+            }}
+            className="relative h-full overflow-auto px-3 py-4"
+          >
+            <div className="flex min-h-full items-start justify-start">
               <div
                 className="relative shrink-0"
                 style={{width: `${scaledCanvasWidth}px`, height: `${scaledCanvasFrameHeight}px`}}
               >
                 <div
-                  className="absolute left-0 top-0 w-[1920px] origin-top-left overflow-hidden border border-[#c2c8bf]/50 bg-[#fafaf5] shadow-[0_28px_60px_rgba(26,28,25,0.16)]"
-                  style={{transform: `scale(${zoom})`}}
+                  className="absolute left-0 top-0 origin-top-left overflow-hidden border border-[#c2c8bf]/50 bg-[#fafaf5] shadow-[0_28px_60px_rgba(26,28,25,0.16)]"
+                  style={{width: `${currentCanvasWidth}px`, transform: `scale(${zoom})`}}
                 >
                   <div className="border-b border-[#c2c8bf]/30 px-4 py-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Badge className="rounded border-[#c7ecca] bg-[#eff6ec] px-2 py-1 tracking-[0.12em] text-[#23422a]">
-                        {editorProject.canvasLabel}
+                        {currentCanvasLabel}
                       </Badge>
                       <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971]">
                         {t("canvas.live")}
@@ -1413,8 +2047,8 @@ export function EditorWorkbench({
 
                   <div className="bg-[#fafaf5] p-3">
                     <div
-                      className={`${canvasView === "grid" ? "dot-grid" : ""} relative h-[1080px] w-[1920px] overflow-hidden border border-[#c2c8bf]/50`}
-                      style={canvasBackgroundStyle}
+                      className={`${canvasView === "grid" ? "dot-grid" : ""} relative overflow-hidden border border-[#c2c8bf]/50`}
+                      style={{...canvasBackgroundStyle, width: `${currentCanvasWidth}px`, height: `${currentCanvasHeight}px`}}
                     >
                       {canvasView === "safe" ? (
                         <div className="pointer-events-none absolute inset-[48px] border border-dashed border-[#23422a]/25" />
@@ -1426,90 +2060,94 @@ export function EditorWorkbench({
                         />
                       ) : null}
                       <div className="absolute inset-0 flex flex-col p-4">
-                      {screenConfig.showHeader ? (
-                        <div className="mb-4 flex items-start justify-between">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              {screenConfig.showStatusBadge ? (
-                                <Badge className="rounded border-[#c7ecca] bg-[#eff6ec] px-2 py-1 tracking-[0.12em] text-[#23422a]">
-                                  {screenConfig.statusBadgeLabel || editorProject.canvasLabel}
-                                </Badge>
-                              ) : null}
-                              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971]">
-                                {screenConfig.statusMetaLabel || t("canvas.live")}
-                              </span>
-                            </div>
-                            <h1 className="mt-3 font-headline text-[24px] font-extrabold leading-tight tracking-tight text-[#23422a]">
-                              {screenConfig.title}
-                            </h1>
-                            <p className="mt-1 text-[9px] font-medium uppercase tracking-[0.24em] text-[#727971]">
-                              {screenConfig.subtitle}
-                            </p>
-                          </div>
-                          {screenConfig.showTimestamp ? (
-                            <div className="flex items-center gap-5 text-right">
-                              <div>
-                                <div className="text-[11px] font-bold font-mono text-[#1a1c19]">
-                                  {screenConfig.timeText}
-                                </div>
-                                <div className="text-[9px] uppercase tracking-[0.16em] text-[#727971]">
-                                  {screenConfig.dateText}
-                                </div>
-                              </div>
-                              <div className="border-l border-[#c2c8bf]/40 pl-4">
-                                <div className="text-[11px] font-bold text-[#1a1c19]">
-                                  {screenConfig.rightMetaPrimary}
-                                </div>
-                                <div className="mt-1 text-[9px] uppercase tracking-[0.16em] text-[#727971]">
-                                  {screenConfig.rightMetaSecondary}
-                                </div>
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
+                        {screenConfig.showHeader ? (
+                          <ScreenHeader
+                            screenConfig={screenConfig}
+                            canvasLabel={currentCanvasLabel}
+                            fallbackMetaLabel={t("canvas.live")}
+                          />
+                        ) : null}
 
-                      <div ref={canvasGridRef} className="relative flex-1">
-                        {typeof snapGuides.vertical === "number" ? (
-                          <div
-                            className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-[#4e7b56]/70"
-                            style={{left: `${snapGuides.vertical}px`}}
-                          />
-                        ) : null}
-                        {typeof snapGuides.horizontal === "number" ? (
-                          <div
-                            className="pointer-events-none absolute left-0 right-0 z-10 h-px bg-[#4e7b56]/70"
-                            style={{top: `${snapGuides.horizontal}px`}}
-                          />
-                        ) : null}
-                        {visibleOrderedWidgets.map((widget) => (
+                        <div
+                          ref={canvasGridRef}
+                          onPointerDown={handleCanvasMarqueeStart}
+                          className="relative flex-1"
+                        >
+                          {typeof snapGuides.vertical === "number" ? (
+                            <div
+                              className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-[#4e7b56]/70"
+                              style={{left: `${snapGuides.vertical}px`}}
+                            />
+                          ) : null}
+                          {typeof snapGuides.horizontal === "number" ? (
+                            <div
+                              className="pointer-events-none absolute left-0 right-0 z-10 h-px bg-[#4e7b56]/70"
+                              style={{top: `${snapGuides.horizontal}px`}}
+                            />
+                          ) : null}
+                          {marqueeRect ? (
+                            <div
+                              className="pointer-events-none absolute z-20 border border-dashed border-[#4e7b56] bg-[#4e7b56]/10"
+                              style={{
+                                left: `${marqueeRect.x}px`,
+                                top: `${marqueeRect.y}px`,
+                                width: `${marqueeRect.width}px`,
+                                height: `${marqueeRect.height}px`,
+                              }}
+                            />
+                          ) : null}
+                          {visibleOrderedWidgets.map((widget) => (
                           <WidgetCanvasItem
                             key={widget.id}
                             widget={widget}
-                            selected={selectedWidgetIdSet.has(widget.id)}
-                            mapLabels={mapLabels}
-                            map3dAxis={map3dAxis}
-                            mapZoom={mapZoom}
-                            mapTheme={mapTheme}
-                            mapRouteDensity={mapRouteDensity}
-                            mapMarkers={mapMarkers}
-                            mapGlow={mapGlow}
-                            mapRouteStyle={mapRouteStyle}
-                            mapLabelStyle={mapLabelStyle}
-                            mapSurfaceTone={mapSurfaceTone}
+                              canvasWidth={currentCanvasWidth}
+                              canvasHeight={currentCanvasHeight}
+                              selected={selectedWidgetIdSet.has(widget.id)}
+                              mapLabels={mapLabels}
+                              map3dAxis={map3dAxis}
+                              mapZoom={mapZoom}
+                              mapTheme={mapTheme}
+                              mapRouteDensity={mapRouteDensity}
+                              mapMarkers={mapMarkers}
+                              mapGlow={mapGlow}
+                              mapRouteStyle={mapRouteStyle}
+                              mapLabelStyle={mapLabelStyle}
+                              mapSurfaceTone={mapSurfaceTone}
+                              mapPointScale={mapPointScale}
+                              mapRouteWidth={mapRouteWidth}
+                              mapLandOpacity={mapLandOpacity}
+                              mapLabelOpacity={mapLabelOpacity}
+                              mapOceanColor={mapOceanColor}
+                              mapLandStartColor={mapLandStartColor}
+                              mapLandEndColor={mapLandEndColor}
+                              mapBorderColor={mapBorderColor}
+                              mapAxisColor={mapAxisColor}
+                              mapAxisSecondaryColor={mapAxisSecondaryColor}
+                              mapRouteColor={mapRouteColor}
+                              mapRouteGlowColor={mapRouteGlowColor}
+                              mapMarkerColor={mapMarkerColor}
+                              mapMarkerHaloColor={mapMarkerHaloColor}
+                              mapMarkerGlowColor={mapMarkerGlowColor}
+                              mapLabelColor={mapLabelColor}
+                              mapPanelTextColor={mapPanelTextColor}
+                              mapHeatLowColor={mapHeatLowColor}
+                              mapHeatHighColor={mapHeatHighColor}
                             dataset={datasetLookup[widget.dataset]}
                             onDragStart={handleWidgetPointerDown}
+                            onContextMenu={handleWidgetContextMenu}
                             onResizeStart={handleWidgetResizeStart}
                           />
-                        ))}
-                      </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="absolute bottom-6 right-8 flex items-center gap-2 rounded-full border border-[#c2c8bf]/60 bg-[#fafaf5]/95 px-2 py-2 shadow-[0_18px_40px_rgba(26,28,25,0.08)] backdrop-blur">
+            <div className="pointer-events-none absolute bottom-5 right-5">
+              <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-[#c2c8bf]/60 bg-[#fafaf5]/95 px-2 py-2 shadow-[0_18px_40px_rgba(26,28,25,0.08)] backdrop-blur">
                 <button
                   onClick={() => {
                     hasManualZoomRef.current = false;
@@ -1543,88 +2181,204 @@ export function EditorWorkbench({
                   <ZoomIn className="h-4 w-4" />
                 </button>
               </div>
-            </section>
+            </div>
+            {contextMenu ? (
+              <div
+                className="absolute z-30 min-w-40 rounded-xl border border-[#c2c8bf]/50 bg-[#fafaf5] p-1.5 shadow-[0_18px_40px_rgba(26,28,25,0.14)]"
+                style={{left: `${contextMenu.x}px`, top: `${contextMenu.y}px`}}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                <ContextMenuButton
+                  label={locale === "zh-CN" ? "复制组件" : "Duplicate"}
+                  onClick={() => {
+                    duplicateSelectedWidget();
+                    setContextMenu(null);
+                  }}
+                />
+                <ContextMenuButton
+                  label={locale === "zh-CN" ? "上移一层" : "Bring Forward"}
+                  onClick={() => {
+                    moveSelectedWidgetLayer("forward");
+                    setContextMenu(null);
+                  }}
+                />
+                <ContextMenuButton
+                  label={locale === "zh-CN" ? "下移一层" : "Send Backward"}
+                  onClick={() => {
+                    moveSelectedWidgetLayer("backward");
+                    setContextMenu(null);
+                  }}
+                />
+                <ContextMenuButton
+                  label={selectedWidgets.length && selectedWidgets.every((widget) => widget.locked)
+                    ? locale === "zh-CN" ? "解锁组件" : "Unlock"
+                    : locale === "zh-CN" ? "锁定组件" : "Lock"}
+                  onClick={() => {
+                    toggleSelectedWidgetLock();
+                    setContextMenu(null);
+                  }}
+                />
+                <ContextMenuButton
+                  danger
+                  label={locale === "zh-CN" ? "删除组件" : "Delete"}
+                  onClick={() => {
+                    deleteSelectedWidget();
+                    setContextMenu(null);
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
+        </section>
 
-            <aside className="h-full w-[308px] shrink-0 border-l border-[#c2c8bf]/20 bg-[#fafaf5]">
-              <div className="border-b border-[#c2c8bf]/20 px-5 py-4">
-                <h2 className="font-headline text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#727971]">
-                  {t("rightPanel.title")}
-                </h2>
+        <aside className="h-full overflow-hidden border-l border-[#c2c8bf]/20 bg-[#fafaf5]">
+              <div className="space-y-3 border-b border-[#c2c8bf]/20 px-5 py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-headline text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#727971]">
+                    {rightPanelMode === "component"
+                      ? locale === "zh-CN"
+                        ? "组件编辑"
+                        : "Component"
+                      : locale === "zh-CN"
+                        ? "页面设置"
+                        : "Page"}
+                  </h2>
+                  <Badge className="rounded border-[#d7d8d1] bg-[#f4f4ef] px-2 py-1 text-[10px] tracking-[0.12em] text-[#727971]">
+                    {rightPanelMode === "component"
+                      ? locale === "zh-CN"
+                        ? "聚焦当前选中"
+                        : "Focused Selection"
+                      : locale === "zh-CN"
+                        ? "画布与展示"
+                        : "Canvas & Display"}
+                  </Badge>
+                </div>
+                <Tabs
+                  value={rightPanelMode}
+                  onValueChange={(value) => setRightPanelMode(value as RightPanelMode)}
+                  className="w-full rounded-lg bg-[#f4f4ef] p-1"
+                  options={[
+                    {label: locale === "zh-CN" ? "组件" : "Component", value: "component"},
+                    {label: locale === "zh-CN" ? "页面" : "Page", value: "page"},
+                  ]}
+                />
+                {rightPanelMode === "component" ? (
+                  <Tabs
+                    value={componentPanelTab}
+                    onValueChange={(value) => setComponentPanelTab(value as ComponentPanelTab)}
+                    className="w-full rounded-lg bg-[#f7f6f1] p-1"
+                    options={[
+                      {label: locale === "zh-CN" ? "内容" : "Content", value: "content"},
+                      {label: locale === "zh-CN" ? "数据" : "Data", value: "data"},
+                      {label: locale === "zh-CN" ? "样式" : "Style", value: "style"},
+                    ]}
+                  />
+                ) : null}
               </div>
 
               <div className="flex h-[calc(100vh-7.5rem)] flex-col overflow-y-auto px-5 py-4">
                 <div className="space-y-5">
+                  {rightPanelMode === "page" ? (
+                    <>
                   <EditorSection
-                    title={t("rightPanel.selection.title")}
-                    subtitle={
-                      selectedWidgetIds.length > 1
-                        ? locale === "zh-CN"
-                          ? `已选择 ${selectedWidgetIds.length} 个组件`
-                          : `${selectedWidgetIds.length} widgets selected`
-                        : selectedWidget.title
-                    }
-                    className="space-y-2"
+                    title={t("rightPanel.page.title")}
+                    subtitle={t("rightPanel.page.subtitle")}
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <Badge className="rounded border-[#23422a]/20 bg-[#dce9dc] px-2 py-1 tracking-[0.12em] text-[#23422a]">
-                        {selectedWidgetIds.length > 1
-                          ? locale === "zh-CN"
-                            ? "多选模式"
-                            : "Multi Select"
-                          : widgetTypeLabel(selectedWidget.type, locale)}
-                      </Badge>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => moveSelectedWidgetLayer("backward")}
-                          disabled={selectedWidgetIds.length > 1}
-                          className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-2.5 py-1.5 text-[11px] font-medium text-[#23422a] transition-colors hover:bg-[#eef2ea]"
-                        >
-                          {locale === "zh-CN" ? "下移" : "Backward"}
-                        </button>
-                        <button
-                          onClick={() => moveSelectedWidgetLayer("forward")}
-                          disabled={selectedWidgetIds.length > 1}
-                          className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-2.5 py-1.5 text-[11px] font-medium text-[#23422a] transition-colors hover:bg-[#eef2ea]"
-                        >
-                          {locale === "zh-CN" ? "上移" : "Forward"}
-                        </button>
-                        <button
-                          onClick={toggleSelectedWidgetLock}
-                          className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-2.5 py-1.5 text-[11px] font-medium text-[#23422a] transition-colors hover:bg-[#eef2ea]"
-                        >
-                          {selectedWidgets.length && selectedWidgets.every((widget) => widget.locked)
-                            ? locale === "zh-CN"
-                              ? "解锁"
-                              : "Unlock"
-                            : locale === "zh-CN"
-                              ? "锁定"
-                              : "Lock"}
-                        </button>
-                        <button
-                          onClick={duplicateSelectedWidget}
-                          className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-2.5 py-1.5 text-[11px] font-medium text-[#23422a] transition-colors hover:bg-[#eef2ea]"
-                        >
-                          {locale === "zh-CN" ? "复制" : "Duplicate"}
-                        </button>
-                        <button
-                          onClick={deleteSelectedWidget}
-                          disabled={widgets.length <= 1}
-                          className="rounded-md border border-[#efc0ba] bg-[#fff4f2] px-2.5 py-1.5 text-[11px] font-medium text-[#a23b32] transition-colors hover:bg-[#ffeae6] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {locale === "zh-CN" ? "删除" : "Delete"}
-                        </button>
-                      </div>
+                    <EditorField label={locale === "zh-CN" ? "画布预设" : "Canvas Preset"}>
+                      <Select
+                        className={editorControlClass}
+                        value={screenConfig.canvasPreset}
+                        onChange={(event) => applyCanvasPreset(event.target.value as ScreenConfig["canvasPreset"])}
+                        options={canvasPresets.map((preset) => ({
+                          label: preset.label,
+                          value: preset.id,
+                        }))}
+                      />
+                    </EditorField>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <EditorField label={locale === "zh-CN" ? "画布宽度" : "Canvas Width"}>
+                        <Input
+                          className={editorControlClass}
+                          value={String(screenConfig.canvasWidth)}
+                          onChange={(event) => applyCustomCanvasDimension("width", event.target.value)}
+                        />
+                      </EditorField>
+                      <EditorField label={locale === "zh-CN" ? "画布高度" : "Canvas Height"}>
+                        <Input
+                          className={editorControlClass}
+                          value={String(screenConfig.canvasHeight)}
+                          onChange={(event) => applyCustomCanvasDimension("height", event.target.value)}
+                        />
+                      </EditorField>
                     </div>
-                    {selectedWidgetIds.length > 1 ? (
-                      <p className="text-[11px] leading-5 text-[#727971]">
-                        {locale === "zh-CN"
-                          ? "当前右侧内容项仍以主选中的组件为准；批量对齐、复制、删除和锁定会作用到全部选中项。"
-                          : "Content fields still follow the primary selection; align, duplicate, delete and lock actions apply to all selected widgets."}
-                      </p>
-                    ) : null}
-                  </EditorSection>
-
-                  <EditorSection title={t("rightPanel.page.title")} subtitle={t("rightPanel.page.subtitle")}>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <EditorField label={locale === "zh-CN" ? "头部样式" : "Header Style"}>
+                        <Select
+                          className={editorControlClass}
+                          value={screenConfig.headerVariant}
+                          onChange={(event) =>
+                            handleScreenConfigPatch({
+                              headerVariant: event.target.value as ScreenConfig["headerVariant"],
+                            })
+                          }
+                          options={[
+                            {label: locale === "zh-CN" ? "经典信息头" : "Classic", value: "classic"},
+                            {label: locale === "zh-CN" ? "紧凑信息头" : "Compact", value: "compact"},
+                            {label: locale === "zh-CN" ? "极简头部" : "Minimal", value: "minimal"},
+                            {label: locale === "zh-CN" ? "播报头部" : "Broadcast", value: "broadcast"},
+                            {label: locale === "zh-CN" ? "信号头部" : "Signal", value: "signal"},
+                          ]}
+                        />
+                      </EditorField>
+                      <EditorField label={locale === "zh-CN" ? "展示适配" : "Display Fit"}>
+                        <Select
+                          className={editorControlClass}
+                          value={screenConfig.displayMode}
+                          onChange={(event) =>
+                            handleScreenConfigPatch({
+                              displayMode: event.target.value as ScreenConfig["displayMode"],
+                            })
+                          }
+                          options={[
+                            {label: locale === "zh-CN" ? "完整适配" : "Contain", value: "contain"},
+                            {label: locale === "zh-CN" ? "按宽度铺满" : "Fit Width", value: "fit-width"},
+                            {label: locale === "zh-CN" ? "原始尺寸" : "Actual Size", value: "actual"},
+                          ]}
+                        />
+                      </EditorField>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <EditorField label={locale === "zh-CN" ? "展示模式" : "Presentation Mode"}>
+                        <Select
+                          className={editorControlClass}
+                          value={screenConfig.presentationMode}
+                          onChange={(event) =>
+                            handleScreenConfigPatch({
+                              presentationMode: event.target.value as ScreenConfig["presentationMode"],
+                            })
+                          }
+                          options={[
+                            {label: locale === "zh-CN" ? "标准展示" : "Standard", value: "standard"},
+                            {label: locale === "zh-CN" ? "沉浸投屏" : "Immersive", value: "immersive"},
+                          ]}
+                        />
+                      </EditorField>
+                      <EditorField label={locale === "zh-CN" ? "展示对齐" : "Display Alignment"}>
+                        <Select
+                          className={editorControlClass}
+                          value={screenConfig.displayAlign}
+                          onChange={(event) =>
+                            handleScreenConfigPatch({
+                              displayAlign: event.target.value as ScreenConfig["displayAlign"],
+                            })
+                          }
+                          options={[
+                            {label: locale === "zh-CN" ? "居中" : "Centered", value: "center"},
+                            {label: locale === "zh-CN" ? "靠上" : "Top Aligned", value: "top"},
+                          ]}
+                        />
+                      </EditorField>
+                    </div>
                     <EditorField label={t("rightPanel.page.screenTitle")}>
                       <Input
                         className={editorControlClass}
@@ -1722,23 +2476,71 @@ export function EditorWorkbench({
                       />
                     </EditorField>
                     <EditorField label={t("rightPanel.background.baseColor")}>
-                      <Input
-                        className={editorControlClass}
+                      <ColorSwatchField
                         value={screenConfig.backgroundColor}
-                        onChange={(event) => handleScreenConfigPatch({backgroundColor: event.target.value})}
+                        onChange={(nextValue) => handleScreenConfigPatch({backgroundColor: nextValue})}
+                        swatches={["#fafaf5", "#eef4ea", "#f2efe3", "#ecefe7", "#1f2b24", "#20302a"]}
                       />
                     </EditorField>
                     {screenConfig.backgroundMode === "gradient" ? (
-                      <EditorField label={t("rightPanel.background.gradientValue")}>
-                        <Textarea
-                          value={screenConfig.backgroundGradient}
-                          onChange={(event) => handleScreenConfigPatch({backgroundGradient: event.target.value})}
-                          className="min-h-24 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
-                        />
-                      </EditorField>
+                      <>
+                        <EditorField
+                          label={locale === "zh-CN" ? "背景预设" : "Background Presets"}
+                          hint={locale === "zh-CN" ? "先用预设建立氛围，再做细调" : "Use presets as a fast starting point"}
+                        >
+                          <div className="grid grid-cols-1 gap-2">
+                            {backgroundPresets.map((preset) => (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                onClick={() => applyBackgroundPreset(preset.value)}
+                                className="overflow-hidden rounded-md border border-[#d7d8d1] bg-[#fafaf5] text-left transition-colors hover:border-[#9cb39d]"
+                              >
+                                <div
+                                  className="h-12 border-b border-[#d7d8d1]/60"
+                                  style={{backgroundImage: preset.value}}
+                                />
+                                <div className="px-3 py-2 text-[11px] font-medium text-[#1a1c19]">
+                                  {locale === "zh-CN" ? preset.labelZh : preset.labelEn}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </EditorField>
+                        <EditorField label={t("rightPanel.background.gradientValue")}>
+                          <Textarea
+                            value={screenConfig.backgroundGradient}
+                            onChange={(event) => handleScreenConfigPatch({backgroundGradient: event.target.value})}
+                            className="min-h-24 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
+                          />
+                        </EditorField>
+                      </>
                     ) : null}
                     {screenConfig.backgroundMode === "image" ? (
                       <>
+                        <input
+                          ref={backgroundAssetInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/avif"
+                          className="hidden"
+                          onChange={(event) => handleBackgroundAssetSelected(event.target.files?.[0] ?? null)}
+                        />
+                        <EditorField
+                          label={locale === "zh-CN" ? "背景资源" : "Background Asset"}
+                          hint={locale === "zh-CN" ? "支持上传图片，或继续直接填写 URL" : "Upload an asset or keep using a direct URL"}
+                        >
+                          <div className="grid grid-cols-2 gap-2">
+                            <MiniActionButton
+                              label={locale === "zh-CN" ? "上传图片" : "Upload"}
+                              onClick={() => backgroundAssetInputRef.current?.click()}
+                            />
+                            <MiniActionButton
+                              label={locale === "zh-CN" ? "清空图片" : "Clear"}
+                              onClick={() => handleScreenConfigPatch({backgroundImage: "", backgroundMode: "color"})}
+                              disabled={!screenConfig.backgroundImage}
+                            />
+                          </div>
+                        </EditorField>
                         <EditorField label={t("rightPanel.background.imageUrl")}>
                           <Input
                             className={editorControlClass}
@@ -1782,7 +2584,88 @@ export function EditorWorkbench({
                       </>
                     ) : null}
                   </EditorSection>
+                    </>
+                  ) : null}
 
+                  {rightPanelMode === "component" ? (
+                    <>
+                  <EditorSection
+                    title={t("rightPanel.selection.title")}
+                    subtitle={
+                      selectedWidgetIds.length > 1
+                        ? locale === "zh-CN"
+                          ? `已选择 ${selectedWidgetIds.length} 个组件`
+                          : `${selectedWidgetIds.length} widgets selected`
+                        : selectedWidget.title
+                    }
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <Badge className="rounded border-[#23422a]/20 bg-[#dce9dc] px-2 py-1 tracking-[0.12em] text-[#23422a]">
+                        {selectedWidgetIds.length > 1
+                          ? locale === "zh-CN"
+                            ? "多选模式"
+                            : "Multi Select"
+                          : widgetTypeLabel(selectedWidget.type, locale)}
+                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => moveSelectedWidgetLayer("backward")}
+                          disabled={selectedWidgetIds.length > 1}
+                          className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-2.5 py-1.5 text-[11px] font-medium text-[#23422a] transition-colors hover:bg-[#eef2ea]"
+                        >
+                          {locale === "zh-CN" ? "下移" : "Backward"}
+                        </button>
+                        <button
+                          onClick={() => moveSelectedWidgetLayer("forward")}
+                          disabled={selectedWidgetIds.length > 1}
+                          className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-2.5 py-1.5 text-[11px] font-medium text-[#23422a] transition-colors hover:bg-[#eef2ea]"
+                        >
+                          {locale === "zh-CN" ? "上移" : "Forward"}
+                        </button>
+                        <button
+                          onClick={toggleSelectedWidgetLock}
+                          className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-2.5 py-1.5 text-[11px] font-medium text-[#23422a] transition-colors hover:bg-[#eef2ea]"
+                        >
+                          {selectedWidgets.length && selectedWidgets.every((widget) => widget.locked)
+                            ? locale === "zh-CN"
+                              ? "解锁"
+                              : "Unlock"
+                            : locale === "zh-CN"
+                              ? "锁定"
+                              : "Lock"}
+                        </button>
+                        <button
+                          onClick={duplicateSelectedWidget}
+                          className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-2.5 py-1.5 text-[11px] font-medium text-[#23422a] transition-colors hover:bg-[#eef2ea]"
+                        >
+                          {locale === "zh-CN" ? "复制" : "Duplicate"}
+                        </button>
+                        <button
+                          onClick={deleteSelectedWidget}
+                          disabled={widgets.length <= 1}
+                          className="rounded-md border border-[#efc0ba] bg-[#fff4f2] px-2.5 py-1.5 text-[11px] font-medium text-[#a23b32] transition-colors hover:bg-[#ffeae6] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {locale === "zh-CN" ? "删除" : "Delete"}
+                        </button>
+                      </div>
+                    </div>
+                    {selectedWidgetIds.length > 1 ? (
+                      <p className="text-[11px] leading-5 text-[#727971]">
+                        {locale === "zh-CN"
+                          ? "右侧当前聚焦组件编辑；批量对齐、复制、删除和锁定会作用到全部选中项，内容字段仍以主选中组件为准。"
+                          : "The panel stays focused on widget editing. Align, duplicate, delete and lock apply to all selected widgets, while content fields still follow the primary selection."}
+                      </p>
+                    ) : (
+                      <p className="text-[11px] leading-5 text-[#727971]">
+                        {locale === "zh-CN"
+                          ? "当前右侧只显示这个组件的布局、内容、样式和数据配置；页面设置请切到上方“页面”。"
+                          : "The panel is focused on this widget only. Switch to “Page” above for canvas and presentation settings."}
+                      </p>
+                    )}
+                  </EditorSection>
+
+                  {componentPanelTab === "content" ? (
                   <EditorSection title={t("rightPanel.layout.title")}>
                     <div className="grid grid-cols-2 gap-2.5">
                       <EditorField label={t("rightPanel.layout.width")}>
@@ -1808,9 +2691,63 @@ export function EditorWorkbench({
                         <MiniActionButton label={t("rightPanel.layout.alignBottom")} onClick={() => alignSelectedWidget("bottom")} />
                       </div>
                     </EditorField>
+                    <EditorField
+                      label={locale === "zh-CN" ? "批量分布" : "Distribute"}
+                      hint={
+                        selectedWidgetIds.length < 3
+                          ? locale === "zh-CN"
+                            ? "至少选择 3 个组件"
+                            : "Select at least 3 widgets"
+                          : locale === "zh-CN"
+                            ? "按当前选区分布组件间距"
+                            : "Distribute spacing within the current selection"
+                      }
+                      className="mt-3"
+                    >
+                      <div className="grid grid-cols-2 gap-2">
+                        <MiniActionButton
+                          label={locale === "zh-CN" ? "水平分布" : "Horizontal"}
+                          onClick={() => distributeSelectedWidgets("horizontal")}
+                          disabled={selectedWidgetIds.length < 3}
+                        />
+                        <MiniActionButton
+                          label={locale === "zh-CN" ? "垂直分布" : "Vertical"}
+                          onClick={() => distributeSelectedWidgets("vertical")}
+                          disabled={selectedWidgetIds.length < 3}
+                        />
+                      </div>
+                    </EditorField>
+                    <EditorField
+                      label={locale === "zh-CN" ? "统一尺寸" : "Match Size"}
+                      hint={
+                        selectedWidgetIds.length < 2
+                          ? locale === "zh-CN"
+                            ? "至少选择 2 个组件"
+                            : "Select at least 2 widgets"
+                          : locale === "zh-CN"
+                            ? "以主选中组件为尺寸基准"
+                            : "Use the primary selection as the size source"
+                      }
+                      className="mt-3"
+                    >
+                      <div className="grid grid-cols-2 gap-2">
+                        <MiniActionButton
+                          label={locale === "zh-CN" ? "同宽" : "Match Width"}
+                          onClick={() => matchSelectedWidgetSize("width")}
+                          disabled={selectedWidgetIds.length < 2}
+                        />
+                        <MiniActionButton
+                          label={locale === "zh-CN" ? "同高" : "Match Height"}
+                          onClick={() => matchSelectedWidgetSize("height")}
+                          disabled={selectedWidgetIds.length < 2}
+                        />
+                      </div>
+                    </EditorField>
                   </EditorSection>
+                  ) : null}
 
-                  <EditorSection title={locale === "zh-CN" ? "组件内容" : "Widget Content"}>
+                  {componentPanelTab === "content" ? (
+                  <EditorSection title={locale === "zh-CN" ? "组件基础" : "Widget Basics"}>
                     <EditorField label={locale === "zh-CN" ? "标题" : "Title"}>
                       <Input className={editorControlClass} value={selectedWidget.title} onChange={(event) => handleWidgetPatch({title: event.target.value})} />
                     </EditorField>
@@ -1844,7 +2781,11 @@ export function EditorWorkbench({
                         />
                       </div>
                     </EditorField>
-                    {selectedWidget.type === "metric" ? (
+                  </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "content" && selectedWidget.type === "metric" ? (
+                    <EditorSection title={locale === "zh-CN" ? "指标内容" : "Metric Content"}>
                       <div className="grid grid-cols-2 gap-2.5">
                         <EditorField label={locale === "zh-CN" ? "数值" : "Value"}>
                           <Input
@@ -1861,47 +2802,35 @@ export function EditorWorkbench({
                           />
                         </EditorField>
                       </div>
-                    ) : null}
-                    {selectedWidget.type === "map" ? (
-                      <EditorField label={locale === "zh-CN" ? "地图说明" : "Map Note"}>
+                    </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "content" && selectedWidget.type === "text" ? (
+                    <EditorSection title={locale === "zh-CN" ? "文本内容" : "Text Content"}>
+                      <EditorField label={locale === "zh-CN" ? "主文本" : "Primary Copy"}>
+                        <Textarea
+                          className="min-h-20 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
+                          value={selectedWidget.value ?? ""}
+                          onChange={(event) => handleWidgetPatch({value: event.target.value})}
+                        />
+                      </EditorField>
+                      <EditorField label={locale === "zh-CN" ? "辅助说明" : "Supporting Copy"}>
                         <Textarea
                           className="min-h-20 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
                           value={selectedWidget.hint ?? ""}
                           onChange={(event) => handleWidgetPatch({hint: event.target.value})}
                         />
                       </EditorField>
-                    ) : null}
-                    {selectedWidget.type === "events" || selectedWidget.type === "table" ? (
-                      <EditorField label={locale === "zh-CN" ? "数据说明" : "Data Note"}>
-                        <Textarea
-                          className="min-h-20 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
-                          value={selectedWidget.hint ?? ""}
-                          onChange={(event) => handleWidgetPatch({hint: event.target.value})}
-                        />
-                      </EditorField>
-                    ) : null}
-                    {selectedWidget.type === "text" ? (
-                      <>
-                        <EditorField label={locale === "zh-CN" ? "主文本" : "Primary Copy"}>
-                          <Textarea
-                            className="min-h-20 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
-                            value={selectedWidget.value ?? ""}
-                            onChange={(event) => handleWidgetPatch({value: event.target.value})}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "辅助说明" : "Supporting Copy"}>
-                          <Textarea
-                            className="min-h-20 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
-                            value={selectedWidget.hint ?? ""}
-                            onChange={(event) => handleWidgetPatch({hint: event.target.value})}
-                          />
-                        </EditorField>
+                    </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "style" && selectedWidget.type === "text" ? (
+                    <EditorSection title={locale === "zh-CN" ? "文本样式" : "Text Style"}>
                         <div className="grid grid-cols-2 gap-2.5">
                           <EditorField label={locale === "zh-CN" ? "文字颜色" : "Text Color"}>
-                            <Input
-                              className={editorControlClass}
+                            <ColorSwatchField
                               value={selectedWidget.textColor ?? "#1a1c19"}
-                              onChange={(event) => handleWidgetPatch({textColor: event.target.value})}
+                              onChange={(nextValue) => handleWidgetPatch({textColor: nextValue})}
                             />
                           </EditorField>
                           <EditorField label={locale === "zh-CN" ? "字号" : "Font Size"}>
@@ -1936,49 +2865,562 @@ export function EditorWorkbench({
                             />
                           </EditorField>
                         </div>
-                      </>
-                    ) : null}
-                    {selectedWidget.type === "image" ? (
-                      <>
-                        <EditorField label={locale === "zh-CN" ? "图片地址" : "Image URL"}>
-                          <Input
-                            className={editorControlClass}
-                            value={selectedWidget.value ?? ""}
-                            onChange={(event) => handleWidgetPatch({value: event.target.value})}
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "文本对齐" : "Text Align"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.textAlign ?? "left"}
+                              onChange={(event) =>
+                                handleWidgetPatch({textAlign: event.target.value as EditorWidget["textAlign"]})
+                              }
+                              options={[
+                                {label: locale === "zh-CN" ? "左对齐" : "Left", value: "left"},
+                                {label: locale === "zh-CN" ? "居中" : "Center", value: "center"},
+                                {label: locale === "zh-CN" ? "右对齐" : "Right", value: "right"},
+                              ]}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "字距" : "Letter Spacing"}>
+                            <Input
+                              className={editorControlClass}
+                              value={String(selectedWidget.letterSpacing ?? 0)}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  letterSpacing: numberOr(event.target.value, selectedWidget.letterSpacing ?? 0),
+                                })
+                              }
+                            />
+                          </EditorField>
+                        </div>
+                      </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "content" && selectedWidget.type === "image" ? (
+                    <EditorSection title={locale === "zh-CN" ? "图片内容" : "Image Content"}>
+                      <EditorField label={locale === "zh-CN" ? "图片地址" : "Image URL"}>
+                        <Input
+                          className={editorControlClass}
+                          value={selectedWidget.value ?? ""}
+                          onChange={(event) => handleWidgetPatch({value: event.target.value})}
+                        />
+                      </EditorField>
+                      <EditorField label={locale === "zh-CN" ? "图片说明" : "Image Caption"}>
+                        <Textarea
+                          className="min-h-20 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
+                          value={selectedWidget.hint ?? ""}
+                          onChange={(event) => handleWidgetPatch({hint: event.target.value})}
+                        />
+                      </EditorField>
+                    </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "style" && selectedWidget.type === "image" ? (
+                    <>
+                      <EditorSection title={locale === "zh-CN" ? "图片视觉" : "Image Visuals"}>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "填充模式" : "Fit Mode"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.imageFit ?? "cover"}
+                              onChange={(event) => handleWidgetPatch({imageFit: event.target.value as EditorWidget["imageFit"]})}
+                              options={[
+                                {label: locale === "zh-CN" ? "铺满裁切" : "Cover", value: "cover"},
+                                {label: locale === "zh-CN" ? "完整显示" : "Contain", value: "contain"},
+                                {label: locale === "zh-CN" ? "拉伸填充" : "Fill", value: "fill"},
+                              ]}
+                            />
+                          </EditorField>
+                          <ToggleRow
+                            label={locale === "zh-CN" ? "灰度处理" : "Grayscale"}
+                            checked={selectedWidget.imageGrayscale ?? false}
+                            onCheckedChange={(checked) => handleWidgetPatch({imageGrayscale: checked})}
                           />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "图片说明" : "Image Caption"}>
-                          <Textarea
-                            className="min-h-20 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
-                            value={selectedWidget.hint ?? ""}
-                            onChange={(event) => handleWidgetPatch({hint: event.target.value})}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "填充模式" : "Fit Mode"}>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "亮度" : "Brightness"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.imageBrightness ?? 100}%`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  imageBrightness: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageBrightness ?? 100), 40, 160),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "对比" : "Contrast"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.imageContrast ?? 100}%`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  imageContrast: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageContrast ?? 100), 40, 180),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "饱和" : "Saturation"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.imageSaturation ?? 100}%`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  imageSaturation: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageSaturation ?? 100), 0, 180),
+                                })
+                              }
+                            />
+                          </EditorField>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "边框风格" : "Border Style"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.imageBorderStyle ?? "soft"}
+                              onChange={(event) =>
+                                handleWidgetPatch({imageBorderStyle: event.target.value as EditorWidget["imageBorderStyle"]})
+                              }
+                              options={[
+                                {label: locale === "zh-CN" ? "柔和边框" : "Soft", value: "soft"},
+                                {label: locale === "zh-CN" ? "画框边框" : "Frame", value: "frame"},
+                                {label: locale === "zh-CN" ? "无边框" : "None", value: "none"},
+                              ]}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "画面缩放" : "Image Zoom"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.imageZoom ?? 100}%`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  imageZoom: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageZoom ?? 100), 80, 140),
+                                })
+                              }
+                            />
+                          </EditorField>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "边框颜色" : "Border Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.imageBorderColor ?? "#c2c8bf"}
+                              onChange={(nextValue) => handleWidgetPatch({imageBorderColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "边框宽度" : "Border Width"}>
+                            <Input
+                              className={editorControlClass}
+                              value={String(selectedWidget.imageBorderWidth ?? 1)}
+                              onChange={(event) => handleWidgetPatch({imageBorderWidth: clamp(numberOr(event.target.value, selectedWidget.imageBorderWidth ?? 1), 0, 10)})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "阴影颜色" : "Shadow Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.imageShadowColor ?? "#1a1c19"}
+                              onChange={(nextValue) => handleWidgetPatch({imageShadowColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "阴影强度" : "Shadow Opacity"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.imageShadowOpacity ?? 18}%`}
+                              onChange={(event) => handleWidgetPatch({imageShadowOpacity: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageShadowOpacity ?? 18), 0, 100)})}
+                            />
+                          </EditorField>
+                        </div>
+                      </EditorSection>
+
+                      <EditorSection title={locale === "zh-CN" ? "遮罩与说明" : "Overlay & Caption"}>
+                        <EditorField label={locale === "zh-CN" ? "遮罩方向" : "Overlay Direction"}>
                           <Select
                             className={editorControlClass}
-                            value={selectedWidget.imageFit ?? "cover"}
-                            onChange={(event) => handleWidgetPatch({imageFit: event.target.value as EditorWidget["imageFit"]})}
+                            value={selectedWidget.imageOverlayDirection ?? "bottom"}
+                            onChange={(event) =>
+                              handleWidgetPatch({
+                                imageOverlayDirection: event.target.value as EditorWidget["imageOverlayDirection"],
+                              })
+                            }
                             options={[
-                              {label: locale === "zh-CN" ? "铺满裁切" : "Cover", value: "cover"},
-                              {label: locale === "zh-CN" ? "完整显示" : "Contain", value: "contain"},
-                              {label: locale === "zh-CN" ? "拉伸填充" : "Fill", value: "fill"},
+                              {label: locale === "zh-CN" ? "底部渐隐" : "Bottom", value: "bottom"},
+                              {label: locale === "zh-CN" ? "中心聚焦" : "Center", value: "center"},
+                              {label: locale === "zh-CN" ? "全幅压暗" : "Full", value: "full"},
                             ]}
                           />
                         </EditorField>
-                      </>
-                    ) : null}
-                  </EditorSection>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "遮罩颜色" : "Overlay Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.imageOverlayColor ?? "#111714"}
+                              onChange={(nextValue) => handleWidgetPatch({imageOverlayColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "遮罩强度" : "Overlay Strength"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.imageOverlayOpacity ?? 68}%`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  imageOverlayOpacity: clamp(
+                                    numberOr(event.target.value.replace("%", ""), selectedWidget.imageOverlayOpacity ?? 68),
+                                    0,
+                                    100,
+                                  ),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "遮罩模糊" : "Overlay Blur"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.imageOverlayBlur ?? 0}px`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  imageOverlayBlur: clamp(
+                                    numberOr(event.target.value.replace("px", ""), selectedWidget.imageOverlayBlur ?? 0),
+                                    0,
+                                    32,
+                                  ),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "说明文字色" : "Caption Text"}>
+                            <ColorSwatchField
+                              value={selectedWidget.imageCaptionTextColor ?? "#ffffff"}
+                              onChange={(nextValue) => handleWidgetPatch({imageCaptionTextColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "说明底色" : "Caption Surface"}>
+                            <ColorSwatchField
+                              value={selectedWidget.imageCaptionBackgroundColor ?? "#111714"}
+                              onChange={(nextValue) => handleWidgetPatch({imageCaptionBackgroundColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "说明圆角" : "Caption Radius"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.imageCaptionRadius ?? 18}px`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  imageCaptionRadius: clamp(
+                                    numberOr(event.target.value.replace("px", ""), selectedWidget.imageCaptionRadius ?? 18),
+                                    0,
+                                    32,
+                                  ),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "说明内边距" : "Caption Padding"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.imageCaptionPadding ?? 12}px`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  imageCaptionPadding: clamp(
+                                    numberOr(event.target.value.replace("px", ""), selectedWidget.imageCaptionPadding ?? 12),
+                                    0,
+                                    32,
+                                  ),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "说明底色透明度" : "Caption Surface Opacity"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.imageCaptionOpacity ?? 82}%`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  imageCaptionOpacity: clamp(
+                                    numberOr(event.target.value.replace("%", ""), selectedWidget.imageCaptionOpacity ?? 82),
+                                    0,
+                                    100,
+                                  ),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "说明模糊" : "Caption Blur"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.imageCaptionBlur ?? 0}px`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  imageCaptionBlur: clamp(
+                                    numberOr(event.target.value.replace("px", ""), selectedWidget.imageCaptionBlur ?? 0),
+                                    0,
+                                    32,
+                                  ),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "说明阴影色" : "Caption Shadow Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.imageCaptionShadowColor ?? "#111714"}
+                              onChange={(nextValue) => handleWidgetPatch({imageCaptionShadowColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "说明阴影强度" : "Caption Shadow Opacity"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.imageCaptionShadowOpacity ?? 0}%`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  imageCaptionShadowOpacity: clamp(
+                                    numberOr(event.target.value.replace("%", ""), selectedWidget.imageCaptionShadowOpacity ?? 0),
+                                    0,
+                                    100,
+                                  ),
+                                })
+                              }
+                            />
+                          </EditorField>
+                        </div>
+                      </EditorSection>
+                    </>
+                  ) : null}
 
+                  {componentPanelTab === "content" && selectedWidget.type === "table" ? (
+                    <EditorSection title={locale === "zh-CN" ? "表格内容" : "Table Content"}>
+                      <EditorField label={locale === "zh-CN" ? "数据说明" : "Data Note"}>
+                        <Textarea
+                          className="min-h-20 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
+                          value={selectedWidget.hint ?? ""}
+                          onChange={(event) => handleWidgetPatch({hint: event.target.value})}
+                        />
+                      </EditorField>
+                    </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "style" && selectedWidget.type === "table" ? (
+                    <EditorSection title={locale === "zh-CN" ? "表格样式" : "Table Style"}>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "行密度" : "Density"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.tableDensity ?? "comfortable"}
+                              onChange={(event) =>
+                                handleWidgetPatch({tableDensity: event.target.value as EditorWidget["tableDensity"]})
+                              }
+                              options={[
+                                {label: locale === "zh-CN" ? "舒适" : "Comfortable", value: "comfortable"},
+                                {label: locale === "zh-CN" ? "紧凑" : "Compact", value: "compact"},
+                              ]}
+                            />
+                          </EditorField>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "边框颜色" : "Border Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableBorderColor ?? "#c2c8bf"}
+                              onChange={(nextValue) => handleWidgetPatch({tableBorderColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "边框宽度" : "Border Width"}>
+                            <Input
+                              className={editorControlClass}
+                              value={String(selectedWidget.tableBorderWidth ?? 1)}
+                              onChange={(event) => handleWidgetPatch({tableBorderWidth: clamp(numberOr(event.target.value, selectedWidget.tableBorderWidth ?? 1), 0, 8)})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "阴影颜色" : "Shadow Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableShadowColor ?? "#1a1c19"}
+                              onChange={(nextValue) => handleWidgetPatch({tableShadowColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "阴影强度" : "Shadow Opacity"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.tableShadowOpacity ?? 14}%`}
+                              onChange={(event) => handleWidgetPatch({tableShadowOpacity: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.tableShadowOpacity ?? 14), 0, 100)})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "表体底色" : "Body Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableBodyColor ?? "#ffffff"}
+                              onChange={(nextValue) => handleWidgetPatch({tableBodyColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "表头底色" : "Header Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableHeaderBgColor ?? "#e8e8e3"}
+                              onChange={(nextValue) => handleWidgetPatch({tableHeaderBgColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "表头文字色" : "Header Text"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableHeaderTextColor ?? "#727971"}
+                              onChange={(nextValue) => handleWidgetPatch({tableHeaderTextColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "表头辅助文字色" : "Header Meta Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableHeaderMetaColor ?? "#727971"}
+                              onChange={(nextValue) => handleWidgetPatch({tableHeaderMetaColor: nextValue})}
+                            />
+                          </EditorField>
+                          <ToggleRow
+                            label={locale === "zh-CN" ? "高亮数值列" : "Highlight Numeric Values"}
+                            checked={selectedWidget.tableHighlightNumbers !== false}
+                            onCheckedChange={(checked) => handleWidgetPatch({tableHighlightNumbers: checked})}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "分隔线颜色" : "Divider Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableDividerColor ?? "#c2c8bf"}
+                              onChange={(nextValue) => handleWidgetPatch({tableDividerColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "斑马纹颜色" : "Stripe Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableStripeColor ?? "#fafaf5"}
+                              onChange={(nextValue) => handleWidgetPatch({tableStripeColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "主字段颜色" : "Key Text"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableKeyColor ?? "#23422a"}
+                              onChange={(nextValue) => handleWidgetPatch({tableKeyColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "数值颜色" : "Number Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableNumberColor ?? "#31503a"}
+                              onChange={(nextValue) => handleWidgetPatch({tableNumberColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "辅助信息色" : "Meta Text Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableMetaColor ?? "#727971"}
+                              onChange={(nextValue) => handleWidgetPatch({tableMetaColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "悬停底色" : "Row Hover Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableRowHoverColor ?? "#f3f5ef"}
+                              onChange={(nextValue) => handleWidgetPatch({tableRowHoverColor: nextValue})}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "表头对齐" : "Header Align"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.tableHeaderAlign ?? "left"}
+                              onChange={(event) =>
+                                handleWidgetPatch({tableHeaderAlign: event.target.value as EditorWidget["tableHeaderAlign"]})
+                              }
+                              options={[
+                                {label: locale === "zh-CN" ? "左对齐" : "Left", value: "left"},
+                                {label: locale === "zh-CN" ? "居中" : "Center", value: "center"},
+                                {label: locale === "zh-CN" ? "右对齐" : "Right", value: "right"},
+                              ]}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "单元格对齐" : "Cell Align"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.tableCellAlign ?? "left"}
+                              onChange={(event) =>
+                                handleWidgetPatch({tableCellAlign: event.target.value as EditorWidget["tableCellAlign"]})
+                              }
+                              options={[
+                                {label: locale === "zh-CN" ? "左对齐" : "Left", value: "left"},
+                                {label: locale === "zh-CN" ? "居中" : "Center", value: "center"},
+                                {label: locale === "zh-CN" ? "右对齐" : "Right", value: "right"},
+                              ]}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "表头字号" : "Header Size"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.tableHeaderSize ?? 10}px`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  tableHeaderSize: clamp(numberOr(event.target.value.replace("px", ""), selectedWidget.tableHeaderSize ?? 10), 8, 18),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "表头字距" : "Header Tracking"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.tableHeaderTracking ?? 1.8}px`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  tableHeaderTracking: clamp(numberOr(event.target.value.replace("px", ""), selectedWidget.tableHeaderTracking ?? 1.8), 0, 8),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "单元格字号" : "Cell Size"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.tableCellSize ?? 10}px`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  tableCellSize: clamp(numberOr(event.target.value.replace("px", ""), selectedWidget.tableCellSize ?? 10), 8, 18),
+                                })
+                              }
+                            />
+                          </EditorField>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <ToggleRow
+                            label={locale === "zh-CN" ? "斑马纹行" : "Zebra Rows"}
+                            checked={selectedWidget.tableZebra !== false}
+                            onCheckedChange={(checked) => handleWidgetPatch({tableZebra: checked})}
+                          />
+                          <ToggleRow
+                            label={locale === "zh-CN" ? "强调首列" : "Highlight First Column"}
+                            checked={selectedWidget.tableHighlightFirstColumn !== false}
+                            onCheckedChange={(checked) => handleWidgetPatch({tableHighlightFirstColumn: checked})}
+                          />
+                        </div>
+                        <EditorField label={locale === "zh-CN" ? "数值格式" : "Number Format"}>
+                          <Select
+                            className={editorControlClass}
+                            value={selectedWidget.tableNumberFormat ?? "raw"}
+                            onChange={(event) =>
+                              handleWidgetPatch({tableNumberFormat: event.target.value as EditorWidget["tableNumberFormat"]})
+                            }
+                            options={[
+                              {label: locale === "zh-CN" ? "原始值" : "Raw", value: "raw"},
+                              {label: locale === "zh-CN" ? "紧凑格式" : "Compact", value: "compact"},
+                              {label: locale === "zh-CN" ? "人民币" : "Currency", value: "currency"},
+                              {label: locale === "zh-CN" ? "百分比" : "Percent", value: "percent"},
+                            ]}
+                          />
+                        </EditorField>
+                      </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "content" && selectedWidget.type === "events" ? (
+                    <EditorSection title={locale === "zh-CN" ? "事件列表内容" : "Event List Content"}>
+                      <EditorField label={locale === "zh-CN" ? "数据说明" : "Data Note"}>
+                        <Textarea
+                          className="min-h-20 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
+                          value={selectedWidget.hint ?? ""}
+                          onChange={(event) => handleWidgetPatch({hint: event.target.value})}
+                        />
+                      </EditorField>
+                    </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "style" ? (
                   <EditorSection title={t("rightPanel.appearance.title")}>
                     <EditorField label={t("rightPanel.appearance.fillColor")}>
-                      <Input className={editorControlClass} value={selectedWidget.fill} onChange={(event) => handleWidgetPatch({fill: event.target.value})} />
+                      <ColorSwatchField
+                        value={selectedWidget.fill}
+                        onChange={(nextValue) => handleWidgetPatch({fill: nextValue})}
+                        swatches={["#fafaf5", "#f4f4ef", "#eef5ec", "#ffdad6", "#20302a", "#233029"]}
+                      />
                     </EditorField>
                     <EditorField label={locale === "zh-CN" ? "强调色" : "Accent Color"}>
-                      <Input
-                        className={editorControlClass}
-                        value={selectedWidget.accent ?? ""}
-                        onChange={(event) => handleWidgetPatch({accent: event.target.value})}
+                      <ColorSwatchField
+                        value={selectedWidget.accent ?? "#23422a"}
+                        onChange={(nextValue) => handleWidgetPatch({accent: nextValue})}
+                        swatches={["#23422a", "#2f6d48", "#2b6cb0", "#c96b32", "#7a4dd8", "#ba1a1a"]}
                       />
                     </EditorField>
                     <div className="grid grid-cols-2 gap-2.5">
@@ -2057,6 +3499,42 @@ export function EditorWorkbench({
                         />
                       </EditorField>
                     </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <EditorField label={locale === "zh-CN" ? "标题颜色" : "Title Color"}>
+                        <ColorSwatchField
+                          value={selectedWidget.titleColor ?? "#727971"}
+                          onChange={(nextValue) => handleWidgetPatch({titleColor: nextValue})}
+                          swatches={["#727971", "#1a1c19", "#23422a", "#31503a", "#ffffff", "#ba1a1a"]}
+                        />
+                      </EditorField>
+                      <EditorField label={locale === "zh-CN" ? "标题字号" : "Title Size"}>
+                        <Input
+                          className={editorControlClass}
+                          value={String(selectedWidget.titleSize ?? 10)}
+                          onChange={(event) =>
+                            handleWidgetPatch({titleSize: clamp(numberOr(event.target.value, selectedWidget.titleSize ?? 10), 8, 18)})
+                          }
+                        />
+                      </EditorField>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <EditorField label={locale === "zh-CN" ? "标题字距" : "Title Tracking"}>
+                        <Input
+                          className={editorControlClass}
+                          value={String(selectedWidget.titleTracking ?? 1.8)}
+                          onChange={(event) =>
+                            handleWidgetPatch({
+                              titleTracking: clamp(numberOr(event.target.value, selectedWidget.titleTracking ?? 1.8), 0, 8),
+                            })
+                          }
+                        />
+                      </EditorField>
+                      <ToggleRow
+                        label={locale === "zh-CN" ? "大写标题" : "Uppercase Title"}
+                        checked={selectedWidget.titleUppercase !== false}
+                        onCheckedChange={(checked) => handleWidgetPatch({titleUppercase: checked})}
+                      />
+                    </div>
                     <EditorField label={locale === "zh-CN" ? "标题显示" : "Show Title"}>
                       <div className="flex items-center justify-between rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-3 py-2">
                         <span className="text-[12px] text-[#1a1c19]">
@@ -2075,8 +3553,108 @@ export function EditorWorkbench({
                       </div>
                     </EditorField>
                   </EditorSection>
+                  ) : null}
 
+                  {componentPanelTab === "data" ? (
                   <EditorSection title={t("rightPanel.dataBinding.title")}>
+                    {supportsManualData ? (
+                      <EditorField label={locale === "zh-CN" ? "数据来源" : "Data Source"}>
+                        <Select
+                          className={editorControlClass}
+                          value={selectedWidget.dataSourceMode ?? "dataset"}
+                          onChange={(event) =>
+                            handleWidgetPatch({
+                              dataSourceMode: event.target.value as "dataset" | "manual",
+                            })
+                          }
+                          options={[
+                            {label: locale === "zh-CN" ? "绑定数据集" : "Dataset Binding", value: "dataset"},
+                            {label: locale === "zh-CN" ? "手动 JSON" : "Manual JSON", value: "manual"},
+                          ]}
+                        />
+                      </EditorField>
+                    ) : null}
+
+                    {supportsManualData && (selectedWidget.dataSourceMode ?? "dataset") === "manual" ? (
+                      <>
+                        <div className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3 text-[12px] text-[#424842]">
+                          <div className="font-medium text-[#1a1c19]">
+                            {locale === "zh-CN" ? "组件独立数据" : "Widget-local Data"}
+                          </div>
+                          <div className="mt-2 text-[11px] leading-5 text-[#727971]">
+                            {locale === "zh-CN"
+                              ? "这个组件将优先使用手动填写的 JSON 数据，不再依赖全局数据集。适合快速做演示图、单独修正某个图表，或临时口径调整。"
+                              : "This widget will prefer the JSON entered below instead of the shared dataset. Use it for quick charts, local overrides or presentation-only data."}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <MiniActionButton
+                            label={locale === "zh-CN" ? "填充示例 JSON" : "Fill Sample JSON"}
+                            onClick={fillManualDataTemplate}
+                          />
+                          <MiniActionButton
+                            label={locale === "zh-CN" ? "切回数据集绑定" : "Back to Dataset"}
+                            onClick={resetToDatasetBinding}
+                          />
+                        </div>
+                        <EditorField
+                          label={locale === "zh-CN" ? "手动 JSON 数据" : "Manual JSON Data"}
+                          hint={manualDataPlaceholderHint(selectedWidget.type, locale)}
+                        >
+                          <Textarea
+                            value={selectedWidget.manualData ?? defaultManualDataTemplate(selectedWidget.type)}
+                            onChange={(event) => handleWidgetPatch({manualData: event.target.value})}
+                            className="min-h-32 resize-y rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 font-mono text-[12px] leading-5 focus:border-[#45664b]"
+                          />
+                        </EditorField>
+                        <div
+                          className={`rounded-md border px-3 py-3 text-[12px] ${
+                            manualDataState?.valid
+                              ? "border-[#c2d8c4] bg-[#eef5ec] text-[#23422a]"
+                              : "border-[#efc0ba] bg-[#fff4f2] text-[#8a2f25]"
+                          }`}
+                        >
+                          <div className="font-semibold">
+                            {manualDataState?.valid
+                              ? locale === "zh-CN"
+                                ? "JSON 校验通过"
+                                : "JSON validated"
+                              : locale === "zh-CN"
+                                ? "JSON 校验失败"
+                                : "JSON validation failed"}
+                          </div>
+                          <p className="mt-1 leading-5">
+                            {manualDataState?.valid
+                              ? manualDataSuccessSummary(selectedWidget.type, manualDataState, locale)
+                              : manualDataState?.error ??
+                                (locale === "zh-CN"
+                                  ? "请填写合法的 JSON 数据"
+                                  : "Enter valid JSON data to drive this widget.")}
+                          </p>
+                        </div>
+                        {manualDataState?.valid ? (
+                          <ManualDataPreviewCard
+                            locale={locale}
+                            widgetType={selectedWidget.type}
+                            state={manualDataState}
+                            widget={selectedWidget}
+                          />
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                    {supportsManualData ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <MiniActionButton
+                          label={locale === "zh-CN" ? "切到手动 JSON" : "Switch to Manual JSON"}
+                          onClick={fillManualDataTemplate}
+                        />
+                        <MiniActionButton
+                          label={locale === "zh-CN" ? "清空字段映射" : "Clear Field Map"}
+                          onClick={() => handleWidgetPatch({fieldMap: ""})}
+                        />
+                      </div>
+                    ) : null}
                     <EditorField label={t("rightPanel.dataBinding.dataset")}>
                       <Select
                         className={editorControlClass}
@@ -2088,6 +3666,74 @@ export function EditorWorkbench({
                         }))}
                       />
                     </EditorField>
+                    <div className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3 text-[12px] text-[#424842]">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium text-[#1a1c19]">
+                          {selectedWidget.dataset || (locale === "zh-CN" ? "未绑定数据集" : "No dataset")}
+                        </span>
+                        <span className="text-[10px] uppercase tracking-[0.14em] text-[#727971]">
+                          {selectedDatasetFields.length} {locale === "zh-CN" ? "字段" : "fields"}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-[11px] text-[#727971]">
+                        {locale === "zh-CN"
+                          ? "字段映射会直接驱动图表、指标卡和表格内容。"
+                          : "Field bindings directly drive charts, KPIs and table content."}
+                      </div>
+                    </div>
+                    <EditorField
+                      label={locale === "zh-CN" ? "当前绑定概览" : "Binding Summary"}
+                      hint={
+                        bindingSummary.length
+                          ? locale === "zh-CN"
+                            ? "这里显示当前组件实际会读取到的字段"
+                            : "These fields are currently driving the selected widget"
+                          : locale === "zh-CN"
+                            ? "当前组件不依赖额外字段映射"
+                            : "This widget does not require extra field mappings"
+                      }
+                    >
+                      {bindingSummary.length ? (
+                        <div className="space-y-2">
+                          {bindingSummary.map((binding) => (
+                            <div
+                              key={binding.alias}
+                              className={`rounded-md border px-3 py-2 text-[12px] ${
+                                binding.resolvedField
+                                  ? "border-[#d7d8d1] bg-[#fafaf5] text-[#1a1c19]"
+                                  : "border-[#efc0ba] bg-[#fff4f2] text-[#8a2f25]"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="font-medium">{binding.label}</span>
+                                <span className="text-[10px] uppercase tracking-[0.14em] text-[#727971]">
+                                  {binding.resolvedMeta?.type ?? (locale === "zh-CN" ? "未绑定" : "Unmapped")}
+                                </span>
+                              </div>
+                              <div className="mt-1 text-[11px]">
+                                {binding.resolvedField || (locale === "zh-CN" ? "请选择一个字段" : "Choose a field")}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-md border border-dashed border-[#d7d8d1] bg-[#fafaf5] px-3 py-3 text-[12px] text-[#727971]">
+                          {locale === "zh-CN"
+                            ? "当前组件主要依赖文本或样式配置，不需要额外字段映射。"
+                            : "This widget mainly relies on its own content and style, so no extra field mapping is required."}
+                        </div>
+                      )}
+                    </EditorField>
+                    {missingBindings.length ? (
+                      <div className="rounded-md border border-[#efc0ba] bg-[#fff4f2] px-3 py-3 text-[12px] text-[#8a2f25]">
+                        <div className="font-semibold">{locale === "zh-CN" ? "绑定提醒" : "Binding Notice"}</div>
+                        <p className="mt-1 leading-5">
+                          {locale === "zh-CN"
+                            ? "当前组件还有字段未完成绑定，画布会先回退到示例数据。"
+                            : "Some bindings are still missing, so the canvas temporarily falls back to sample data."}
+                        </p>
+                      </div>
+                    ) : null}
                     {fieldMappingOptions.length ? (
                       <div className="space-y-2.5">
                         {fieldMappingOptions.map((mapping) => (
@@ -2128,25 +3774,718 @@ export function EditorWorkbench({
                         className="min-h-24 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
                       />
                     </EditorField>
+                      </>
+                    )}
+                    {selectedWidget.type === "table" && selectedDatasetFields.length ? (
+                      <div className="space-y-3">
+                        <EditorField
+                          label={locale === "zh-CN" ? "显示列" : "Visible Columns"}
+                          hint={locale === "zh-CN" ? "至少保留 1 列；顺序即展示顺序" : "Keep at least one column; order follows the list below"}
+                        >
+                          <div className="space-y-2">
+                            {selectedDatasetFields.map((field) => {
+                              const checked = effectiveTableColumns.includes(field.field);
+                              return (
+                                <button
+                                  key={field.field}
+                                  type="button"
+                                  onClick={() => handleTableColumnToggle(field.field)}
+                                  className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-[12px] transition-colors ${
+                                    checked
+                                      ? "border-[#9db7a0] bg-[#eef5ec] text-[#23422a]"
+                                      : "border-[#d7d8d1] bg-[#fafaf5] text-[#1a1c19] hover:bg-[#f2f2ec]"
+                                  }`}
+                                >
+                                  <span className="inline-flex min-w-0 items-center gap-2">
+                                    <span className="font-medium">{field.field}</span>
+                                    <span className="text-[10px] uppercase tracking-[0.14em] text-[#727971]">{field.type}</span>
+                                  </span>
+                                  <span className="text-[11px] font-semibold">{checked ? (locale === "zh-CN" ? "显示" : "On") : (locale === "zh-CN" ? "隐藏" : "Off")}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </EditorField>
+                        {effectiveTableColumns.map((column) => (
+                          <EditorField
+                            key={column}
+                            label={locale === "zh-CN" ? `${column} 别名` : `${column} Label`}
+                          >
+                            <div className="space-y-2">
+                              <Input
+                                className={editorControlClass}
+                                value={selectedWidget.tableColumnLabels?.[column] ?? ""}
+                                onChange={(event) => handleTableColumnLabelChange(column, event.target.value)}
+                                placeholder={column}
+                              />
+                              <Input
+                                className={editorControlClass}
+                                value={String(selectedWidget.tableColumnWidths?.[column] ?? 140)}
+                                onChange={(event) => handleTableColumnWidthChange(column, event.target.value)}
+                                placeholder={locale === "zh-CN" ? "列宽 (px)" : "Width (px)"}
+                              />
+                              <div className="grid grid-cols-2 gap-2">
+                                <MiniActionButton
+                                  label={locale === "zh-CN" ? "上移列" : "Move Up"}
+                                  onClick={() => handleTableColumnMove(column, "up")}
+                                  disabled={effectiveTableColumns.indexOf(column) === 0}
+                                />
+                                <MiniActionButton
+                                  label={locale === "zh-CN" ? "下移列" : "Move Down"}
+                                  onClick={() => handleTableColumnMove(column, "down")}
+                                  disabled={effectiveTableColumns.indexOf(column) === effectiveTableColumns.length - 1}
+                                />
+                              </div>
+                            </div>
+                          </EditorField>
+                        ))}
+                      </div>
+                    ) : null}
                   </EditorSection>
+                  ) : null}
 
-                  <EditorSection title={t("rightPanel.map.title")}>
+                  {componentPanelTab === "style" && isChartWidget ? (
+                    <EditorSection title={locale === "zh-CN" ? "图表配置" : "Chart Settings"}>
+                      <div className="space-y-3">
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "标题" : "Title"}
+                          description={
+                            locale === "zh-CN"
+                              ? "先把标题区和信息头部调顺，图表气质会稳定很多。"
+                              : "Dial in the title area first so the chart feels cohesive before tuning the plot."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "标题强调色" : "Title Accent"}>
+                              <ColorSwatchField
+                                value={selectedWidget.chartTitleAccentColor ?? (selectedWidget.accent ?? "#23422a")}
+                                onChange={(nextValue) => handleWidgetPatch({chartTitleAccentColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "标题底色" : "Title Surface"}>
+                              <ColorSwatchField
+                                value={selectedWidget.chartTitleBackgroundColor ?? "#eef5ec"}
+                                onChange={(nextValue) => handleWidgetPatch({chartTitleBackgroundColor: nextValue})}
+                              />
+                            </EditorField>
+                          </div>
+                          <EditorField label={locale === "zh-CN" ? "标题边框色" : "Title Border"}>
+                            <ColorSwatchField
+                              value={selectedWidget.chartTitleBorderColor ?? "#c7d4c8"}
+                              onChange={(nextValue) => handleWidgetPatch({chartTitleBorderColor: nextValue})}
+                            />
+                          </EditorField>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "标题内边距 X" : "Title Padding X"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.chartTitlePaddingX ?? 0}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartTitlePaddingX: clamp(numberOr(event.target.value.replace("px", ""), selectedWidget.chartTitlePaddingX ?? 0), 0, 24),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "标题内边距 Y" : "Title Padding Y"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.chartTitlePaddingY ?? 0}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartTitlePaddingY: clamp(numberOr(event.target.value.replace("px", ""), selectedWidget.chartTitlePaddingY ?? 0), 0, 16),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "标题圆角" : "Title Radius"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.chartTitleRadius ?? 999}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartTitleRadius: clamp(numberOr(event.target.value.replace("px", ""), selectedWidget.chartTitleRadius ?? 999), 0, 999),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "标题底色透明度" : "Title Surface Opacity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.chartTitleSurfaceOpacity ?? 12}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartTitleSurfaceOpacity: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.chartTitleSurfaceOpacity ?? 12), 0, 100),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "标题边框宽度" : "Title Border Width"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.chartTitleBorderWidth ?? 1}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartTitleBorderWidth: clamp(numberOr(event.target.value.replace("px", ""), selectedWidget.chartTitleBorderWidth ?? 1), 0, 8),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "信号点尺寸" : "Signal Dot Size"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.chartTitleSignalSize ?? 0}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartTitleSignalSize: clamp(numberOr(event.target.value.replace("px", ""), selectedWidget.chartTitleSignalSize ?? 0), 0, 20),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "信号点光圈色" : "Signal Halo"}>
+                              <ColorSwatchField
+                                value={selectedWidget.chartTitleSignalHaloColor ?? "#ffffff"}
+                                onChange={(nextValue) => handleWidgetPatch({chartTitleSignalHaloColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "分割线宽度" : "Divider Width"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.chartTitleDividerWidth ?? 0}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartTitleDividerWidth: clamp(numberOr(event.target.value.replace("px", ""), selectedWidget.chartTitleDividerWidth ?? 0), 0, 6),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "分割线起始色" : "Divider Start"}>
+                              <ColorSwatchField
+                                value={selectedWidget.chartTitleDividerStartColor ?? "#c7d4c8"}
+                                onChange={(nextValue) => handleWidgetPatch({chartTitleDividerStartColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "分割线结束色" : "Divider End"}>
+                              <ColorSwatchField
+                                value={selectedWidget.chartTitleDividerEndColor ?? "transparent"}
+                                onChange={(nextValue) => handleWidgetPatch({chartTitleDividerEndColor: nextValue})}
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "配色与视觉" : "Palette & Visuals"}
+                          description={
+                            locale === "zh-CN"
+                              ? "集中控制图表主色、层次色和读图用的关键颜色。"
+                              : "Control the primary palette and the key colors used to read the chart."
+                          }
+                        >
+                          <EditorField label={locale === "zh-CN" ? "主色" : "Primary Accent"}>
+                            <ColorSwatchField
+                              value={selectedWidget.accent ?? "#23422a"}
+                              onChange={(nextAccent) => handleWidgetPatch({accent: nextAccent})}
+                            />
+                          </EditorField>
+                          <EditorField
+                            label={locale === "zh-CN" ? "图表调色板" : "Chart Palette"}
+                            hint={
+                              locale === "zh-CN"
+                                ? "直接定义主色、辅助色、浅色和深色，图表会即时跟着更新。"
+                                : "Define the primary, support, light and dark colors directly for instant updates."
+                            }
+                          >
+                            <ChartPaletteEditor
+                              value={selectedWidget.chartPaletteColors}
+                              palette={selectedWidget.chartPalette ?? "forest"}
+                              accent={selectedWidget.accent ?? "#23422a"}
+                              onChange={(nextColors) => handleWidgetPatch({chartPaletteColors: nextColors})}
+                            />
+                          </EditorField>
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "标签与图例" : "Labels & Legend"}
+                          description={
+                            locale === "zh-CN"
+                              ? "控制数值、数据标签和图例怎么出现在用户眼前。"
+                              : "Control how values, labels and legends are presented to the viewer."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "数值格式" : "Value Format"}>
+                              <Select
+                                className={editorControlClass}
+                                value={selectedWidget.chartLabelFormat ?? (selectedWidget.type === "pie" ? "percent" : "raw")}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartLabelFormat: event.target.value as EditorWidget["chartLabelFormat"],
+                                  })
+                                }
+                                options={[
+                                  {label: locale === "zh-CN" ? "原始值" : "Raw", value: "raw"},
+                                  {label: locale === "zh-CN" ? "紧凑格式" : "Compact", value: "compact"},
+                                  {label: locale === "zh-CN" ? "百分比" : "Percent", value: "percent"},
+                                ]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "小数位" : "Decimals"}>
+                              <Input
+                                className={editorControlClass}
+                                value={String(selectedWidget.chartDecimals ?? 0)}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartDecimals: clamp(numberOr(event.target.value, selectedWidget.chartDecimals ?? 0), 0, 3),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "前缀" : "Prefix"}>
+                              <Input
+                                className={editorControlClass}
+                                value={selectedWidget.valuePrefix ?? ""}
+                                onChange={(event) => handleWidgetPatch({valuePrefix: event.target.value})}
+                                placeholder={locale === "zh-CN" ? "如 ¥" : "e.g. $"}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "后缀" : "Suffix"}>
+                              <Input
+                                className={editorControlClass}
+                                value={selectedWidget.valueSuffix ?? ""}
+                                onChange={(event) => handleWidgetPatch({valueSuffix: event.target.value})}
+                                placeholder={locale === "zh-CN" ? "如 件 / %" : "e.g. %"}
+                              />
+                            </EditorField>
+                          </div>
+                          <ToggleRow
+                            label={locale === "zh-CN" ? "显示数值标签" : "Show Data Labels"}
+                            checked={selectedWidget.showDataLabels ?? false}
+                            onCheckedChange={(checked) => handleWidgetPatch({showDataLabels: checked})}
+                          />
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <ToggleRow
+                              label={locale === "zh-CN" ? "显示信息徽章" : "Show Summary Badges"}
+                              checked={selectedWidget.showHighlightBadges !== false}
+                              onCheckedChange={(checked) => handleWidgetPatch({showHighlightBadges: checked})}
+                            />
+                            <EditorField label={locale === "zh-CN" ? "标签强度" : "Label Tone"}>
+                              <Select
+                                className={editorControlClass}
+                                value={selectedWidget.chartLabelTone ?? "balanced"}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartLabelTone: event.target.value as EditorWidget["chartLabelTone"],
+                                  })
+                                }
+                                options={[
+                                  {label: locale === "zh-CN" ? "弱化" : "Muted", value: "muted"},
+                                  {label: locale === "zh-CN" ? "均衡" : "Balanced", value: "balanced"},
+                                  {label: locale === "zh-CN" ? "强调" : "Strong", value: "strong"},
+                                ]}
+                              />
+                            </EditorField>
+                          </div>
+                          <EditorField label={locale === "zh-CN" ? "徽章布局" : "Badge Layout"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.chartBadgeLayout ?? "split"}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  chartBadgeLayout: event.target.value as EditorWidget["chartBadgeLayout"],
+                                })
+                              }
+                              options={[
+                                {label: locale === "zh-CN" ? "两侧分布" : "Split", value: "split"},
+                                {label: locale === "zh-CN" ? "纵向堆叠" : "Stacked", value: "stacked"},
+                                {label: locale === "zh-CN" ? "底部条带" : "Footer", value: "footer"},
+                              ]}
+                            />
+                          </EditorField>
+                          {selectedWidget.type === "pie" ? (
+                            <>
+                              <ToggleRow
+                                label={locale === "zh-CN" ? "显示图例" : "Show Legend"}
+                                checked={selectedWidget.showLegend !== false}
+                                onCheckedChange={(checked) => handleWidgetPatch({showLegend: checked})}
+                              />
+                              <div className="grid grid-cols-2 gap-2.5">
+                                <EditorField label={locale === "zh-CN" ? "图例强度" : "Legend Tone"}>
+                                  <Select
+                                    className={editorControlClass}
+                                    value={selectedWidget.chartLegendTone ?? "balanced"}
+                                    onChange={(event) =>
+                                      handleWidgetPatch({
+                                        chartLegendTone: event.target.value as EditorWidget["chartLegendTone"],
+                                      })
+                                    }
+                                    options={[
+                                      {label: locale === "zh-CN" ? "弱化" : "Muted", value: "muted"},
+                                      {label: locale === "zh-CN" ? "均衡" : "Balanced", value: "balanced"},
+                                      {label: locale === "zh-CN" ? "强调" : "Strong", value: "strong"},
+                                    ]}
+                                  />
+                                </EditorField>
+                                <EditorField label={locale === "zh-CN" ? "图例位置" : "Legend Position"}>
+                                  <Select
+                                    className={editorControlClass}
+                                    value={selectedWidget.legendPosition ?? "right"}
+                                    onChange={(event) =>
+                                      handleWidgetPatch({
+                                        legendPosition: event.target.value as EditorWidget["legendPosition"],
+                                      })
+                                    }
+                                    options={[
+                                      {label: locale === "zh-CN" ? "右侧" : "Right", value: "right"},
+                                      {label: locale === "zh-CN" ? "底部" : "Bottom", value: "bottom"},
+                                    ]}
+                                  />
+                                </EditorField>
+                              </div>
+                            </>
+                          ) : null}
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "坐标与网格" : "Axes & Grid"}
+                          description={
+                            locale === "zh-CN"
+                              ? "控制坐标轴、标签和网格密度，让图表信息层次更清楚。"
+                              : "Tune axes, labels and grid visibility so the chart reads clearly on a big screen."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "图内留白" : "Inner Padding"}>
+                              <Select
+                                className={editorControlClass}
+                                value={selectedWidget.chartPaddingMode ?? "balanced"}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartPaddingMode: event.target.value as EditorWidget["chartPaddingMode"],
+                                  })
+                                }
+                                options={[
+                                  {label: locale === "zh-CN" ? "紧凑" : "Compact", value: "compact"},
+                                  {label: locale === "zh-CN" ? "均衡" : "Balanced", value: "balanced"},
+                                  {label: locale === "zh-CN" ? "展示型" : "Showcase", value: "showcase"},
+                                ]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "网格样式" : "Grid Style"}>
+                              <Select
+                                className={editorControlClass}
+                                value={selectedWidget.chartGridStyle ?? "dashed"}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartGridStyle: event.target.value as EditorWidget["chartGridStyle"],
+                                  })
+                                }
+                                options={[
+                                  {label: locale === "zh-CN" ? "虚线" : "Dashed", value: "dashed"},
+                                  {label: locale === "zh-CN" ? "实线" : "Solid", value: "solid"},
+                                  {label: locale === "zh-CN" ? "点线" : "Dot", value: "dot"},
+                                ]}
+                              />
+                            </EditorField>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "轴文字颜色" : "Axis Text Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.chartAxisColor ?? "#727971"}
+                                onChange={(nextValue) => handleWidgetPatch({chartAxisColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "网格颜色" : "Grid Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.chartGridColor ?? "#d9d0b7"}
+                                onChange={(nextValue) => handleWidgetPatch({chartGridColor: nextValue})}
+                              />
+                            </EditorField>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "网格透明度" : "Grid Opacity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.chartGridOpacity ?? 42}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartGridOpacity: clamp(
+                                      numberOr(event.target.value.replace("%", ""), selectedWidget.chartGridOpacity ?? 42),
+                                      0,
+                                      100,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "轴线透明度" : "Axis Opacity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.chartAxisOpacity ?? 56}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    chartAxisOpacity: clamp(
+                                      numberOr(event.target.value.replace("%", ""), selectedWidget.chartAxisOpacity ?? 56),
+                                      0,
+                                      100,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                          <ToggleRow
+                            label={locale === "zh-CN" ? "显示网格辅助" : "Show Grid"}
+                            checked={selectedWidget.showGrid ?? false}
+                            onCheckedChange={(checked) => handleWidgetPatch({showGrid: checked})}
+                          />
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "轴标签字号" : "Axis Label Size"}>
+                              <Input
+                                className={editorControlClass}
+                                value={String(selectedWidget.axisLabelSize ?? 8)}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    axisLabelSize: clamp(numberOr(event.target.value, selectedWidget.axisLabelSize ?? 8), 8, 14),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "X 轴旋转" : "X Label Rotate"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.axisLabelRotate ?? 0}°`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    axisLabelRotate: clamp(
+                                      numberOr(event.target.value.replace("°", ""), selectedWidget.axisLabelRotate ?? 0),
+                                      0,
+                                      90,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <ToggleRow
+                              label={locale === "zh-CN" ? "显示 X 轴标签" : "Show X Labels"}
+                              checked={selectedWidget.showXAxisLabels ?? (selectedWidget.type === "bar")}
+                              onCheckedChange={(checked) => handleWidgetPatch({showXAxisLabels: checked})}
+                            />
+                            <ToggleRow
+                              label={locale === "zh-CN" ? "显示 Y 轴标签" : "Show Y Labels"}
+                              checked={selectedWidget.showYAxisLabels ?? false}
+                              onCheckedChange={(checked) => handleWidgetPatch({showYAxisLabels: checked})}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <ToggleRow
+                              label={locale === "zh-CN" ? "显示 X 轴线" : "Show X Axis"}
+                              checked={selectedWidget.showXAxisLine ?? (selectedWidget.type === "bar")}
+                              onCheckedChange={(checked) => handleWidgetPatch({showXAxisLine: checked})}
+                            />
+                            <ToggleRow
+                              label={locale === "zh-CN" ? "显示 Y 轴线" : "Show Y Axis"}
+                              checked={selectedWidget.showYAxisLine ?? false}
+                              onCheckedChange={(checked) => handleWidgetPatch({showYAxisLine: checked})}
+                            />
+                          </div>
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "图形细节" : "Series Detail"}
+                          description={
+                            locale === "zh-CN"
+                              ? "只显示当前图表真正相关的图形细节，让面板保持聚焦。"
+                              : "Only expose the chart-specific drawing details that matter to the current widget."
+                          }
+                        >
+                          {(selectedWidget.type === "line" || selectedWidget.type === "area") ? (
+                            <>
+                              <ToggleRow
+                                label={locale === "zh-CN" ? "平滑曲线" : "Smooth Curve"}
+                                checked={selectedWidget.lineSmooth !== false}
+                                onCheckedChange={(checked) => handleWidgetPatch({lineSmooth: checked})}
+                              />
+                              {selectedWidget.type === "line" ? (
+                                <ToggleRow
+                                  label={locale === "zh-CN" ? "显示折点" : "Show Series Points"}
+                                  checked={selectedWidget.showSeriesPoints ?? true}
+                                  onCheckedChange={(checked) => handleWidgetPatch({showSeriesPoints: checked})}
+                                />
+                              ) : null}
+                              <EditorField label={locale === "zh-CN" ? "线条样式" : "Line Style"}>
+                                <Select
+                                  className={editorControlClass}
+                                  value={selectedWidget.lineStyle ?? "solid"}
+                                  onChange={(event) =>
+                                    handleWidgetPatch({
+                                      lineStyle: event.target.value as EditorWidget["lineStyle"],
+                                    })
+                                  }
+                                  options={[
+                                    {label: locale === "zh-CN" ? "实线" : "Solid", value: "solid"},
+                                    {label: locale === "zh-CN" ? "虚线" : "Dashed", value: "dashed"},
+                                  ]}
+                                />
+                              </EditorField>
+                              {selectedWidget.type === "line" ? (
+                                <div className="grid grid-cols-2 gap-2.5">
+                                  <EditorField label={locale === "zh-CN" ? "线宽" : "Line Weight"}>
+                                    <Input
+                                      className={editorControlClass}
+                                      value={String(selectedWidget.lineWeight ?? 3)}
+                                      onChange={(event) =>
+                                        handleWidgetPatch({
+                                          lineWeight: clamp(numberOr(event.target.value, selectedWidget.lineWeight ?? 3), 1, 8),
+                                        })
+                                      }
+                                    />
+                                  </EditorField>
+                                  <EditorField label={locale === "zh-CN" ? "折点大小" : "Point Size"}>
+                                    <Input
+                                      className={editorControlClass}
+                                      value={String(selectedWidget.pointSize ?? 8)}
+                                      onChange={(event) =>
+                                        handleWidgetPatch({
+                                          pointSize: clamp(numberOr(event.target.value, selectedWidget.pointSize ?? 8), 4, 18),
+                                        })
+                                      }
+                                    />
+                                  </EditorField>
+                                </div>
+                              ) : (
+                                <EditorField label={locale === "zh-CN" ? "填充透明度" : "Area Opacity"}>
+                                  <Input
+                                    className={editorControlClass}
+                                    value={`${selectedWidget.areaOpacity ?? 22}%`}
+                                    onChange={(event) =>
+                                      handleWidgetPatch({
+                                        areaOpacity: clamp(
+                                          numberOr(event.target.value.replace("%", ""), selectedWidget.areaOpacity ?? 22),
+                                          8,
+                                          72,
+                                        ),
+                                      })
+                                    }
+                                  />
+                                </EditorField>
+                              )}
+                            </>
+                          ) : null}
+                          {selectedWidget.type === "bar" ? (
+                            <EditorField label={locale === "zh-CN" ? "柱形圆角" : "Bar Radius"}>
+                              <Input
+                                className={editorControlClass}
+                                value={String(selectedWidget.barRadius ?? 4)}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    barRadius: clamp(numberOr(event.target.value, selectedWidget.barRadius ?? 4), 0, 16),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          ) : null}
+                          {selectedWidget.type === "pie" ? (
+                            <EditorField label={locale === "zh-CN" ? "内环比例" : "Inner Radius"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.pieInnerRadius ?? 58}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    pieInnerRadius: clamp(
+                                      numberOr(event.target.value.replace("%", ""), selectedWidget.pieInnerRadius ?? 58),
+                                      20,
+                                      78,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          ) : null}
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "容器" : "Container"}
+                          description={
+                            locale === "zh-CN"
+                              ? "控制图表卡片本身的层次、边框、阴影和发光，不影响数据表达。"
+                              : "Control the chart card itself: surface, border, shadow and glow without touching the data."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "图内底色" : "Inner Surface"}>
+                              <ColorSwatchField
+                                value={selectedWidget.fill ?? "#f6f3e8"}
+                                onChange={(nextValue) => handleWidgetPatch({fill: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "点缀高光" : "Accent Tint"}>
+                              <ColorSwatchField
+                                value={selectedWidget.chartSurfaceAccentColor ?? "#c7dfcb"}
+                                onChange={(nextValue) => handleWidgetPatch({chartSurfaceAccentColor: nextValue})}
+                              />
+                            </EditorField>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "边框颜色" : "Border Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.chartBorderColor ?? "#c7d4c8"}
+                                onChange={(nextValue) => handleWidgetPatch({chartBorderColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "边框宽度" : "Border Width"}>
+                              <Input
+                                className={editorControlClass}
+                                value={String(selectedWidget.chartBorderWidth ?? 1)}
+                                onChange={(event) => handleWidgetPatch({chartBorderWidth: clamp(numberOr(event.target.value, selectedWidget.chartBorderWidth ?? 1), 0, 8)})}
+                              />
+                            </EditorField>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "阴影颜色" : "Shadow Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.chartShadowColor ?? "#1a1c19"}
+                                onChange={(nextValue) => handleWidgetPatch({chartShadowColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "阴影强度" : "Shadow Opacity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.chartShadowOpacity ?? 12}%`}
+                                onChange={(event) => handleWidgetPatch({chartShadowOpacity: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.chartShadowOpacity ?? 12), 0, 100)})}
+                              />
+                            </EditorField>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "光晕颜色" : "Glow Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.chartGlowColor ?? (selectedWidget.accent ?? "#23422a")}
+                                onChange={(nextValue) => handleWidgetPatch({chartGlowColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "光晕强度" : "Glow Opacity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.chartGlowOpacity ?? 0}%`}
+                                onChange={(event) => handleWidgetPatch({chartGlowOpacity: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.chartGlowOpacity ?? 0), 0, 100)})}
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+                      </div>
+                    </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "style" && selectedWidget.type === "map" ? (
+                    <EditorSection title={t("rightPanel.map.title")}>
                     <div className="space-y-3">
                       <ToggleRow label={t("rightPanel.map.showLabels")} checked={mapLabels} onCheckedChange={setMapLabels} />
                       <ToggleRow label={t("rightPanel.map.show3DAxis")} checked={map3dAxis} onCheckedChange={setMap3dAxis} />
                       <ToggleRow label={locale === "zh-CN" ? "显示标记点" : "Show Markers"} checked={mapMarkers} onCheckedChange={setMapMarkers} />
-                      <EditorField label={locale === "zh-CN" ? "地图主题" : "Map Theme"}>
-                        <Select
-                          className={editorControlClass}
-                          value={mapTheme}
-                          onChange={(event) => setMapTheme(event.target.value as "emerald" | "midnight" | "amber")}
-                          options={[
-                            {label: locale === "zh-CN" ? "翡翠绿" : "Emerald", value: "emerald"},
-                            {label: locale === "zh-CN" ? "深夜蓝" : "Midnight", value: "midnight"},
-                            {label: locale === "zh-CN" ? "琥珀金" : "Amber", value: "amber"},
-                          ]}
-                        />
-                      </EditorField>
                       <EditorField label={locale === "zh-CN" ? "路线密度" : "Route Density"}>
                         <Select
                           className={editorControlClass}
@@ -2182,17 +4521,96 @@ export function EditorWorkbench({
                           ]}
                         />
                       </EditorField>
-                      <EditorField label={locale === "zh-CN" ? "地表层次" : "Surface Tone"}>
-                        <Select
-                          className={editorControlClass}
-                          value={mapSurfaceTone}
-                          onChange={(event) => setMapSurfaceTone(event.target.value as "soft" | "contrast")}
-                          options={[
-                            {label: locale === "zh-CN" ? "柔和" : "Soft", value: "soft"},
-                            {label: locale === "zh-CN" ? "高对比" : "Contrast", value: "contrast"},
-                          ]}
-                        />
-                      </EditorField>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <EditorField label={locale === "zh-CN" ? "海洋底色" : "Ocean Color"}>
+                          <ColorSwatchField
+                            value={mapOceanColor}
+                            onChange={setMapOceanColor}
+                            swatches={["#0f1915", "#10231d", "#0e2430", "#201a14", "#162119", "#ffffff"]}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "边界线颜色" : "Border Color"}>
+                          <ColorSwatchField
+                            value={mapBorderColor}
+                            onChange={setMapBorderColor}
+                            swatches={["#4e7459", "#6c8f78", "#7f9d89", "#5d768a", "#c7e0cc", "#ffffff"]}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "地表起始色" : "Land Start"}>
+                          <ColorSwatchField
+                            value={mapLandStartColor}
+                            onChange={setMapLandStartColor}
+                            swatches={["#23422a", "#284a32", "#31503a", "#34503b", "#5c845f", "#ffffff"]}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "地表结束色" : "Land End"}>
+                          <ColorSwatchField
+                            value={mapLandEndColor}
+                            onChange={setMapLandEndColor}
+                            swatches={["#1b3423", "#20302a", "#243b2c", "#314536", "#5c745d", "#dff3e2"]}
+                          />
+                        </EditorField>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <EditorField label={locale === "zh-CN" ? "路线颜色" : "Route Color"}>
+                          <ColorSwatchField
+                            value={mapRouteColor}
+                            onChange={setMapRouteColor}
+                            swatches={["#bde7c7", "#dfffe7", "#c6e7ff", "#ffd9b3", "#f6f6ef", "#8ef0ae"]}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "路线辉光色" : "Route Glow"}>
+                          <ColorSwatchField
+                            value={mapRouteGlowColor}
+                            onChange={setMapRouteGlowColor}
+                            swatches={["#8ef0ae", "#bde7c7", "#8ecbff", "#ffd08e", "#ffffff", "#5cf1b8"]}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "标记点颜色" : "Marker Color"}>
+                          <ColorSwatchField
+                            value={mapMarkerColor}
+                            onChange={setMapMarkerColor}
+                            swatches={["#dfffe7", "#ffffff", "#ffe9d4", "#d6edff", "#bde7c7", "#8ef0ae"]}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "标记辉光色" : "Marker Glow"}>
+                          <ColorSwatchField
+                            value={mapMarkerGlowColor}
+                            onChange={setMapMarkerGlowColor}
+                            swatches={["#8ef0ae", "#bde7c7", "#9ae9ae", "#8ecbff", "#ffd08e", "#ffffff"]}
+                          />
+                        </EditorField>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <EditorField label={locale === "zh-CN" ? "标签文字色" : "Label Color"}>
+                          <ColorSwatchField
+                            value={mapLabelColor}
+                            onChange={setMapLabelColor}
+                            swatches={["#f5fff7", "#ffffff", "#dfffe7", "#d8f4ff", "#ffe7d2", "#20302a"]}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "热力低值色" : "Heat Low"}>
+                          <ColorSwatchField
+                            value={mapHeatLowColor}
+                            onChange={setMapHeatLowColor}
+                            swatches={["#4d8f67", "#5ca37a", "#5d84a3", "#c99a4b", "#8f8f7a", "#ffffff"]}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "热力高值色" : "Heat High"}>
+                          <ColorSwatchField
+                            value={mapHeatHighColor}
+                            onChange={setMapHeatHighColor}
+                            swatches={["#bde7c7", "#dfffe7", "#bde2ff", "#ffd9a6", "#f6f6ef", "#8ef0ae"]}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "面板文字色" : "Panel Text"}>
+                          <ColorSwatchField
+                            value={mapPanelTextColor}
+                            onChange={setMapPanelTextColor}
+                            swatches={["#243129", "#20302a", "#31503a", "#4c5f56", "#ffffff", "#dfffe7"]}
+                          />
+                        </EditorField>
+                      </div>
                       <EditorField label={locale === "zh-CN" ? "辉光强度" : "Glow Intensity"}>
                         <Input
                           className={editorControlClass}
@@ -2200,38 +4618,66 @@ export function EditorWorkbench({
                           onChange={(event) => setMapGlow(clamp(numberOr(event.target.value.replace("%", ""), mapGlow), 0, 100))}
                         />
                       </EditorField>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <EditorField label={locale === "zh-CN" ? "点位大小" : "Marker Scale"}>
+                          <Input
+                            className={editorControlClass}
+                            value={`${mapPointScale}%`}
+                            onChange={(event) => setMapPointScale(clamp(numberOr(event.target.value.replace("%", ""), mapPointScale), 40, 220))}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "路线粗细" : "Route Width"}>
+                          <Input
+                            className={editorControlClass}
+                            value={`${mapRouteWidth}%`}
+                            onChange={(event) => setMapRouteWidth(clamp(numberOr(event.target.value.replace("%", ""), mapRouteWidth), 40, 220))}
+                          />
+                        </EditorField>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <EditorField label={locale === "zh-CN" ? "主轴颜色" : "Axis Color"}>
+                          <ColorSwatchField
+                            value={mapAxisColor}
+                            onChange={setMapAxisColor}
+                            swatches={["#6f8575", "#8ea093", "#bcd0c3", "#6e8897", "#d8e5dc", "#ffffff"]}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "副轴颜色" : "Secondary Axis"}>
+                          <ColorSwatchField
+                            value={mapAxisSecondaryColor}
+                            onChange={setMapAxisSecondaryColor}
+                            swatches={["#486050", "#5c745d", "#7e8d80", "#4f6472", "#c7d8cb", "#ffffff"]}
+                          />
+                        </EditorField>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <EditorField label={locale === "zh-CN" ? "地表透明度" : "Land Opacity"}>
+                          <Input
+                            className={editorControlClass}
+                            value={`${mapLandOpacity}%`}
+                            onChange={(event) => setMapLandOpacity(clamp(numberOr(event.target.value.replace("%", ""), mapLandOpacity), 20, 100))}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "标签透明度" : "Label Opacity"}>
+                          <Input
+                            className={editorControlClass}
+                            value={`${mapLabelOpacity}%`}
+                            onChange={(event) => setMapLabelOpacity(clamp(numberOr(event.target.value.replace("%", ""), mapLabelOpacity), 20, 100))}
+                          />
+                        </EditorField>
+                      </div>
                       <EditorField label={t("rightPanel.map.defaultZoom")}>
                         <Input className={editorControlClass} value={mapZoom} onChange={(event) => setMapZoom(event.target.value)} />
                       </EditorField>
                     </div>
-                  </EditorSection>
+                    </EditorSection>
+                  ) : null}
 
-                  <EditorSection title={t("rightPanel.layers.title")} subtitle={t("rightPanel.layers.subtitle")}>
-                    <div className="space-y-2">
-                      {[...orderedWidgets].reverse().map((widget) => (
-                        <button
-                          key={widget.id}
-                          onClick={(event) => selectWidget(widget.id, event.shiftKey || event.metaKey || event.ctrlKey)}
-                          className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-[12px] ${
-                            selectedWidgetIdSet.has(widget.id) ? "bg-[#dce9dc] text-[#23422a]" : "bg-[#f4f4ef] text-[#1a1c19]"
-                          }`}
-                        >
-                          <span className="inline-flex min-w-0 items-center gap-2">
-                            {(widget.locked ?? false) ? <Lock className="h-3.5 w-3.5 shrink-0 text-[#727971]" /> : null}
-                            <span className="truncate">{widget.title}</span>
-                          </span>
-                          <span className="text-[10px] uppercase tracking-[0.18em] text-[#727971]">
-                            #{widget.zIndex ?? 0}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </EditorSection>
+                    </>
+                  ) : null}
                 </div>
               </div>
-            </aside>
-          </div>
-        </main>
+        </aside>
       </div>
     </main>
   );
@@ -2288,12 +4734,21 @@ function ToolIconButton({
   );
 }
 
-function MiniActionButton({label, onClick}: {label: string; onClick: () => void}) {
+function MiniActionButton({
+  label,
+  onClick,
+  disabled = false,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-2 py-1.5 text-[11px] font-medium text-[#23422a] transition-colors hover:bg-[#eef2ea]"
+      disabled={disabled}
+      className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-2 py-1.5 text-[11px] font-medium text-[#23422a] transition-colors hover:bg-[#eef2ea] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[#fafaf5]"
     >
       {label}
     </button>
@@ -2337,8 +4792,33 @@ function RailItem({
   );
 }
 
+function ContextMenuButton({
+  label,
+  onClick,
+  danger = false,
+}: {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-[12px] transition-colors ${
+        danger
+          ? "text-[#ba1a1a] hover:bg-[#fdebea]"
+          : "text-[#1a1c19] hover:bg-[#eef2ea]"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 function WidgetCanvasItem({
   widget,
+  canvasWidth,
+  canvasHeight,
   selected,
   mapLabels,
   map3dAxis,
@@ -2350,11 +4830,33 @@ function WidgetCanvasItem({
   mapRouteStyle,
   mapLabelStyle,
   mapSurfaceTone,
+  mapPointScale,
+  mapRouteWidth,
+  mapLandOpacity,
+  mapLabelOpacity,
+  mapOceanColor,
+  mapLandStartColor,
+  mapLandEndColor,
+  mapBorderColor,
+  mapAxisColor,
+  mapAxisSecondaryColor,
+  mapRouteColor,
+  mapRouteGlowColor,
+  mapMarkerColor,
+  mapMarkerHaloColor,
+  mapMarkerGlowColor,
+  mapLabelColor,
+  mapPanelTextColor,
+  mapHeatLowColor,
+  mapHeatHighColor,
   dataset,
   onDragStart,
+  onContextMenu,
   onResizeStart,
 }: {
   widget: EditorWidget;
+  canvasWidth: number;
+  canvasHeight: number;
   selected: boolean;
   mapLabels: boolean;
   map3dAxis: boolean;
@@ -2366,8 +4868,28 @@ function WidgetCanvasItem({
   mapRouteStyle: "solid" | "dashed" | "pulse";
   mapLabelStyle: "pill" | "minimal";
   mapSurfaceTone: "soft" | "contrast";
+  mapPointScale: number;
+  mapRouteWidth: number;
+  mapLandOpacity: number;
+  mapLabelOpacity: number;
+  mapOceanColor: string;
+  mapLandStartColor: string;
+  mapLandEndColor: string;
+  mapBorderColor: string;
+  mapAxisColor: string;
+  mapAxisSecondaryColor: string;
+  mapRouteColor: string;
+  mapRouteGlowColor: string;
+  mapMarkerColor: string;
+  mapMarkerHaloColor: string;
+  mapMarkerGlowColor: string;
+  mapLabelColor: string;
+  mapPanelTextColor: string;
+  mapHeatLowColor: string;
+  mapHeatHighColor: string;
   dataset?: {fields: DatasetPanelItem["fields"]; rows: DatasetRow[]};
   onDragStart: (widgetId: string, event: React.PointerEvent<HTMLButtonElement>) => void;
+  onContextMenu: (widgetId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
   onResizeStart: (
     widgetId: string,
     direction: ResizeDirection,
@@ -2375,8 +4897,12 @@ function WidgetCanvasItem({
   ) => void;
 }) {
   return (
-    <div className="absolute" style={editorWidgetPlacement(widget)}>
-      <button onPointerDown={(event) => onDragStart(widget.id, event)} className="relative block h-full w-full text-left">
+    <div className="absolute" style={editorWidgetPlacementWithin(widget, canvasWidth, canvasHeight)}>
+      <button
+        onPointerDown={(event) => onDragStart(widget.id, event)}
+        onContextMenu={(event) => onContextMenu(widget.id, event)}
+        className="relative block h-full w-full text-left"
+      >
         <EditorCanvasWidget
           widget={widget}
           selected={selected}
@@ -2390,6 +4916,25 @@ function WidgetCanvasItem({
           mapRouteStyle={mapRouteStyle}
           mapLabelStyle={mapLabelStyle}
           mapSurfaceTone={mapSurfaceTone}
+          mapPointScale={mapPointScale}
+          mapRouteWidth={mapRouteWidth}
+          mapLandOpacity={mapLandOpacity}
+          mapLabelOpacity={mapLabelOpacity}
+          mapOceanColor={mapOceanColor}
+          mapLandStartColor={mapLandStartColor}
+          mapLandEndColor={mapLandEndColor}
+          mapBorderColor={mapBorderColor}
+          mapAxisColor={mapAxisColor}
+          mapAxisSecondaryColor={mapAxisSecondaryColor}
+          mapRouteColor={mapRouteColor}
+          mapRouteGlowColor={mapRouteGlowColor}
+          mapMarkerColor={mapMarkerColor}
+          mapMarkerHaloColor={mapMarkerHaloColor}
+          mapMarkerGlowColor={mapMarkerGlowColor}
+          mapLabelColor={mapLabelColor}
+          mapPanelTextColor={mapPanelTextColor}
+          mapHeatLowColor={mapHeatLowColor}
+          mapHeatHighColor={mapHeatHighColor}
           dataset={dataset}
         />
       </button>
@@ -2521,6 +5066,413 @@ function widgetTypeLabel(type: EditorWidget["type"], locale: string) {
   return locale === "zh-CN" ? zh[type] : en[type];
 }
 
+function defaultManualDataTemplate(type: EditorWidget["type"]) {
+  if (type === "metric") {
+    return JSON.stringify(
+      {
+        value: 1280,
+        hint: "较上周 +12%",
+      },
+      null,
+      2,
+    );
+  }
+
+  if (type === "table") {
+    return JSON.stringify(
+      [
+        {region: "华东", sales: 820, status: "正常", eta: "12:45"},
+        {region: "华南", sales: 760, status: "预警", eta: "13:10"},
+        {region: "华北", sales: 690, status: "处理中", eta: "13:30"},
+      ],
+      null,
+      2,
+    );
+  }
+
+  if (type === "events") {
+    return JSON.stringify(
+      [
+        {title: "深圳仓入库延迟", meta: "14:22 · 仓储"},
+        {title: "华东线路流量回升", meta: "14:35 · 运输"},
+        {title: "北方区域库存补齐", meta: "14:48 · 运营"},
+      ],
+      null,
+      2,
+    );
+  }
+
+  if (type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank") {
+    return JSON.stringify(
+      [
+        {label: "Jan", value: 120},
+        {label: "Feb", value: 138},
+        {label: "Mar", value: 156},
+      ],
+      null,
+      2,
+    );
+  }
+
+  return JSON.stringify([], null, 2);
+}
+
+function manualDataPlaceholderHint(type: EditorWidget["type"], locale: string) {
+  if (type === "metric") {
+    return locale === "zh-CN"
+      ? "对象格式，例如 {\"value\":1280,\"hint\":\"较上周 +12%\"}"
+      : "Use an object, for example {\"value\":1280,\"hint\":\"+12% vs last week\"}";
+  }
+
+  if (type === "table" || type === "events") {
+    return locale === "zh-CN"
+      ? "对象数组格式，例如 [{\"region\":\"华东\",\"sales\":820}]"
+      : "Use an array of objects, for example [{\"region\":\"East\",\"sales\":820}]";
+  }
+
+  return locale === "zh-CN"
+    ? "数组格式，例如 [{\"label\":\"Jan\",\"value\":120}]"
+    : "Use an array, for example [{\"label\":\"Jan\",\"value\":120}]";
+}
+
+function manualDataSuccessSummary(
+  type: EditorWidget["type"],
+  state: Exclude<ReturnType<typeof parseManualWidgetData>, null>,
+  locale: string,
+) {
+  if (!state.valid) return state.error;
+
+  if (type === "metric" && state.metric) {
+    return locale === "zh-CN"
+      ? `已识别 1 条指标数据，当前值为 ${state.metric.value}`
+      : `1 metric record detected. Current value: ${state.metric.value}`;
+  }
+
+  if (state.series?.length) {
+    return locale === "zh-CN"
+      ? `已识别 ${state.series.length} 条图表数据，将直接驱动当前组件渲染`
+      : `${state.series.length} chart records detected and ready for rendering.`;
+  }
+
+  if (state.rows?.length) {
+    return locale === "zh-CN"
+      ? `已识别 ${state.rows.length} 行数据`
+      : `${state.rows.length} rows detected.`;
+  }
+
+  return locale === "zh-CN" ? "JSON 数据可用" : "JSON data is ready.";
+}
+
+function ChartConfigGroup({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-3 rounded-xl border border-[#d7d8d1] bg-[#fcfcf8] px-3 py-3 shadow-[0_1px_0_rgba(255,255,255,0.55)]">
+      <div>
+        <div className="text-[12px] font-semibold text-[#1a1c19]">{title}</div>
+        {description ? <p className="mt-1 text-[11px] leading-5 text-[#727971]">{description}</p> : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function defaultChartPaletteColors(palette: NonNullable<EditorWidget["chartPalette"]>, accent: string) {
+  if (palette === "ocean") return [accent || "#2b6cb0", "#4c8eda", "#90cdf4", "#d7efff", "#1f4c7a"];
+  if (palette === "sunset") return [accent || "#c96b32", "#e59b5a", "#f7c289", "#f3dfc4", "#8c4a1d"];
+  if (palette === "mono") return [accent || "#34503b", "#5e7866", "#8da190", "#c7d0c9", "#e7ece8"];
+  return [accent || "#215637", "#406840", "#7da785", "#c7dfcb", "#23422a"];
+}
+
+function normalizeChartPaletteColors(
+  colors: string[] | undefined,
+  palette: NonNullable<EditorWidget["chartPalette"]>,
+  accent: string,
+) {
+  const fallback = defaultChartPaletteColors(palette, accent);
+  const next = [...fallback];
+
+  (colors ?? []).slice(0, 5).forEach((color, index) => {
+    if (color) next[index] = color;
+  });
+
+  return next;
+}
+
+function ColorSwatchField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (nextColor: string) => void;
+  swatches?: string[];
+}) {
+  const parsedColor = parseColorInput(value);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={parsedColor.hex}
+          onChange={(event) => onChange(composeColorValue(event.target.value, parsedColor.alpha))}
+          className="h-9 w-11 cursor-pointer rounded-md border border-[#d7d8d1] bg-[#fafaf5] p-1"
+        />
+        <Input
+          className={`${editorControlClass} w-20 shrink-0`}
+          value={`${parsedColor.alpha}%`}
+          onChange={(event) =>
+            onChange(
+              composeColorValue(
+                parsedColor.hex,
+                clamp(numberOr(event.target.value.replace("%", ""), parsedColor.alpha), 0, 100),
+              ),
+            )
+          }
+        />
+        <Input
+          className={editorControlClass}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function normalizeColorValue(value: string) {
+  return parseColorInput(value).hex;
+}
+
+function parseColorInput(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return {hex: "#23422a", alpha: 100};
+  }
+
+  if (trimmed.toLowerCase() === "transparent") {
+    return {hex: "#23422a", alpha: 0};
+  }
+
+  const shortHex = /^#([0-9a-fA-F]{3})$/i.exec(trimmed);
+  if (shortHex) {
+    const expanded = `#${shortHex[1]
+      .split("")
+      .map((token) => `${token}${token}`)
+      .join("")}`;
+    return {hex: expanded.toLowerCase(), alpha: 100};
+  }
+
+  const hex = /^#([0-9a-fA-F]{6})$/i.exec(trimmed);
+  if (hex) {
+    return {hex: trimmed.toLowerCase(), alpha: 100};
+  }
+
+  const shortHexAlpha = /^#([0-9a-fA-F]{4})$/i.exec(trimmed);
+  if (shortHexAlpha) {
+    const expanded = shortHexAlpha[1]
+      .split("")
+      .map((token) => `${token}${token}`)
+      .join("");
+    return {
+      hex: `#${expanded.slice(0, 6).toLowerCase()}`,
+      alpha: Math.round((Number.parseInt(expanded.slice(6, 8), 16) / 255) * 100),
+    };
+  }
+
+  const hexAlpha = /^#([0-9a-fA-F]{8})$/i.exec(trimmed);
+  if (hexAlpha) {
+    return {
+      hex: `#${hexAlpha[1].slice(0, 6).toLowerCase()}`,
+      alpha: Math.round((Number.parseInt(hexAlpha[1].slice(6, 8), 16) / 255) * 100),
+    };
+  }
+
+  const rgba = /^rgba?\((.+)\)$/i.exec(trimmed);
+  if (rgba) {
+    const parts = rgba[1].split(",").map((part) => part.trim());
+    if (parts.length >= 3) {
+      const r = clamp(numberOr(parts[0], 35), 0, 255);
+      const g = clamp(numberOr(parts[1], 66), 0, 255);
+      const b = clamp(numberOr(parts[2], 42), 0, 255);
+      const alpha =
+        parts.length >= 4 ? clamp(Math.round(numberOr(parts[3], 1) * 100), 0, 100) : 100;
+      return {
+        hex: rgbToHex(r, g, b),
+        alpha,
+      };
+    }
+  }
+
+  return {hex: "#23422a", alpha: 100};
+}
+
+function composeColorValue(hex: string, alpha: number) {
+  const normalizedHex = normalizeColorValue(hex);
+  const nextAlpha = clamp(alpha, 0, 100);
+  if (nextAlpha <= 0) return "transparent";
+  if (nextAlpha >= 100) return normalizedHex;
+  const {r, g, b} = hexToRgb(normalizedHex);
+  return `rgba(${r}, ${g}, ${b}, ${Number((nextAlpha / 100).toFixed(2))})`;
+}
+
+function hexToRgb(hex: string) {
+  const normalized = normalizeColorValue(hex).replace("#", "");
+  const value = Number.parseInt(normalized, 16);
+  return {
+    r: (value >> 16) & 255,
+    g: (value >> 8) & 255,
+    b: value & 255,
+  };
+}
+
+function rgbToHex(r: number, g: number, b: number) {
+  return `#${[r, g, b]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function ChartPaletteEditor({
+  value,
+  palette,
+  accent,
+  onChange,
+}: {
+  value?: string[];
+  palette: NonNullable<EditorWidget["chartPalette"]>;
+  accent: string;
+  onChange: (nextColors: string[]) => void;
+}) {
+  const colors = normalizeChartPaletteColors(value, palette, accent);
+  const labels = ["主色", "辅助 1", "辅助 2", "浅色", "深色"];
+  const swatches = ["#23422a", "#2f6d48", "#2b6cb0", "#c96b32", "#7a4dd8", "#ba1a1a", "#f4e7ba", "#20302a"];
+
+  return (
+    <div className="space-y-3">
+      {colors.map((color, index) => (
+        <div key={`${labels[index]}-${index}`} className="space-y-1.5">
+          <div className="text-[11px] font-medium text-[#45664b]">{labels[index]}</div>
+          <ColorSwatchField
+            value={color}
+            onChange={(nextColor) => {
+              const nextColors = [...colors];
+              nextColors[index] = nextColor;
+              onChange(nextColors);
+            }}
+            swatches={swatches}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ManualDataPreviewCard({
+  locale,
+  widgetType,
+  state,
+  widget,
+}: {
+  locale: string;
+  widgetType: EditorWidget["type"];
+  state: Exclude<ManualWidgetDataParseResult, null>;
+  widget: EditorWidget;
+}) {
+  if (!state.valid) return null;
+
+  const title = locale === "zh-CN" ? "实际渲染预览" : "Rendered Preview";
+  const subtitle =
+    locale === "zh-CN"
+      ? "这里展示这段 JSON 最终会驱动出的内容结构。"
+      : "This preview shows what the widget will actually render from the JSON above.";
+
+  if (widgetType === "metric" && state.metric) {
+    return (
+      <div className="rounded-xl border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3">
+        <div className="text-[12px] font-semibold text-[#1a1c19]">{title}</div>
+        <p className="mt-1 text-[11px] leading-5 text-[#727971]">{subtitle}</p>
+        <div className="mt-3 rounded-lg border border-[#cfe0cf] bg-[#eef5ec] px-3 py-3">
+          <div className="text-[10px] uppercase tracking-[0.16em] text-[#727971]">{widget.title}</div>
+          <div className="mt-2 text-[24px] font-black text-[#23422a]">{`${widget.valuePrefix ?? ""}${state.metric.value}${widget.valueSuffix ?? ""}`}</div>
+          {state.metric.hint ? <div className="mt-1 text-[11px] font-medium text-[#45664b]">{state.metric.hint}</div> : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (state.series?.length) {
+    return (
+      <div className="rounded-xl border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3">
+        <div className="text-[12px] font-semibold text-[#1a1c19]">{title}</div>
+        <p className="mt-1 text-[11px] leading-5 text-[#727971]">{subtitle}</p>
+        <div className="mt-3 space-y-2">
+          {state.series.slice(0, 5).map((item, index) => (
+            <div key={`${item.label}-${index}`} className="flex items-center justify-between rounded-lg border border-[#dde2d7] bg-white/70 px-3 py-2">
+              <span className="truncate text-[12px] font-medium text-[#1a1c19]">{item.label}</span>
+              <span className="font-mono text-[12px] text-[#45664b]">{`${widget.valuePrefix ?? ""}${item.value}${widget.valueSuffix ?? ""}`}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (state.rows?.length) {
+    const isEventLike = widgetType === "events";
+    const eventRows = isEventLike ? eventSnapshotFromRows(state.rows, widget.fieldMap).slice(0, 4) : [];
+    const tablePreview = !isEventLike
+      ? tableSnapshotFromRows(state.rows, {
+          columns: widget.tableColumns,
+          labels: widget.tableColumnLabels,
+          widths: widget.tableColumnWidths,
+        })
+      : null;
+
+    return (
+      <div className="rounded-xl border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3">
+        <div className="text-[12px] font-semibold text-[#1a1c19]">{title}</div>
+        <p className="mt-1 text-[11px] leading-5 text-[#727971]">{subtitle}</p>
+        {isEventLike ? (
+          <div className="mt-3 space-y-2">
+            {eventRows.map((row, index) => (
+              <div key={`${row.title}-${index}`} className="rounded-lg border border-[#dde2d7] bg-white/70 px-3 py-2">
+                <div className="text-[12px] font-medium text-[#1a1c19]">{row.title}</div>
+                {row.meta ? <div className="mt-1 text-[11px] text-[#727971]">{row.meta}</div> : null}
+              </div>
+            ))}
+          </div>
+        ) : tablePreview ? (
+          <div className="mt-3 overflow-hidden rounded-lg border border-[#dde2d7] bg-white/80">
+            <div className="grid bg-[#eef0e8] text-[10px] uppercase tracking-[0.14em] text-[#727971]" style={{gridTemplateColumns: `repeat(${Math.max(1, tablePreview.columns.length)}, minmax(0, 1fr))`}}>
+              {tablePreview.columns.slice(0, 4).map((column) => (
+                <div key={column.key} className="px-3 py-2">{column.label}</div>
+              ))}
+            </div>
+            <div className="divide-y divide-[#ecefe7]">
+              {tablePreview.rows.slice(0, 3).map((row, rowIndex) => (
+                <div key={rowIndex} className="grid text-[12px] text-[#1a1c19]" style={{gridTemplateColumns: `repeat(${Math.max(1, tablePreview.columns.length)}, minmax(0, 1fr))`}}>
+                  {tablePreview.columns.slice(0, 4).map((column) => (
+                    <div key={column.key} className="truncate px-3 py-2.5">{String(row[column.key] ?? "-")}</div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return null;
+}
+
 function numberOr(raw: string, fallback: number) {
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -2536,6 +5488,8 @@ function resolveSnapForMove(
   proposedX: number,
   proposedY: number,
   canvasView: CanvasView,
+  canvasWidth: number,
+  canvasHeight: number,
 ) {
   const threshold = canvasView === "grid" ? 18 : 10;
   let snappedX = canvasView === "grid" ? snapToGrid(proposedX) : proposedX;
@@ -2557,21 +5511,21 @@ function resolveSnapForMove(
   const baselineXOptions = [
     {delta: Math.abs(left - 0), next: 0, guide: 0},
     {
-      delta: Math.abs(right - EDITOR_CANVAS_WIDTH),
-      next: EDITOR_CANVAS_WIDTH - movingWidget.width,
-      guide: EDITOR_CANVAS_WIDTH,
+      delta: Math.abs(right - canvasWidth),
+      next: canvasWidth - movingWidget.width,
+      guide: canvasWidth,
     },
     {
-      delta: Math.abs(centerX - EDITOR_CANVAS_WIDTH / 2),
-      next: EDITOR_CANVAS_WIDTH / 2 - movingWidget.width / 2,
-      guide: EDITOR_CANVAS_WIDTH / 2,
+      delta: Math.abs(centerX - canvasWidth / 2),
+      next: canvasWidth / 2 - movingWidget.width / 2,
+      guide: canvasWidth / 2,
     },
   ];
 
   for (const option of baselineXOptions) {
     if (option.delta <= bestX) {
       bestX = option.delta;
-      snappedX = clamp(Math.round(option.next), 0, Math.max(0, EDITOR_CANVAS_WIDTH - movingWidget.width));
+      snappedX = clamp(Math.round(option.next), 0, Math.max(0, canvasWidth - movingWidget.width));
       vertical = option.guide;
     }
   }
@@ -2579,21 +5533,21 @@ function resolveSnapForMove(
   const baselineYOptions = [
     {delta: Math.abs(top - 0), next: 0, guide: 0},
     {
-      delta: Math.abs(bottom - EDITOR_CANVAS_HEIGHT),
-      next: EDITOR_CANVAS_HEIGHT - movingWidget.height,
-      guide: EDITOR_CANVAS_HEIGHT,
+      delta: Math.abs(bottom - canvasHeight),
+      next: canvasHeight - movingWidget.height,
+      guide: canvasHeight,
     },
     {
-      delta: Math.abs(centerY - EDITOR_CANVAS_HEIGHT / 2),
-      next: EDITOR_CANVAS_HEIGHT / 2 - movingWidget.height / 2,
-      guide: EDITOR_CANVAS_HEIGHT / 2,
+      delta: Math.abs(centerY - canvasHeight / 2),
+      next: canvasHeight / 2 - movingWidget.height / 2,
+      guide: canvasHeight / 2,
     },
   ];
 
   for (const option of baselineYOptions) {
     if (option.delta <= bestY) {
       bestY = option.delta;
-      snappedY = clamp(Math.round(option.next), 0, Math.max(0, EDITOR_CANVAS_HEIGHT - movingWidget.height));
+      snappedY = clamp(Math.round(option.next), 0, Math.max(0, canvasHeight - movingWidget.height));
       horizontal = option.guide;
     }
   }
@@ -2615,7 +5569,7 @@ function resolveSnapForMove(
     for (const option of xOptions) {
       if (option.delta <= bestX) {
         bestX = option.delta;
-        snappedX = clamp(Math.round(option.next), 0, Math.max(0, EDITOR_CANVAS_WIDTH - movingWidget.width));
+        snappedX = clamp(Math.round(option.next), 0, Math.max(0, canvasWidth - movingWidget.width));
         vertical = option.guide;
       }
     }
@@ -2636,8 +5590,8 @@ function resolveSnapForMove(
   }
 
   return {
-    x: clamp(snappedX, 0, Math.max(0, EDITOR_CANVAS_WIDTH - movingWidget.width)),
-    y: clamp(snappedY, 0, Math.max(0, EDITOR_CANVAS_HEIGHT - movingWidget.height)),
+    x: clamp(snappedX, 0, Math.max(0, canvasWidth - movingWidget.width)),
+    y: clamp(snappedY, 0, Math.max(0, canvasHeight - movingWidget.height)),
     guides: {
       vertical: bestX < threshold ? vertical : undefined,
       horizontal: bestY < threshold ? horizontal : undefined,
@@ -2651,6 +5605,8 @@ function resolveSnapForResize(
   proposedWidth: number,
   proposedHeight: number,
   canvasView: CanvasView,
+  canvasWidth: number,
+  canvasHeight: number,
 ) {
   const threshold = canvasView === "grid" ? 18 : 10;
   let snappedWidth = canvasView === "grid" ? snapToGrid(proposedWidth) : proposedWidth;
@@ -2664,42 +5620,42 @@ function resolveSnapForResize(
 
   const baselineWidthOptions = [
     {
-      delta: Math.abs(proposedRight - EDITOR_CANVAS_WIDTH),
-      next: EDITOR_CANVAS_WIDTH - resizingWidget.x,
-      guide: EDITOR_CANVAS_WIDTH,
+      delta: Math.abs(proposedRight - canvasWidth),
+      next: canvasWidth - resizingWidget.x,
+      guide: canvasWidth,
     },
     {
-      delta: Math.abs(proposedRight - EDITOR_CANVAS_WIDTH / 2),
-      next: EDITOR_CANVAS_WIDTH / 2 - resizingWidget.x,
-      guide: EDITOR_CANVAS_WIDTH / 2,
+      delta: Math.abs(proposedRight - canvasWidth / 2),
+      next: canvasWidth / 2 - resizingWidget.x,
+      guide: canvasWidth / 2,
     },
   ];
 
   for (const option of baselineWidthOptions) {
     if (option.delta <= bestX) {
       bestX = option.delta;
-      snappedWidth = clamp(Math.round(option.next), 120, Math.max(120, EDITOR_CANVAS_WIDTH - resizingWidget.x));
+      snappedWidth = clamp(Math.round(option.next), 120, Math.max(120, canvasWidth - resizingWidget.x));
       vertical = option.guide;
     }
   }
 
   const baselineHeightOptions = [
     {
-      delta: Math.abs(proposedBottom - EDITOR_CANVAS_HEIGHT),
-      next: EDITOR_CANVAS_HEIGHT - resizingWidget.y,
-      guide: EDITOR_CANVAS_HEIGHT,
+      delta: Math.abs(proposedBottom - canvasHeight),
+      next: canvasHeight - resizingWidget.y,
+      guide: canvasHeight,
     },
     {
-      delta: Math.abs(proposedBottom - EDITOR_CANVAS_HEIGHT / 2),
-      next: EDITOR_CANVAS_HEIGHT / 2 - resizingWidget.y,
-      guide: EDITOR_CANVAS_HEIGHT / 2,
+      delta: Math.abs(proposedBottom - canvasHeight / 2),
+      next: canvasHeight / 2 - resizingWidget.y,
+      guide: canvasHeight / 2,
     },
   ];
 
   for (const option of baselineHeightOptions) {
     if (option.delta <= bestY) {
       bestY = option.delta;
-      snappedHeight = clamp(Math.round(option.next), 80, Math.max(80, EDITOR_CANVAS_HEIGHT - resizingWidget.y));
+      snappedHeight = clamp(Math.round(option.next), 80, Math.max(80, canvasHeight - resizingWidget.y));
       horizontal = option.guide;
     }
   }
@@ -2713,7 +5669,7 @@ function resolveSnapForResize(
     const widthDelta = Math.abs(proposedRight - candidateRight);
     if (widthDelta <= bestX) {
       bestX = widthDelta;
-      snappedWidth = clamp(Math.round(candidateRight - resizingWidget.x), 120, Math.max(120, EDITOR_CANVAS_WIDTH - resizingWidget.x));
+      snappedWidth = clamp(Math.round(candidateRight - resizingWidget.x), 120, Math.max(120, canvasWidth - resizingWidget.x));
       vertical = candidateRight;
     }
 
@@ -2726,8 +5682,8 @@ function resolveSnapForResize(
   }
 
   return {
-    width: clamp(snappedWidth, 120, Math.max(120, EDITOR_CANVAS_WIDTH - resizingWidget.x)),
-    height: clamp(snappedHeight, 80, Math.max(80, EDITOR_CANVAS_HEIGHT - resizingWidget.y)),
+    width: clamp(snappedWidth, 120, Math.max(120, canvasWidth - resizingWidget.x)),
+    height: clamp(snappedHeight, 80, Math.max(80, canvasHeight - resizingWidget.y)),
     guides: {
       vertical: bestX < threshold ? vertical : undefined,
       horizontal: bestY < threshold ? horizontal : undefined,

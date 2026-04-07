@@ -6,12 +6,12 @@ import {useRouter} from "next/navigation";
 import {ArrowLeft, ExternalLink} from "lucide-react";
 
 import {Badge} from "@/components/ui/badge";
+import {ScreenHeader} from "@/components/screen/screen-header";
+import {ScreenStage} from "@/components/screen/screen-stage";
 import {defaultScreenConfig} from "@/lib/mocks/editor";
 import {readEditorDraft, readImportedDatasets, type ScreenConfig} from "@/lib/editor-storage";
 import {readProjectRecord} from "@/lib/project-store";
 import {
-  EDITOR_CANVAS_HEIGHT,
-  EDITOR_CANVAS_WIDTH,
   editorDatasetSchemas,
   editorProject,
   editorWidgets,
@@ -19,7 +19,7 @@ import {
 } from "@/lib/mocks/editor";
 import {
   EditorCanvasWidget,
-  editorWidgetPlacement,
+  editorWidgetPlacementWithin,
 } from "@/components/editor/editor-canvas-widgets";
 
 export function PreviewPage({projectId}: {projectId: string}) {
@@ -37,6 +37,10 @@ export function PreviewPage({projectId}: {projectId: string}) {
   const [mapRouteStyle, setMapRouteStyle] = useState<"solid" | "dashed" | "pulse">("pulse");
   const [mapLabelStyle, setMapLabelStyle] = useState<"pill" | "minimal">("pill");
   const [mapSurfaceTone, setMapSurfaceTone] = useState<"soft" | "contrast">("soft");
+  const [mapPointScale, setMapPointScale] = useState(100);
+  const [mapRouteWidth, setMapRouteWidth] = useState(100);
+  const [mapLandOpacity, setMapLandOpacity] = useState(96);
+  const [mapLabelOpacity, setMapLabelOpacity] = useState(92);
   const [projectTitle, setProjectTitle] = useState(editorProject.name);
   const [screenConfig, setScreenConfig] = useState<ScreenConfig>(defaultScreenConfig);
   const [datasetDrafts, setDatasetDrafts] = useState<Record<string, {fields: {field: string; type: string; sample: string; icon: string}[]; rows: Record<string, string | number>[]}>>({});
@@ -61,6 +65,10 @@ export function PreviewPage({projectId}: {projectId: string}) {
       setMapRouteStyle(draft.mapRouteStyle ?? "pulse");
       setMapLabelStyle(draft.mapLabelStyle ?? "pill");
       setMapSurfaceTone(draft.mapSurfaceTone ?? "soft");
+      setMapPointScale(draft.mapPointScale ?? 100);
+      setMapRouteWidth(draft.mapRouteWidth ?? 100);
+      setMapLandOpacity(draft.mapLandOpacity ?? 96);
+      setMapLabelOpacity(draft.mapLabelOpacity ?? 92);
       setDatasetDrafts(draft.datasetDrafts ?? {});
     }
     const projectRecord = readProjectRecord(projectId);
@@ -71,6 +79,9 @@ export function PreviewPage({projectId}: {projectId: string}) {
   }, [projectId]);
 
   const visibleWidgets = useMemo(() => widgets.filter((widget) => widget.visible), [widgets]);
+  const currentCanvasWidth = screenConfig.canvasWidth || 1920;
+  const currentCanvasHeight = screenConfig.canvasHeight || 1080;
+  const currentCanvasLabel = `${currentCanvasWidth} × ${currentCanvasHeight}`;
   const datasetLookup = useMemo(
     () =>
       Object.fromEntries([
@@ -117,7 +128,7 @@ export function PreviewPage({projectId}: {projectId: string}) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Badge className="rounded border-[#c7ecca] bg-[#eff6ec] px-2 py-1 tracking-[0.12em] text-[#23422a]">
-                  {editorProject.canvasLabel}
+                  {currentCanvasLabel}
                 </Badge>
                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971]">
                   {t("live")}
@@ -137,65 +148,46 @@ export function PreviewPage({projectId}: {projectId: string}) {
                   style={{opacity: Math.max(0, Math.min(100, screenConfig.backgroundOverlay)) / 100}}
                 />
               ) : null}
-              <div className="absolute inset-0 flex flex-col p-5">
-                {screenConfig.showHeader ? (
-                  <div className="mb-4 flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-3">
-                        {screenConfig.showStatusBadge ? (
-                          <Badge className="rounded border-[#c7ecca] bg-[#eff6ec] px-2 py-1 tracking-[0.12em] text-[#23422a]">
-                            {screenConfig.statusBadgeLabel || editorProject.canvasLabel}
-                          </Badge>
-                        ) : null}
-                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971]">
-                          {screenConfig.statusMetaLabel || t("live")}
-                        </span>
-                      </div>
-                      <h1 className="mt-3 font-headline text-[28px] font-extrabold leading-tight tracking-tight text-[#23422a]">
-                        {screenConfig.title}
-                      </h1>
-                      <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.24em] text-[#727971]">
-                        {screenConfig.subtitle}
-                      </p>
-                    </div>
-                    {screenConfig.showTimestamp ? (
-                      <div className="flex items-center gap-5 text-right">
-                        <div>
-                          <div className="text-[11px] font-bold font-mono text-[#1a1c19]">{screenConfig.timeText}</div>
-                          <div className="text-[9px] uppercase tracking-[0.16em] text-[#727971]">{screenConfig.dateText}</div>
-                        </div>
-                        <div className="border-l border-[#c2c8bf]/40 pl-4">
-                          <div className="text-[11px] font-bold text-[#1a1c19]">{screenConfig.rightMetaPrimary}</div>
-                          <div className="mt-1 text-[9px] uppercase tracking-[0.16em] text-[#727971]">{screenConfig.rightMetaSecondary}</div>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                <div
-                  className="relative flex-1"
-                  style={{width: `${EDITOR_CANVAS_WIDTH}px`, height: `${EDITOR_CANVAS_HEIGHT}px`}}
-                >
-                  {visibleWidgets.map((widget) => (
-                    <PreviewWidget
-                      key={widget.id}
-                      widget={widget}
-                      mapLabels={mapLabels}
-                      map3dAxis={map3dAxis}
-                      mapZoom={mapZoom}
-                      mapTheme={mapTheme}
-                      mapRouteDensity={mapRouteDensity}
-                      mapMarkers={mapMarkers}
-                      mapGlow={mapGlow}
-                      mapRouteStyle={mapRouteStyle}
-                      mapLabelStyle={mapLabelStyle}
-                      mapSurfaceTone={mapSurfaceTone}
-                      dataset={datasetLookup[widget.dataset]}
+              <ScreenStage screenConfig={screenConfig} viewportWidth={1160} viewportHeight={720}>
+                <div className="absolute inset-0 flex flex-col">
+                  {screenConfig.showHeader ? (
+                    <ScreenHeader
+                      screenConfig={screenConfig}
+                      canvasLabel={currentCanvasLabel}
+                      fallbackMetaLabel={t("live")}
                     />
-                  ))}
+                  ) : null}
+
+                  <div
+                    className="relative flex-1"
+                    style={{width: `${currentCanvasWidth}px`, height: `${currentCanvasHeight}px`}}
+                  >
+                    {visibleWidgets.map((widget) => (
+                      <PreviewWidget
+                        key={widget.id}
+                        widget={widget}
+                        canvasWidth={currentCanvasWidth}
+                        canvasHeight={currentCanvasHeight}
+                        mapLabels={mapLabels}
+                        map3dAxis={map3dAxis}
+                        mapZoom={mapZoom}
+                        mapTheme={mapTheme}
+                        mapRouteDensity={mapRouteDensity}
+                        mapMarkers={mapMarkers}
+                        mapGlow={mapGlow}
+                        mapRouteStyle={mapRouteStyle}
+                        mapLabelStyle={mapLabelStyle}
+                        mapSurfaceTone={mapSurfaceTone}
+                        mapPointScale={mapPointScale}
+                        mapRouteWidth={mapRouteWidth}
+                        mapLandOpacity={mapLandOpacity}
+                        mapLabelOpacity={mapLabelOpacity}
+                        dataset={datasetLookup[widget.dataset]}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </ScreenStage>
             </div>
           </div>
         </div>
@@ -237,6 +229,8 @@ function buildCanvasBackgroundStyle(screenConfig: ScreenConfig) {
 
 function PreviewWidget({
   widget,
+  canvasWidth,
+  canvasHeight,
   mapLabels,
   map3dAxis,
   mapZoom,
@@ -247,9 +241,15 @@ function PreviewWidget({
   mapRouteStyle,
   mapLabelStyle,
   mapSurfaceTone,
+  mapPointScale,
+  mapRouteWidth,
+  mapLandOpacity,
+  mapLabelOpacity,
   dataset,
 }: {
   widget: EditorWidget;
+  canvasWidth: number;
+  canvasHeight: number;
   mapLabels: boolean;
   map3dAxis: boolean;
   mapZoom: string;
@@ -260,10 +260,14 @@ function PreviewWidget({
   mapRouteStyle: "solid" | "dashed" | "pulse";
   mapLabelStyle: "pill" | "minimal";
   mapSurfaceTone: "soft" | "contrast";
+  mapPointScale: number;
+  mapRouteWidth: number;
+  mapLandOpacity: number;
+  mapLabelOpacity: number;
   dataset?: {fields: {field: string; type: string; sample: string; icon: string}[]; rows: Record<string, string | number>[]};
 }) {
   return (
-    <div className="absolute text-left" style={editorWidgetPlacement(widget)}>
+    <div className="absolute text-left" style={editorWidgetPlacementWithin(widget, canvasWidth, canvasHeight)}>
       <EditorCanvasWidget
         widget={widget}
         mapLabels={mapLabels}
@@ -276,6 +280,10 @@ function PreviewWidget({
         mapRouteStyle={mapRouteStyle}
         mapLabelStyle={mapLabelStyle}
         mapSurfaceTone={mapSurfaceTone}
+        mapPointScale={mapPointScale}
+        mapRouteWidth={mapRouteWidth}
+        mapLandOpacity={mapLandOpacity}
+        mapLabelOpacity={mapLabelOpacity}
         dataset={dataset}
       />
     </div>

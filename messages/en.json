@@ -246,6 +246,7 @@
     "topbar": {
       "projectPrefix": "Project:",
       "saved": "All changes saved",
+      "save": "Save",
       "preview": "Preview",
       "publish": "Publish"
     },
@@ -377,7 +378,15 @@
     "copy": "Copy",
     "publishedAt": "Published at",
     "draftNotice": "This share link is currently backed by a local mock snapshot.",
-    "viewPreview": "Open published preview",
+    "viewScreen": "Open published screen",
     "backToEditor": "Back to editor"
+  },
+  "Screen": {
+    "title": "Published Screen",
+    "published": "Published",
+    "readOnly": "Read-only Display",
+    "missingSnapshot": "No published snapshot is available for this project yet",
+    "enterFullscreen": "Enter Fullscreen",
+    "exitFullscreen": "Exit Fullscreen"
   }
 }

@@ -1,4 +1,4 @@
-import type {ScreenConfig} from "@/lib/editor-storage";
+import type {ScreenCanvasPreset, ScreenConfig} from "@/lib/editor-storage";
 
 type ToolItem = {
   name: string;
@@ -28,6 +28,20 @@ export type EditorDatasetSchema = {
 export type WidgetShadow = "none" | "soft" | "medium" | "strong";
 export type WidgetTitleAlign = "left" | "center" | "right";
 export type ImageFitMode = "cover" | "contain" | "fill";
+export type TableHeaderTone = "muted" | "emerald" | "charcoal";
+export type TableDensity = "compact" | "comfortable";
+export type ImageOverlayDirection = "bottom" | "center" | "full";
+export type ChartPaddingMode = "compact" | "balanced" | "showcase";
+export type ChartGridStyle = "dashed" | "solid" | "dot";
+export type ChartLegendTone = "muted" | "balanced" | "strong";
+export type TableAlign = "left" | "center" | "right";
+export type ChartStylePreset = "executive" | "signal" | "comparison" | "minimal";
+export type TableNumberFormat = "raw" | "compact" | "currency" | "percent";
+export type ImageFilterPreset = "natural" | "cinematic" | "cool" | "mono";
+export type TableSurfacePreset = "soft" | "panel" | "contrast";
+export type TableDividerTone = "soft" | "strong" | "none";
+export type ImagePresentationPreset = "card" | "immersive" | "editorial";
+export type ImageCaptionTone = "soft" | "strong";
 
 export type EditorWidgetType =
   | "metric"
@@ -51,12 +65,16 @@ export type EditorWidget = {
   width: number;
   height: number;
   dataset: string;
+  dataSourceMode?: "dataset" | "manual";
+  manualData?: string;
   fill: string;
   visible: boolean;
   opacity?: number;
   stroke?: string;
   accent?: string;
   value?: string;
+  valuePrefix?: string;
+  valueSuffix?: string;
   hint?: string;
   fieldMap?: string;
   radius?: number;
@@ -64,13 +82,139 @@ export type EditorWidget = {
   shadow?: WidgetShadow;
   titleVisible?: boolean;
   titleAlign?: WidgetTitleAlign;
+  titleColor?: string;
+  titleSize?: number;
+  titleTracking?: number;
+  titleUppercase?: boolean;
   zIndex?: number;
   locked?: boolean;
   textColor?: string;
+  textAlign?: "left" | "center" | "right";
   fontSize?: number;
   fontWeight?: "regular" | "medium" | "semibold" | "bold";
   lineHeight?: number;
+  letterSpacing?: number;
   imageFit?: ImageFitMode;
+  imageOverlayColor?: string;
+  imageOverlayOpacity?: number;
+  chartTone?: "soft" | "contrast" | "night";
+  chartPalette?: "forest" | "ocean" | "sunset" | "mono";
+  chartPaletteColors?: string[];
+  chartPanelStyle?: "flat" | "elevated" | "glow";
+  chartStylePreset?: ChartStylePreset;
+  chartTitlePreset?: "minimal" | "divider" | "capsule" | "signal";
+  chartPaddingMode?: ChartPaddingMode;
+  chartGridStyle?: ChartGridStyle;
+  chartGridOpacity?: number;
+  chartAxisOpacity?: number;
+  chartAxisColor?: string;
+  chartGridColor?: string;
+  chartSurfaceAccentColor?: string;
+  chartBorderColor?: string;
+  chartBorderWidth?: number;
+  chartShadowColor?: string;
+  chartShadowOpacity?: number;
+  chartGlowColor?: string;
+  chartGlowOpacity?: number;
+  chartTitleAccentColor?: string;
+  chartTitleBackgroundColor?: string;
+  chartTitleBorderColor?: string;
+  chartTitleSurfaceOpacity?: number;
+  chartTitleBorderWidth?: number;
+  chartTitleRadius?: number;
+  chartTitleDividerWidth?: number;
+  chartTitleSignalSize?: number;
+  chartTitlePaddingX?: number;
+  chartTitlePaddingY?: number;
+  chartTitleDividerStartColor?: string;
+  chartTitleDividerEndColor?: string;
+  chartTitleSignalHaloColor?: string;
+  chartLegendTone?: ChartLegendTone;
+  chartLabelTone?: ChartLegendTone;
+  chartBadgeLayout?: "split" | "stacked" | "footer";
+  showLegend?: boolean;
+  showGrid?: boolean;
+  showDataLabels?: boolean;
+  showHighlightBadges?: boolean;
+  showXAxisLabels?: boolean;
+  showYAxisLabels?: boolean;
+  showXAxisLine?: boolean;
+  showYAxisLine?: boolean;
+  showSeriesPoints?: boolean;
+  lineSmooth?: boolean;
+  lineStyle?: "solid" | "dashed";
+  lineWeight?: number;
+  pointSize?: number;
+  axisLabelSize?: number;
+  axisLabelRotate?: number;
+  areaOpacity?: number;
+  barRadius?: number;
+  pieInnerRadius?: number;
+  legendPosition?: "right" | "bottom";
+  chartLabelFormat?: "raw" | "compact" | "percent";
+  chartDecimals?: number;
+  tableColumns?: string[];
+  tableColumnLabels?: Record<string, string>;
+  tableColumnWidths?: Record<string, number>;
+  tableHeaderTone?: TableHeaderTone;
+  tableDensity?: TableDensity;
+  tableSurfacePreset?: TableSurfacePreset;
+  tableDividerTone?: TableDividerTone;
+  tableZebra?: boolean;
+  tableHighlightFirstColumn?: boolean;
+  tableHighlightNumbers?: boolean;
+  tableCellAlign?: TableAlign;
+  tableHeaderAlign?: TableAlign;
+  tableNumberFormat?: TableNumberFormat;
+  tableHeaderBgColor?: string;
+  tableHeaderTextColor?: string;
+  tableHeaderMetaColor?: string;
+  tableHeaderTracking?: number;
+  tableHeaderSize?: number;
+  tableHeaderDividerColor?: string;
+  tableHeaderDividerWidth?: number;
+  tableBodyColor?: string;
+  tableRowHoverColor?: string;
+  tableBorderColor?: string;
+  tableBorderWidth?: number;
+  tableDividerColor?: string;
+  tableStripeColor?: string;
+  tableKeyColor?: string;
+  tableNumberColor?: string;
+  tableMetaColor?: string;
+  tableCellSize?: number;
+  tableStatusPositiveColor?: string;
+  tableStatusWarningColor?: string;
+  tableStatusCriticalColor?: string;
+  tableStatusNeutralColor?: string;
+  tableStatusBackgroundOpacity?: number;
+  tableShadowColor?: string;
+  tableShadowOpacity?: number;
+  imageOverlayDirection?: ImageOverlayDirection;
+  imagePresentationPreset?: ImagePresentationPreset;
+  imageCaptionTone?: ImageCaptionTone;
+  imageZoom?: number;
+  imageGrayscale?: boolean;
+  imageBorderStyle?: "none" | "soft" | "frame";
+  imageFilterPreset?: ImageFilterPreset;
+  imageBrightness?: number;
+  imageContrast?: number;
+  imageSaturation?: number;
+  imageBorderColor?: string;
+  imageBorderWidth?: number;
+  imageShadowColor?: string;
+  imageShadowOpacity?: number;
+  imageCaptionTextColor?: string;
+  imageCaptionBackgroundColor?: string;
+  imageCaptionBorderColor?: string;
+  imageCaptionBorderWidth?: number;
+  imageCaptionOpacity?: number;
+  imageCaptionBlur?: number;
+  imageCaptionPadding?: number;
+  imageCaptionRadius?: number;
+  imageCaptionShadowColor?: string;
+  imageCaptionShadowOpacity?: number;
+  imageOverlayBlur?: number;
 };
 
 export const editorProject = {
@@ -87,6 +231,10 @@ export const EDITOR_CANVAS_HEIGHT = 1080;
 export const defaultScreenConfig: ScreenConfig = {
   title: "全球物流与供应链实时中心",
   subtitle: "实时情报流 · Q4 监控阶段",
+  canvasPreset: "1920x1080",
+  canvasWidth: 1920,
+  canvasHeight: 1080,
+  headerVariant: "classic",
   showHeader: true,
   showTimestamp: true,
   showStatusBadge: true,
@@ -102,7 +250,22 @@ export const defaultScreenConfig: ScreenConfig = {
   backgroundImage: "",
   backgroundFit: "cover",
   backgroundOverlay: 18,
+  displayMode: "contain",
+  displayAlign: "center",
+  presentationMode: "standard",
 };
+
+export const canvasPresets: Array<{
+  id: ScreenCanvasPreset;
+  label: string;
+  width: number;
+  height: number;
+}> = [
+  {id: "1920x1080", label: "1920 × 1080", width: 1920, height: 1080},
+  {id: "2560x1080", label: "2560 × 1080", width: 2560, height: 1080},
+  {id: "3840x1080", label: "3840 × 1080", width: 3840, height: 1080},
+  {id: "custom", label: "Custom", width: 1920, height: 1080},
+];
 
 export const editorToolGroups: ToolGroup[] = [
   {
@@ -242,6 +405,14 @@ export const editorWidgets: EditorWidget[] = [
     shadow: "soft",
     titleVisible: true,
     titleAlign: "left",
+    chartTone: "soft",
+    chartPalette: "forest",
+    chartPaddingMode: "balanced",
+    chartGridStyle: "dashed",
+    chartGridOpacity: 42,
+    chartAxisOpacity: 56,
+    chartLabelTone: "balanced",
+    showHighlightBadges: true,
     zIndex: 20,
     locked: false,
   },
@@ -264,6 +435,13 @@ export const editorWidgets: EditorWidget[] = [
     shadow: "soft",
     titleVisible: true,
     titleAlign: "left",
+    chartTone: "contrast",
+    chartPalette: "sunset",
+    chartPaddingMode: "balanced",
+    chartLegendTone: "balanced",
+    chartLabelTone: "strong",
+    showLegend: true,
+    showHighlightBadges: true,
     zIndex: 30,
     locked: false,
   },
@@ -332,6 +510,14 @@ export const editorWidgets: EditorWidget[] = [
     shadow: "soft",
     titleVisible: true,
     titleAlign: "left",
+    chartTone: "night",
+    chartPalette: "ocean",
+    chartPaddingMode: "showcase",
+    chartGridStyle: "dot",
+    chartGridOpacity: 52,
+    chartAxisOpacity: 68,
+    chartLabelTone: "strong",
+    showHighlightBadges: true,
     zIndex: 60,
     locked: false,
   },

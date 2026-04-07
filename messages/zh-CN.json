@@ -246,6 +246,7 @@
     "topbar": {
       "projectPrefix": "项目：",
       "saved": "已保存所有更改",
+      "save": "保存",
       "preview": "预览",
       "publish": "发布"
     },
@@ -377,7 +378,15 @@
     "copy": "复制链接",
     "publishedAt": "发布时间",
     "draftNotice": "当前展示链接基于刚刚发布的 mock 快照。",
-    "viewPreview": "查看展示版本",
+    "viewScreen": "查看展示页",
     "backToEditor": "返回编辑器"
+  },
+  "Screen": {
+    "title": "展示大屏",
+    "published": "已发布版本",
+    "readOnly": "只读展示",
+    "missingSnapshot": "当前没有可展示的已发布快照",
+    "enterFullscreen": "进入全屏",
+    "exitFullscreen": "退出全屏"
   }
 }
