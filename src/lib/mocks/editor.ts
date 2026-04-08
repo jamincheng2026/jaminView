@@ -42,6 +42,13 @@ export type TableSurfacePreset = "soft" | "panel" | "contrast";
 export type TableDividerTone = "soft" | "strong" | "none";
 export type ImagePresentationPreset = "card" | "immersive" | "editorial";
 export type ImageCaptionTone = "soft" | "strong";
+export type DecorationPreset = "frame" | "badge" | "divider" | "glow";
+export type WidgetDataFilterOperator = "contains" | "equals" | "gt" | "gte" | "lt" | "lte";
+export type WidgetDataSortDirection = "asc" | "desc";
+export type WidgetDataAggregateMode = "none" | "sum" | "avg" | "min" | "max" | "count";
+export type WidgetRequestMethod = "GET" | "POST";
+export type WidgetEventAction = "none" | "openLink" | "openPreview" | "openPublished" | "focusWidget";
+export type WidgetEventOpenMode = "self" | "blank";
 
 export type EditorWidgetType =
   | "metric"
@@ -54,7 +61,9 @@ export type EditorWidgetType =
   | "table"
   | "rank"
   | "text"
-  | "image";
+  | "image"
+  | "numberFlip"
+  | "decoration";
 
 export type EditorWidget = {
   id: string;
@@ -65,7 +74,7 @@ export type EditorWidget = {
   width: number;
   height: number;
   dataset: string;
-  dataSourceMode?: "dataset" | "manual";
+  dataSourceMode?: "static" | "dataset" | "manual" | "request";
   manualData?: string;
   fill: string;
   visible: boolean;
@@ -166,6 +175,27 @@ export type EditorWidget = {
   tableCellAlign?: TableAlign;
   tableHeaderAlign?: TableAlign;
   tableNumberFormat?: TableNumberFormat;
+  dataFilterField?: string;
+  dataFilterOperator?: WidgetDataFilterOperator;
+  dataFilterValue?: string;
+  dataSortField?: string;
+  dataSortDirection?: WidgetDataSortDirection;
+  dataLimit?: number;
+  dataAggregateMode?: WidgetDataAggregateMode;
+  dataTruncateLength?: number;
+  requestUrl?: string;
+  requestMethod?: WidgetRequestMethod;
+  requestRefreshInterval?: number;
+  requestParams?: string;
+  requestResponseMap?: string;
+  eventAction?: WidgetEventAction;
+  eventOpenMode?: WidgetEventOpenMode;
+  eventUrl?: string;
+  eventTargetWidgetId?: string;
+  eventTargetWidgetIds?: string[];
+  eventConditionField?: string;
+  eventConditionOperator?: WidgetDataFilterOperator;
+  eventConditionValue?: string;
   tableHeaderBgColor?: string;
   tableHeaderTextColor?: string;
   tableHeaderMetaColor?: string;
@@ -215,6 +245,14 @@ export type EditorWidget = {
   imageCaptionShadowColor?: string;
   imageCaptionShadowOpacity?: number;
   imageOverlayBlur?: number;
+  numberFlipDigitSize?: number;
+  numberFlipGap?: number;
+  numberFlipSurfaceColor?: string;
+  numberFlipGlowOpacity?: number;
+  decorationPreset?: DecorationPreset;
+  decorationSecondaryColor?: string;
+  decorationLineWidth?: number;
+  decorationGlowOpacity?: number;
 };
 
 export const editorProject = {
@@ -288,6 +326,16 @@ export const editorToolGroups: ToolGroup[] = [
     items: [
       {name: "Image", icon: "▣"},
       {name: "Text Block", icon: "T"},
+    ],
+  },
+  {
+    title: "Decor & Display",
+    items: [
+      {name: "Border Decoration", icon: "□"},
+      {name: "Accent Decoration", icon: "◇"},
+      {name: "Divider Decoration", icon: "─"},
+      {name: "Glow Decoration", icon: "✦"},
+      {name: "Number Flip", icon: "09"},
     ],
   },
 ];
@@ -468,19 +516,48 @@ export const editorWidgets: EditorWidget[] = [
     locked: false,
   },
   {
+    id: "route-divider",
+    type: "decoration",
+    title: "Route Divider",
+    x: 560,
+    y: 92,
+    width: 800,
+    height: 56,
+    dataset: editorDatasets[0]?.name ?? "logistics_dump_v2_final.csv",
+    fill: "transparent",
+    visible: true,
+    opacity: 1,
+    stroke: "none",
+    accent: "#8fe1a7",
+    value: "Mediterranean Sync",
+    hint: "Cross-fleet corridor pulse",
+    radius: 0,
+    padding: 0,
+    shadow: "none",
+    titleVisible: false,
+    titleAlign: "left",
+    textColor: "#e9fff0",
+    decorationPreset: "divider",
+    decorationSecondaryColor: "#315a41",
+    decorationLineWidth: 2,
+    decorationGlowOpacity: 32,
+    zIndex: 45,
+    locked: false,
+  },
+  {
     id: "delayed-shipments",
-    type: "metric",
+    type: "numberFlip",
     title: "Delayed Shipments",
     x: 1480,
     y: 0,
     width: 440,
     height: 164,
     dataset: editorDatasets[0]?.name ?? "logistics_dump_v2_final.csv",
-    fill: "#ffdad6",
+    fill: "#13211d",
     visible: true,
     opacity: 1,
     stroke: "none",
-    accent: "#ba1a1a",
+    accent: "#ff8f80",
     value: "42",
     hint: "Suez route congestion",
     radius: 8,
@@ -488,6 +565,12 @@ export const editorWidgets: EditorWidget[] = [
     shadow: "soft",
     titleVisible: true,
     titleAlign: "left",
+    titleColor: "#e9fff0",
+    textColor: "#fff4f2",
+    numberFlipDigitSize: 44,
+    numberFlipGap: 10,
+    numberFlipSurfaceColor: "#21342d",
+    numberFlipGlowOpacity: 28,
     zIndex: 50,
     locked: false,
   },
@@ -563,6 +646,35 @@ export const editorWidgets: EditorWidget[] = [
     titleVisible: true,
     titleAlign: "left",
     zIndex: 80,
+    locked: false,
+  },
+  {
+    id: "screen-frame",
+    type: "decoration",
+    title: "Screen Frame",
+    x: 24,
+    y: 68,
+    width: 1872,
+    height: 988,
+    dataset: editorDatasets[0]?.name ?? "logistics_dump_v2_final.csv",
+    fill: "transparent",
+    visible: true,
+    opacity: 1,
+    stroke: "none",
+    accent: "#8fe1a7",
+    value: "Global Mesh",
+    hint: "Live routing surface",
+    radius: 22,
+    padding: 0,
+    shadow: "none",
+    titleVisible: false,
+    titleAlign: "left",
+    textColor: "#e9fff0",
+    decorationPreset: "frame",
+    decorationSecondaryColor: "#315a41",
+    decorationLineWidth: 2,
+    decorationGlowOpacity: 26,
+    zIndex: 5,
     locked: false,
   },
 ];

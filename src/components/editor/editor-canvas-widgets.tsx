@@ -11,6 +11,9 @@ import {
   lineSeries,
   metricSnapshot,
   parseManualWidgetData,
+  processEventSnapshotRows,
+  processSeriesSnapshot,
+  processTableSnapshotData,
   tableSnapshot,
   tableSnapshotFromRows,
   type WidgetDataset,
@@ -20,6 +23,7 @@ import {EDITOR_CANVAS_HEIGHT, EDITOR_CANVAS_WIDTH, type EditorWidget} from "@/li
 type EditorCanvasWidgetProps = {
   widget: EditorWidget;
   selected?: boolean;
+  onActivate?: () => void;
   mapLabels?: boolean;
   map3dAxis?: boolean;
   mapZoom?: string;
@@ -74,6 +78,7 @@ export function editorWidgetPlacementWithin(
 export function EditorCanvasWidget({
   widget,
   selected = false,
+  onActivate,
   mapLabels = true,
   map3dAxis = true,
   mapZoom = "2.4x",
@@ -116,6 +121,7 @@ export function EditorCanvasWidget({
       }}
     >
       {widget.type === "metric" ? <MetricWidget widget={widget} dataset={dataset} /> : null}
+      {widget.type === "numberFlip" ? <NumberFlipWidget widget={widget} dataset={dataset} /> : null}
       {widget.type === "line" ? <LineWidget widget={widget} dataset={dataset} /> : null}
       {widget.type === "area" ? <AreaWidget widget={widget} dataset={dataset} /> : null}
       {widget.type === "pie" ? <PieWidget widget={widget} dataset={dataset} /> : null}
@@ -160,22 +166,27 @@ export function EditorCanvasWidget({
       {widget.type === "rank" ? <RankWidget widget={widget} dataset={dataset} /> : null}
       {widget.type === "text" ? <TextWidget widget={widget} /> : null}
       {widget.type === "image" ? <ImageWidget widget={widget} /> : null}
+      {widget.type === "decoration" ? <DecorationWidget widget={widget} /> : null}
     </div>
   );
 
-  if (!onSelect) return content;
+  if (!onSelect && !onActivate) return content;
 
   return (
-    <button onClick={onSelect} className="block h-full w-full text-left">
+    <button onClick={onSelect ?? onActivate} className="block h-full w-full text-left">
       {content}
     </button>
   );
 }
 
+function activeManualData(widget: EditorWidget) {
+  return widget.dataSourceMode === "manual" ? parseManualWidgetData(widget) : null;
+}
+
 function MetricWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
   const alert = widget.accent === "#ba1a1a";
   const accent = widget.accent ?? "#23422a";
-  const manualData = parseManualWidgetData(widget);
+  const manualData = activeManualData(widget);
   const data = manualData?.valid && manualData.metric ? manualData.metric : metricSnapshot(dataset, widget.fieldMap);
   const rawValue =
     manualData?.valid && manualData.metric
@@ -210,10 +221,263 @@ function MetricWidget({widget, dataset}: {widget: EditorWidget; dataset?: Widget
   );
 }
 
+function NumberFlipWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
+  const accent = widget.accent ?? "#8fe1a7";
+  const manualData = activeManualData(widget);
+  const data = manualData?.valid && manualData.metric ? manualData.metric : metricSnapshot(dataset, widget.fieldMap);
+  const rawValue =
+    manualData?.valid && manualData.metric
+      ? data.value
+      : widget.value ?? data.value ?? "2048";
+  const hint =
+    manualData?.valid && manualData.metric
+      ? data.hint
+      : widget.hint ?? data.hint;
+  const characters = `${rawValue}`.split("");
+  const gap = widget.numberFlipGap ?? 10;
+  const digitSize = widget.numberFlipDigitSize ?? 42;
+  const digitSurface = widget.numberFlipSurfaceColor ?? "#21342d";
+  const digitText = widget.textColor ?? "#f5fff7";
+  const glowOpacity = (widget.numberFlipGlowOpacity ?? 20) / 100;
+
+  return (
+    <div
+      className="jv-number-flip-shell flex h-full flex-col border border-[#2c4338]"
+      style={{
+        ...widgetCardStyle(widget),
+        background:
+          widget.fill === "transparent"
+            ? `linear-gradient(180deg, ${hexToRgba("#0f1814", 0.92)} 0%, ${hexToRgba("#15231d", 0.98)} 100%)`
+            : widget.fill,
+        boxShadow: [
+          widget.shadow === "none" ? null : widgetShadow(widget.shadow),
+          glowOpacity > 0 ? `0 0 28px ${hexToRgba(accent, glowOpacity)}` : null,
+          `inset 0 1px 0 ${hexToRgba("#ffffff", 0.05)}`,
+        ]
+          .filter(Boolean)
+          .join(", "),
+      }}
+    >
+      <WidgetTitle widget={widget} />
+      <div className="mt-4 flex min-h-0 flex-1 flex-col justify-center">
+        <div className="flex flex-wrap items-end gap-2">
+          {widget.valuePrefix ? (
+            <span
+              className="inline-flex items-center rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]"
+              style={{
+                color: accent,
+                borderColor: hexToRgba(accent, 0.28),
+                background: hexToRgba(accent, 0.08),
+              }}
+            >
+              {widget.valuePrefix}
+            </span>
+          ) : null}
+          <div className="flex flex-wrap items-center" style={{gap: `${gap}px`}}>
+            {characters.map((character, index) =>
+              /\d/.test(character) ? (
+                <div
+                  key={`${character}-${index}`}
+                  className="jv-number-flip-card relative flex items-center justify-center overflow-hidden rounded-xl border font-headline font-black"
+                  style={{
+                    minWidth: `${Math.max(32, Math.round(digitSize * 0.8))}px`,
+                    height: `${Math.max(48, Math.round(digitSize * 1.45))}px`,
+                    padding: `0 ${Math.max(10, Math.round(gap * 0.7))}px`,
+                    fontSize: `${digitSize}px`,
+                    color: digitText,
+                    borderColor: hexToRgba(accent, 0.24),
+                    background: `linear-gradient(180deg, ${hexToRgba(digitSurface, 0.96)} 0%, ${hexToRgba(
+                      accent,
+                      0.16,
+                    )} 100%)`,
+                    boxShadow: `inset 0 1px 0 ${hexToRgba("#ffffff", 0.08)}, 0 14px 28px ${hexToRgba(accent, glowOpacity * 0.65)}`,
+                    animationDelay: `${index * 90}ms`,
+                  }}
+                >
+                  <span
+                    className="jv-number-flip-sheen pointer-events-none absolute inset-x-0 top-0 h-[44%]"
+                    style={{background: `linear-gradient(180deg, ${hexToRgba("#ffffff", 0.12)} 0%, transparent 100%)`}}
+                  />
+                  {character}
+                </div>
+              ) : (
+                <span
+                  key={`${character}-${index}`}
+                  className="self-end font-mono text-[26px] font-bold"
+                  style={{color: hexToRgba(digitText, 0.78)}}
+                >
+                  {character}
+                </span>
+              ),
+            )}
+          </div>
+          {widget.valueSuffix ? (
+            <span
+              className="inline-flex items-center rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]"
+              style={{
+                color: accent,
+                borderColor: hexToRgba(accent, 0.28),
+                background: hexToRgba(accent, 0.08),
+              }}
+            >
+              {widget.valueSuffix}
+            </span>
+          ) : null}
+        </div>
+        {hint ? (
+          <div className="mt-3 text-[11px] font-medium uppercase tracking-[0.12em]" style={{color: hexToRgba(digitText, 0.82)}}>
+            {hint}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DecorationWidget({widget}: {widget: EditorWidget}) {
+  const preset = widget.decorationPreset ?? "badge";
+  const accent = widget.accent ?? "#8fe1a7";
+  const secondary = widget.decorationSecondaryColor ?? "#315a41";
+  const lineWidth = widget.decorationLineWidth ?? 2;
+  const glowOpacity = (widget.decorationGlowOpacity ?? 18) / 100;
+  const label = widget.value?.trim() || widget.title;
+  const note = widget.hint?.trim();
+  const borderRadius = widget.radius ?? 18;
+
+  if (preset === "frame") {
+    return (
+      <div
+        className="relative h-full w-full overflow-hidden"
+        style={{
+          ...widgetCardStyle(widget, {padding: 0}),
+          background: widget.fill === "transparent" ? "transparent" : widget.fill,
+        }}
+      >
+        <div
+          className="absolute inset-0"
+          style={{
+            borderRadius: `${borderRadius}px`,
+            border: `${lineWidth}px solid ${hexToRgba(secondary, 0.58)}`,
+            boxShadow: glowOpacity > 0 ? `0 0 36px ${hexToRgba(accent, glowOpacity)}` : undefined,
+          }}
+        />
+        <div
+          className="absolute inset-[10px]"
+          style={{
+            borderRadius: `${Math.max(8, borderRadius - 8)}px`,
+            border: `1px solid ${hexToRgba(accent, 0.22)}`,
+          }}
+        />
+        {[
+          "left-0 top-0 border-l border-t",
+          "right-0 top-0 border-r border-t",
+          "left-0 bottom-0 border-l border-b",
+          "right-0 bottom-0 border-r border-b",
+        ].map((position) => (
+          <span
+            key={position}
+            className={`absolute h-16 w-16 ${position}`}
+            style={{
+              borderColor: accent,
+              borderWidth: `${Math.max(2, lineWidth + 1)}px`,
+              boxShadow: glowOpacity > 0 ? `0 0 22px ${hexToRgba(accent, glowOpacity * 0.72)}` : undefined,
+            }}
+          />
+        ))}
+        {label ? (
+          <div className="absolute left-6 top-5 inline-flex items-center gap-2 rounded-full px-3 py-1.5" style={{
+            color: widget.textColor ?? "#ecfff1",
+            background: `linear-gradient(90deg, ${hexToRgba(accent, 0.24)} 0%, ${hexToRgba(secondary, 0.18)} 100%)`,
+            border: `1px solid ${hexToRgba(accent, 0.35)}`,
+          }}>
+            <span className="h-2 w-2 rounded-full" style={{background: accent, boxShadow: `0 0 14px ${hexToRgba(accent, 0.72)}`}} />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em]">{label}</span>
+          </div>
+        ) : null}
+        {note ? (
+          <div className="absolute bottom-5 right-6 text-[10px] uppercase tracking-[0.16em]" style={{color: widget.textColor ?? accent}}>
+            {note}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (preset === "divider") {
+    return (
+      <div className="flex h-full items-center" style={widgetCardStyle(widget)}>
+        <div className="w-full">
+          {label ? (
+            <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{color: widget.textColor ?? accent}}>
+              {label}
+            </div>
+          ) : null}
+          <div
+            className="relative h-px w-full"
+            style={{background: `linear-gradient(90deg, ${accent} 0%, ${hexToRgba(secondary, 0.3)} 60%, transparent 100%)`}}
+          >
+            <span
+              className="jv-divider-signal absolute left-0 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full"
+              style={{background: accent, boxShadow: `0 0 16px ${hexToRgba(accent, Math.max(0.3, glowOpacity))}`}}
+            />
+          </div>
+          {note ? <div className="mt-3 text-[11px]" style={{color: hexToRgba(widget.textColor ?? accent, 0.74)}}>{note}</div> : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (preset === "glow") {
+    return (
+      <div className="flex h-full items-center justify-center overflow-hidden" style={widgetCardStyle(widget)}>
+        <div className="relative flex w-full items-center justify-center px-6 py-5">
+          <span
+            className="jv-glow-breath absolute inset-x-10 top-1/2 h-10 -translate-y-1/2 rounded-full blur-2xl"
+            style={{background: hexToRgba(accent, Math.max(0.18, glowOpacity))}}
+          />
+          <span
+            className="jv-glow-scan absolute inset-x-12 top-1/2 h-px -translate-y-1/2"
+            style={{background: `linear-gradient(90deg, transparent 0%, ${accent} 18%, ${secondary} 82%, transparent 100%)`}}
+          />
+          <div className="relative text-center">
+            {label ? <div className="text-[12px] font-semibold uppercase tracking-[0.18em]" style={{color: widget.textColor ?? "#f5fff7"}}>{label}</div> : null}
+            {note ? <div className="mt-2 text-[11px]" style={{color: hexToRgba(widget.textColor ?? accent, 0.76)}}>{note}</div> : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full items-center" style={widgetCardStyle(widget)}>
+      <div
+        className="relative flex w-full items-center gap-3 overflow-hidden rounded-full border px-4 py-3"
+        style={{
+          color: widget.textColor ?? "#f5fff7",
+          borderColor: hexToRgba(accent, 0.34),
+          background: `linear-gradient(90deg, ${hexToRgba(accent, 0.18)} 0%, ${hexToRgba(secondary, 0.14)} 100%)`,
+          boxShadow: glowOpacity > 0 ? `0 0 28px ${hexToRgba(accent, glowOpacity)}` : undefined,
+        }}
+      >
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{background: accent, boxShadow: `0 0 14px ${hexToRgba(accent, 0.78)}`}} />
+        <div className="min-w-0">
+          {label ? <div className="truncate text-[11px] font-semibold uppercase tracking-[0.16em]">{label}</div> : null}
+          {note ? <div className="mt-1 truncate text-[11px]" style={{color: hexToRgba(widget.textColor ?? accent, 0.76)}}>{note}</div> : null}
+        </div>
+        <span
+          className="ml-auto h-px flex-1"
+          style={{background: `linear-gradient(90deg, ${hexToRgba(accent, 0.72)} 0%, transparent 100%)`}}
+        />
+      </div>
+    </div>
+  );
+}
+
 function LineWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
   const accent = widget.accent ?? "#215637";
-  const manualData = parseManualWidgetData(widget);
-  const data = manualData?.valid && manualData.series ? manualData.series : lineSeries(dataset, widget.fieldMap);
+  const manualData = activeManualData(widget);
+  const rawData = manualData?.valid && manualData.series ? manualData.series : lineSeries(dataset, widget.fieldMap);
+  const data = processSeriesSnapshot(rawData, widget);
   return (
     <div className={`flex h-full flex-col ${widgetShellClass(widget)}`} style={widgetCardStyle(widget)}>
       <WidgetTitle widget={widget} />
@@ -259,8 +523,9 @@ function LineWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDa
 
 function AreaWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
   const accent = widget.accent ?? "#2f6d48";
-  const manualData = parseManualWidgetData(widget);
-  const data = manualData?.valid && manualData.series ? manualData.series : lineSeries(dataset, widget.fieldMap);
+  const manualData = activeManualData(widget);
+  const rawData = manualData?.valid && manualData.series ? manualData.series : lineSeries(dataset, widget.fieldMap);
+  const data = processSeriesSnapshot(rawData, widget);
   return (
     <div className={`flex h-full flex-col ${widgetShellClass(widget)}`} style={widgetCardStyle(widget)}>
       <WidgetTitle widget={widget} />
@@ -304,8 +569,9 @@ function AreaWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDa
 
 function PieWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
   const accent = widget.accent ?? "#23422a";
-  const manualData = parseManualWidgetData(widget);
-  const data = manualData?.valid && manualData.series ? manualData.series : categoricalSeries(dataset, widget.fieldMap);
+  const manualData = activeManualData(widget);
+  const rawData = manualData?.valid && manualData.series ? manualData.series : categoricalSeries(dataset, widget.fieldMap);
+  const data = processSeriesSnapshot(rawData, widget);
   return (
     <div className={`flex h-full flex-col ${widgetShellClass(widget)}`} style={widgetCardStyle(widget)}>
       <WidgetTitle widget={widget} />
@@ -338,8 +604,9 @@ function PieWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDat
 }
 
 function BarWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
-  const manualData = parseManualWidgetData(widget);
-  const data = manualData?.valid && manualData.series ? manualData.series : categoricalSeries(dataset, widget.fieldMap);
+  const manualData = activeManualData(widget);
+  const rawData = manualData?.valid && manualData.series ? manualData.series : categoricalSeries(dataset, widget.fieldMap);
+  const data = processSeriesSnapshot(rawData, widget);
   return (
     <div className={`flex h-full flex-col ${widgetShellClass(widget)}`} style={widgetCardStyle(widget)}>
       <WidgetTitle widget={widget} />
@@ -380,8 +647,10 @@ function BarWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDat
 }
 
 function EventsWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
-  const manualData = parseManualWidgetData(widget);
-  const rows = manualData?.valid && manualData.rows ? eventSnapshotFromRows(manualData.rows, widget.fieldMap) : eventSnapshot(dataset, widget.fieldMap);
+  const manualData = activeManualData(widget);
+  const rawRows =
+    manualData?.valid && manualData.rows ? eventSnapshotFromRows(manualData.rows, widget.fieldMap) : eventSnapshot(dataset, widget.fieldMap);
+  const rows = processEventSnapshotRows(rawRows, widget);
   return (
     <div className="h-full border border-[#c2c8bf]/40" style={widgetCardStyle(widget)}>
       <WidgetTitle widget={widget} />
@@ -399,8 +668,8 @@ function EventsWidget({widget, dataset}: {widget: EditorWidget; dataset?: Widget
 }
 
 function TableWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
-  const manualData = parseManualWidgetData(widget);
-  const snapshot = manualData?.valid && manualData.rows
+  const manualData = activeManualData(widget);
+  const rawSnapshot = manualData?.valid && manualData.rows
     ? tableSnapshotFromRows(manualData.rows, {
         columns: widget.tableColumns,
         labels: widget.tableColumnLabels,
@@ -411,6 +680,7 @@ function TableWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetD
         labels: widget.tableColumnLabels,
         widths: widget.tableColumnWidths,
       });
+  const snapshot = processTableSnapshotData(rawSnapshot, widget);
   const columns = snapshot.columns.length
     ? snapshot.columns
     : [
@@ -433,7 +703,6 @@ function TableWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetD
   const tableBodyColor = widget.tableBodyColor ?? "#fafaf5";
   const tableHeaderBgColor = widget.tableHeaderBgColor ?? "#e8e8e3";
   const tableHeaderTextColor = widget.tableHeaderTextColor ?? "#727971";
-  const tableHeaderMetaColor = widget.tableHeaderMetaColor ?? "#727971";
   const tableHeaderTracking = widget.tableHeaderTracking ?? 1.8;
   const tableHeaderSize = widget.tableHeaderSize ?? 10;
   const tableHeaderDividerColor = widget.tableHeaderDividerColor ?? tableDividerColor;
@@ -519,8 +788,11 @@ function TableWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetD
 }
 
 function RankWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDataset}) {
-  const manualData = parseManualWidgetData(widget);
-  const items = (manualData?.valid && manualData.series ? manualData.series : categoricalSeries(dataset, widget.fieldMap)).slice(0, 5);
+  const manualData = activeManualData(widget);
+  const items = processSeriesSnapshot(
+    manualData?.valid && manualData.series ? manualData.series : categoricalSeries(dataset, widget.fieldMap),
+    widget,
+  ).slice(0, 5);
   const rows = items.length
     ? items
     : [
@@ -544,7 +816,7 @@ function RankWidget({widget, dataset}: {widget: EditorWidget; dataset?: WidgetDa
                 </span>
                 <span className="truncate font-medium text-[#1a1c19]">{item.label}</span>
               </div>
-              <span className="font-mono text-[#45664b]">{item.value}</span>
+              <span className="font-mono text-[#45664b]">{formatSeriesDisplayValue(widget, item.value)}</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-[#edf0e8]">
               <div
@@ -939,6 +1211,36 @@ function buildImageFilter(widget: EditorWidget) {
   const hueRotate = preset === "cool" ? " hue-rotate(8deg)" : "";
 
   return `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)${hueRotate}`;
+}
+
+function resolveSeriesLabelFormat(widget: Pick<EditorWidget, "type" | "chartLabelFormat">) {
+  return widget.chartLabelFormat ?? (widget.type === "pie" ? "percent" : "raw");
+}
+
+function formatSeriesDisplayValue(
+  widget: Pick<EditorWidget, "type" | "chartLabelFormat" | "chartDecimals" | "valuePrefix" | "valueSuffix">,
+  value: number,
+) {
+  const format = resolveSeriesLabelFormat(widget);
+  const decimals = widget.chartDecimals ?? 0;
+  let rendered = "";
+
+  if (format === "percent") {
+    rendered = `${value.toFixed(decimals)}%`;
+  } else if (format === "compact") {
+    rendered = new Intl.NumberFormat("en", {
+      notation: "compact",
+      maximumFractionDigits: decimals,
+      minimumFractionDigits: decimals > 0 ? Math.min(decimals, 1) : 0,
+    }).format(value);
+  } else {
+    rendered = new Intl.NumberFormat("en", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: decimals,
+    }).format(value);
+  }
+
+  return `${widget.valuePrefix ?? ""}${rendered}${widget.valueSuffix ?? ""}`;
 }
 
 function formatTableCellValue(value: string | number | undefined, format: EditorWidget["tableNumberFormat"]) {

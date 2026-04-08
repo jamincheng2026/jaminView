@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect, useMemo, useState} from "react";
+import {startTransition, useEffect, useMemo, useState} from "react";
 import {useLocale, useTranslations} from "next-intl";
 import {useRouter} from "next/navigation";
 import {ArrowLeft, Maximize, Minimize} from "lucide-react";
@@ -25,6 +25,13 @@ import {
   EditorCanvasWidget,
   editorWidgetPlacementWithin,
 } from "@/components/editor/editor-canvas-widgets";
+import {
+  hasWidgetRuntimeAction,
+  isExternalWidgetHref,
+  resolveWidgetEventHref,
+  resolveWidgetFocusTargets,
+  shouldTriggerWidgetEvent,
+} from "@/lib/editor-widget-events";
 
 export function ScreenPage({projectId}: {projectId: string}) {
   const t = useTranslations("Screen");
@@ -38,25 +45,30 @@ export function ScreenPage({projectId}: {projectId: string}) {
   const [screenConfig, setScreenConfig] = useState<ScreenConfig>(defaultScreenConfig);
   const [importedDatasets, setImportedDatasets] = useState(() => readImportedDatasets(projectId));
   const [datasetDrafts, setDatasetDrafts] = useState<Record<string, {fields: {field: string; type: string; sample: string; icon: string}[]; rows: Record<string, string | number>[];}>>({});
+  const [activeWidgetIds, setActiveWidgetIds] = useState<string[]>([]);
 
   useEffect(() => {
     const nextSnapshot = readPublishedSnapshot(projectId);
-    setSnapshot(nextSnapshot);
-    setImportedDatasets(readImportedDatasets(projectId));
-
     const projectRecord = readProjectRecord(projectId);
-    if (projectRecord?.name) {
-      setProjectTitle(projectRecord.name);
-    }
+    const nextImportedDatasets = readImportedDatasets(projectId);
 
-    if (!nextSnapshot) return;
+    startTransition(() => {
+      setSnapshot(nextSnapshot);
+      setImportedDatasets(nextImportedDatasets);
 
-    if (nextSnapshot.draft.projectTitle?.trim()) {
-      setProjectTitle(nextSnapshot.draft.projectTitle.trim());
-    }
-    setWidgets(nextSnapshot.draft.widgets);
-    setScreenConfig(nextSnapshot.draft.screenConfig ?? defaultScreenConfig);
-    setDatasetDrafts(nextSnapshot.draft.datasetDrafts ?? {});
+      if (projectRecord?.name) {
+        setProjectTitle(projectRecord.name);
+      }
+
+      if (!nextSnapshot) return;
+
+      if (nextSnapshot.draft.projectTitle?.trim()) {
+        setProjectTitle(nextSnapshot.draft.projectTitle.trim());
+      }
+      setWidgets(nextSnapshot.draft.widgets);
+      setScreenConfig(nextSnapshot.draft.screenConfig ?? defaultScreenConfig);
+      setDatasetDrafts(nextSnapshot.draft.datasetDrafts ?? {});
+    });
   }, [projectId]);
 
   useEffect(() => {
@@ -90,6 +102,30 @@ export function ScreenPage({projectId}: {projectId: string}) {
   const visibleWidgets = useMemo(() => widgets.filter((widget) => widget.visible), [widgets]);
   const canvasBackgroundStyle = useMemo(() => buildCanvasBackgroundStyle(screenConfig), [screenConfig]);
   const immersiveMode = screenConfig.presentationMode === "immersive";
+  const handleWidgetActivate = (widget: EditorWidget) => {
+    if (!shouldTriggerWidgetEvent(widget, datasetLookup[widget.dataset])) return;
+
+    const focusTargets = resolveWidgetFocusTargets(widget);
+    if (focusTargets.length) {
+      setActiveWidgetIds(focusTargets);
+      return;
+    }
+
+    const href = resolveWidgetEventHref(widget, locale, projectId);
+    if (!href) return;
+
+    if (widget.eventOpenMode === "blank") {
+      window.open(href, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    if (isExternalWidgetHref(href)) {
+      window.location.assign(href);
+      return;
+    }
+
+    router.push(href);
+  };
 
   const toggleFullscreen = async () => {
     if (typeof document === "undefined") return;
@@ -214,8 +250,13 @@ export function ScreenPage({projectId}: {projectId: string}) {
                         mapRouteWidth={snapshot?.draft.mapRouteWidth ?? 100}
                         mapLandOpacity={snapshot?.draft.mapLandOpacity ?? 96}
                         mapLabelOpacity={snapshot?.draft.mapLabelOpacity ?? 92}
-                        dataset={datasetLookup[widget.dataset]}
-                          selected={false}
+                          dataset={datasetLookup[widget.dataset]}
+                          selected={activeWidgetIds.includes(widget.id)}
+                          onActivate={
+                            hasWidgetRuntimeAction(widget, locale, projectId)
+                              ? () => handleWidgetActivate(widget)
+                              : undefined
+                          }
                         />
                       </div>
                     ))}

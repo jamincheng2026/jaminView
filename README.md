@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# JaminView
 
-## Getting Started
+JaminView 是一个面向业务交付场景的模板化数据大屏平台原型。
 
-First, run the development server:
+当前产品主线闭环：
+
+`模板 -> 项目 -> 导入数据 -> 编辑页面 -> 预览 -> 发布 -> 展示`
+
+## 文档地图
+
+正式文档入口在 [docs/README.md](docs/README.md)。
+
+建议按这个顺序阅读：
+
+1. [docs/README.md](docs/README.md)
+2. [docs/editor-goview-study-notes-v1.md](docs/editor-goview-study-notes-v1.md)
+3. [docs/editor-master-spec-v1.md](docs/editor-master-spec-v1.md)
+4. [docs/editor-panel-wireframe-v1.md](docs/editor-panel-wireframe-v1.md)
+5. [docs/editor-module-design-plan-v1.md](docs/editor-module-design-plan-v1.md)
+
+## 当前定位
+
+- 首页与产品内页按最终设计稿复现
+- 模板化创建项目
+- CSV / XLSX / JSON 导入
+- 固定画布编辑
+- 预览、发布与展示页闭环
+
+当前编辑器的正式参考基线：
+
+- `DataV` 负责结构
+- `GoView` 负责组件池
+
+## 开发说明
+
+这是一个 Next.js 前端项目。
+
+常用命令：
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
+pnpm build
+pnpm lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+当前实现和后续开发以这两份文档为准：
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [docs/editor-master-spec-v1.md](docs/editor-master-spec-v1.md)
+- [docs/editor-module-design-plan-v1.md](docs/editor-module-design-plan-v1.md)

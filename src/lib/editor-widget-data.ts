@@ -35,6 +35,24 @@ export type ManualMetricDatum = {
   hint?: string;
 };
 
+export type WidgetEventDatum = {
+  title: string;
+  meta: string;
+};
+
+type WidgetDataProcessingConfig = Pick<
+  EditorWidget,
+  | "type"
+  | "dataFilterField"
+  | "dataFilterOperator"
+  | "dataFilterValue"
+  | "dataSortField"
+  | "dataSortDirection"
+  | "dataLimit"
+  | "dataAggregateMode"
+  | "dataTruncateLength"
+>;
+
 export type ManualWidgetDataParseResult =
   | {valid: false; error: string}
   | {
@@ -247,6 +265,63 @@ export function eventSnapshotFromRows(rows: DatasetRow[], fieldMap?: string) {
   );
 }
 
+export function processSeriesSnapshot(series: ManualSeriesDatum[], widget: WidgetDataProcessingConfig) {
+  const aggregateMode = widget.dataAggregateMode ?? "none";
+  let next = [...series];
+
+  if (aggregateMode !== "none") {
+    const grouped = new Map<string, number[]>();
+    next.forEach((item) => {
+      grouped.set(item.label, [...(grouped.get(item.label) ?? []), item.value]);
+    });
+    next = Array.from(grouped.entries()).map(([label, values]) => ({
+      label,
+      value: aggregateValues(values, aggregateMode),
+    }));
+  }
+
+  next = next.filter((item) => matchesDataFilter(resolveSeriesFieldValue(item, widget.dataFilterField), widget));
+  next = sortItems(next, widget.dataSortField, widget.dataSortDirection, resolveSeriesFieldValue);
+  next = applyItemLimit(next, widget.dataLimit);
+
+  return next.map((item) => ({
+    ...item,
+    label: truncateText(item.label, widget.dataTruncateLength),
+  }));
+}
+
+export function processEventSnapshotRows(items: WidgetEventDatum[], widget: WidgetDataProcessingConfig) {
+  const next = items.filter((item) => matchesDataFilter(resolveEventFieldValue(item, widget.dataFilterField), widget));
+  const sorted = sortItems(next, widget.dataSortField, widget.dataSortDirection, resolveEventFieldValue);
+  const limited = applyItemLimit(sorted, widget.dataLimit);
+
+  return limited.map((item) => ({
+    title: truncateText(item.title, widget.dataTruncateLength),
+    meta: truncateText(item.meta, widget.dataTruncateLength),
+  }));
+}
+
+export function processTableSnapshotData(
+  snapshot: {columns: Array<{key: string; label: string; width?: number}>; rows: DatasetRow[]},
+  widget: WidgetDataProcessingConfig,
+) {
+  const nextRows = snapshot.rows.filter((row) => matchesDataFilter(resolveTableFieldValue(row, widget.dataFilterField), widget));
+  const sortedRows = sortItems(nextRows, widget.dataSortField, widget.dataSortDirection, resolveTableFieldValue);
+  const limitedRows = applyItemLimit(sortedRows, widget.dataLimit);
+
+  return {
+    ...snapshot,
+    rows: limitedRows.map((row) =>
+      Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [
+          key,
+          typeof value === "string" ? truncateText(value, widget.dataTruncateLength) : value,
+        ]),
+      ),
+    ),
+  };
+}
+
 export function mapSnapshot(dataset: WidgetDataset | undefined, fieldMap?: string) {
   const fallbackPoints = defaultMapPoints;
 
@@ -319,6 +394,23 @@ export function mapSnapshot(dataset: WidgetDataset | undefined, fieldMap?: strin
   };
 }
 
+export function processMapSnapshotData(
+  snapshot: {points: MapPointSnapshot[]; routes: MapRouteSnapshot[]},
+  widget: WidgetDataProcessingConfig,
+) {
+  const nextPoints = snapshot.points.filter((point) => matchesDataFilter(resolveMapFieldValue(point, widget.dataFilterField), widget));
+  const sortedPoints = sortItems(nextPoints, widget.dataSortField, widget.dataSortDirection, resolveMapFieldValue);
+  const limitedPoints = applyItemLimit(sortedPoints, widget.dataLimit).map((point) => ({
+    ...point,
+    label: truncateText(point.label, widget.dataTruncateLength),
+  }));
+
+  return {
+    points: limitedPoints,
+    routes: buildMapRoutes(limitedPoints),
+  };
+}
+
 export function parseManualWidgetData(
   widget: Pick<EditorWidget, "type" | "dataSourceMode" | "manualData">,
 ): ManualWidgetDataParseResult | null {
@@ -335,7 +427,7 @@ export function parseManualWidgetData(
   try {
     const parsed = JSON.parse(source) as unknown;
 
-    if (widget.type === "metric") {
+    if (widget.type === "metric" || widget.type === "numberFlip") {
       if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
         return {
           valid: false,
@@ -406,11 +498,11 @@ export function parseManualWidgetData(
       };
     }
 
-    if (widget.type === "table" || widget.type === "events") {
+    if (widget.type === "table" || widget.type === "events" || widget.type === "map") {
       if (!Array.isArray(parsed) || parsed.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
         return {
           valid: false,
-          error: "表格或事件列表 JSON 需要对象数组格式",
+          error: "表格、事件或地图组件的 JSON 需要对象数组格式",
         };
       }
 
@@ -473,6 +565,89 @@ function formatMetricValue(value: number) {
   if (Math.abs(value) >= 100) return value.toFixed(0);
   if (Math.abs(value) >= 10) return value.toFixed(1);
   return value.toFixed(2);
+}
+
+function truncateText(value: string, maxLength?: number) {
+  if (!maxLength || maxLength <= 0 || value.length <= maxLength) return value;
+  if (maxLength <= 1) return value.slice(0, 1);
+  return `${value.slice(0, maxLength - 1)}…`;
+}
+
+function aggregateValues(values: number[], mode: NonNullable<EditorWidget["dataAggregateMode"]>) {
+  if (!values.length) return 0;
+  if (mode === "count") return values.length;
+  if (mode === "min") return Math.min(...values);
+  if (mode === "max") return Math.max(...values);
+  if (mode === "avg") return values.reduce((sum, value) => sum + value, 0) / values.length;
+  return values.reduce((sum, value) => sum + value, 0);
+}
+
+function matchesDataFilter(value: DatasetRowValue | undefined, widget: WidgetDataProcessingConfig) {
+  const field = widget.dataFilterField?.trim();
+  const rawFilter = widget.dataFilterValue?.trim();
+  if (!field || !rawFilter) return true;
+
+  const operator = widget.dataFilterOperator ?? "contains";
+  const leftNumber = toNumber(value);
+  const rightNumber = toNumber(rawFilter);
+
+  if (operator === "contains") {
+    return String(value ?? "").toLowerCase().includes(rawFilter.toLowerCase());
+  }
+
+  if (operator === "equals") {
+    if (leftNumber !== null && rightNumber !== null) return leftNumber === rightNumber;
+    return String(value ?? "").trim().toLowerCase() === rawFilter.toLowerCase();
+  }
+
+  if (leftNumber === null || rightNumber === null) return false;
+  if (operator === "gt") return leftNumber > rightNumber;
+  if (operator === "gte") return leftNumber >= rightNumber;
+  if (operator === "lt") return leftNumber < rightNumber;
+  return leftNumber <= rightNumber;
+}
+
+function sortItems<T>(
+  items: T[],
+  field: string | undefined,
+  direction: EditorWidget["dataSortDirection"],
+  resolver: (item: T, field: string | undefined) => DatasetRowValue | undefined,
+) {
+  if (!field) return items;
+  const factor = direction === "asc" ? 1 : -1;
+  return [...items].sort((left, right) => compareDataValues(resolver(left, field), resolver(right, field)) * factor);
+}
+
+function applyItemLimit<T>(items: T[], limit?: number) {
+  if (!limit || limit <= 0) return items;
+  return items.slice(0, limit);
+}
+
+function compareDataValues(left: DatasetRowValue | undefined, right: DatasetRowValue | undefined) {
+  const leftNumber = toNumber(left);
+  const rightNumber = toNumber(right);
+  if (leftNumber !== null && rightNumber !== null) return leftNumber - rightNumber;
+  return String(left ?? "").localeCompare(String(right ?? ""), undefined, {numeric: true, sensitivity: "base"});
+}
+
+function resolveSeriesFieldValue(item: ManualSeriesDatum, field: string | undefined) {
+  if (field === "value") return item.value;
+  return item.label;
+}
+
+function resolveEventFieldValue(item: WidgetEventDatum, field: string | undefined) {
+  if (field === "meta") return item.meta;
+  return item.title;
+}
+
+function resolveTableFieldValue(row: DatasetRow, field: string | undefined) {
+  if (!field) return undefined;
+  return row[field];
+}
+
+function resolveMapFieldValue(point: MapPointSnapshot, field: string | undefined) {
+  if (field === "value") return point.value;
+  return point.label;
 }
 
 function buildMapRoutes(points: MapPointSnapshot[]): MapRouteSnapshot[] {

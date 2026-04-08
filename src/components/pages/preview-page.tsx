@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect, useMemo, useState} from "react";
+import {startTransition, useEffect, useMemo, useState} from "react";
 import {useLocale, useTranslations} from "next-intl";
 import {useRouter} from "next/navigation";
 import {ArrowLeft, ExternalLink} from "lucide-react";
@@ -21,6 +21,13 @@ import {
   EditorCanvasWidget,
   editorWidgetPlacementWithin,
 } from "@/components/editor/editor-canvas-widgets";
+import {
+  hasWidgetRuntimeAction,
+  isExternalWidgetHref,
+  resolveWidgetEventHref,
+  resolveWidgetFocusTargets,
+  shouldTriggerWidgetEvent,
+} from "@/lib/editor-widget-events";
 
 export function PreviewPage({projectId}: {projectId: string}) {
   const t = useTranslations("Preview");
@@ -45,37 +52,42 @@ export function PreviewPage({projectId}: {projectId: string}) {
   const [screenConfig, setScreenConfig] = useState<ScreenConfig>(defaultScreenConfig);
   const [datasetDrafts, setDatasetDrafts] = useState<Record<string, {fields: {field: string; type: string; sample: string; icon: string}[]; rows: Record<string, string | number>[]}>>({});
   const [importedDatasets, setImportedDatasets] = useState(() => readImportedDatasets(projectId));
+  const [activeWidgetIds, setActiveWidgetIds] = useState<string[]>([]);
 
   useEffect(() => {
     // Preview intentionally reads from the same local draft snapshot as the editor.
     const draft = readEditorDraft(projectId);
-    if (draft) {
-      if (draft.projectTitle?.trim()) {
-        setProjectTitle(draft.projectTitle.trim());
-      }
-      setWidgets(draft.widgets);
-      setScreenConfig(draft.screenConfig ?? defaultScreenConfig);
-      setMapLabels(draft.mapLabels);
-      setMap3dAxis(draft.map3dAxis);
-      setMapZoom(draft.mapZoom);
-      setMapTheme(draft.mapTheme ?? "emerald");
-      setMapRouteDensity(draft.mapRouteDensity ?? "balanced");
-      setMapMarkers(draft.mapMarkers ?? true);
-      setMapGlow(draft.mapGlow ?? 72);
-      setMapRouteStyle(draft.mapRouteStyle ?? "pulse");
-      setMapLabelStyle(draft.mapLabelStyle ?? "pill");
-      setMapSurfaceTone(draft.mapSurfaceTone ?? "soft");
-      setMapPointScale(draft.mapPointScale ?? 100);
-      setMapRouteWidth(draft.mapRouteWidth ?? 100);
-      setMapLandOpacity(draft.mapLandOpacity ?? 96);
-      setMapLabelOpacity(draft.mapLabelOpacity ?? 92);
-      setDatasetDrafts(draft.datasetDrafts ?? {});
-    }
     const projectRecord = readProjectRecord(projectId);
-    if (!draft?.projectTitle && projectRecord?.name) {
-      setProjectTitle(projectRecord.name);
-    }
-    setImportedDatasets(readImportedDatasets(projectId));
+    const nextImportedDatasets = readImportedDatasets(projectId);
+
+    startTransition(() => {
+      if (draft) {
+        if (draft.projectTitle?.trim()) {
+          setProjectTitle(draft.projectTitle.trim());
+        }
+        setWidgets(draft.widgets);
+        setScreenConfig(draft.screenConfig ?? defaultScreenConfig);
+        setMapLabels(draft.mapLabels);
+        setMap3dAxis(draft.map3dAxis);
+        setMapZoom(draft.mapZoom);
+        setMapTheme(draft.mapTheme ?? "emerald");
+        setMapRouteDensity(draft.mapRouteDensity ?? "balanced");
+        setMapMarkers(draft.mapMarkers ?? true);
+        setMapGlow(draft.mapGlow ?? 72);
+        setMapRouteStyle(draft.mapRouteStyle ?? "pulse");
+        setMapLabelStyle(draft.mapLabelStyle ?? "pill");
+        setMapSurfaceTone(draft.mapSurfaceTone ?? "soft");
+        setMapPointScale(draft.mapPointScale ?? 100);
+        setMapRouteWidth(draft.mapRouteWidth ?? 100);
+        setMapLandOpacity(draft.mapLandOpacity ?? 96);
+        setMapLabelOpacity(draft.mapLabelOpacity ?? 92);
+        setDatasetDrafts(draft.datasetDrafts ?? {});
+      }
+      if (!draft?.projectTitle && projectRecord?.name) {
+        setProjectTitle(projectRecord.name);
+      }
+      setImportedDatasets(nextImportedDatasets);
+    });
   }, [projectId]);
 
   const visibleWidgets = useMemo(() => widgets.filter((widget) => widget.visible), [widgets]);
@@ -97,6 +109,30 @@ export function PreviewPage({projectId}: {projectId: string}) {
     [datasetDrafts, importedDatasets],
   );
   const canvasBackgroundStyle = useMemo(() => buildCanvasBackgroundStyle(screenConfig), [screenConfig]);
+  const handleWidgetActivate = (widget: EditorWidget) => {
+    if (!shouldTriggerWidgetEvent(widget, datasetLookup[widget.dataset])) return;
+
+    const focusTargets = resolveWidgetFocusTargets(widget);
+    if (focusTargets.length) {
+      setActiveWidgetIds(focusTargets);
+      return;
+    }
+
+    const href = resolveWidgetEventHref(widget, locale, projectId);
+    if (!href) return;
+
+    if (widget.eventOpenMode === "blank") {
+      window.open(href, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    if (isExternalWidgetHref(href)) {
+      window.location.assign(href);
+      return;
+    }
+
+    router.push(href);
+  };
 
   return (
     <main className="flex min-h-screen flex-col bg-[#111714] text-white">
@@ -183,6 +219,12 @@ export function PreviewPage({projectId}: {projectId: string}) {
                         mapLandOpacity={mapLandOpacity}
                         mapLabelOpacity={mapLabelOpacity}
                         dataset={datasetLookup[widget.dataset]}
+                        selected={activeWidgetIds.includes(widget.id)}
+                        onActivate={
+                          hasWidgetRuntimeAction(widget, locale, projectId)
+                            ? () => handleWidgetActivate(widget)
+                            : undefined
+                        }
                       />
                     ))}
                   </div>
@@ -246,6 +288,8 @@ function PreviewWidget({
   mapLandOpacity,
   mapLabelOpacity,
   dataset,
+  selected,
+  onActivate,
 }: {
   widget: EditorWidget;
   canvasWidth: number;
@@ -265,11 +309,15 @@ function PreviewWidget({
   mapLandOpacity: number;
   mapLabelOpacity: number;
   dataset?: {fields: {field: string; type: string; sample: string; icon: string}[]; rows: Record<string, string | number>[]};
+  selected?: boolean;
+  onActivate?: () => void;
 }) {
   return (
     <div className="absolute text-left" style={editorWidgetPlacementWithin(widget, canvasWidth, canvasHeight)}>
       <EditorCanvasWidget
         widget={widget}
+        selected={selected}
+        onActivate={onActivate}
         mapLabels={mapLabels}
         map3dAxis={map3dAxis}
         mapZoom={mapZoom}

@@ -39,7 +39,25 @@ import {
   EditorCanvasWidget,
   editorWidgetPlacementWithin,
 } from "@/components/editor/editor-canvas-widgets";
-import {parseFieldMap, parseManualWidgetData, tableSnapshotFromRows, eventSnapshotFromRows, type ManualWidgetDataParseResult} from "@/lib/editor-widget-data";
+import {
+  categoricalSeries,
+  eventSnapshot,
+  eventSnapshotFromRows,
+  inferFieldsFromRows,
+  lineSeries,
+  mapSnapshot,
+  metricSnapshot,
+  parseFieldMap,
+  parseManualWidgetData,
+  processEventSnapshotRows,
+  processMapSnapshotData,
+  processSeriesSnapshot,
+  processTableSnapshotData,
+  tableSnapshot,
+  tableSnapshotFromRows,
+  type ManualWidgetDataParseResult,
+  type WidgetDataset,
+} from "@/lib/editor-widget-data";
 import {
   canvasPresets,
   editorDatasetSchemas,
@@ -69,7 +87,6 @@ import {readProjectRecord, upsertProjectRecord} from "@/lib/project-store";
 
 const editorControlClass =
   "h-8 rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] text-[#1a1c19] shadow-none focus:border-[#45664b]";
-const EDITOR_STAGE_FRAME_HEIGHT = 1158;
 
 type StarterDatasetDraft = {
   fields: DatasetPanelItem["fields"];
@@ -164,7 +181,7 @@ type AlignmentTarget = "left" | "center" | "right" | "top" | "middle" | "bottom"
 type DistributionAxis = "horizontal" | "vertical";
 type MatchSizeTarget = "width" | "height";
 type RightPanelMode = "component" | "page";
-type ComponentPanelTab = "content" | "data" | "style";
+type ComponentPanelTab = "content" | "data" | "style" | "advanced";
 
 const backgroundPresets = [
   {
@@ -260,6 +277,7 @@ export function EditorWorkbench({
   const sectionViewportRef = useRef<HTMLDivElement | null>(null);
   const canvasGridRef = useRef<HTMLDivElement | null>(null);
   const backgroundAssetInputRef = useRef<HTMLInputElement | null>(null);
+  const imageAssetInputRef = useRef<HTMLInputElement | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
   const resizeStateRef = useRef<ResizeState | null>(null);
   const marqueeStateRef = useRef<MarqueeState | null>(null);
@@ -270,7 +288,6 @@ export function EditorWorkbench({
   const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [fitZoom, setFitZoom] = useState(0.85);
-  const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>("component");
   const [componentPanelTab, setComponentPanelTab] = useState<ComponentPanelTab>("content");
   const hasManualZoomRef = useRef(false);
   const marqueeRectRef = useRef<MarqueeRect | null>(null);
@@ -289,7 +306,7 @@ export function EditorWorkbench({
       setWidgets(draft.widgets);
       setSelectedWidgetId(draft.selectedWidgetId);
       setSelectedWidgetIds(
-        draft.selectedWidgetIds?.length ? draft.selectedWidgetIds : [draft.selectedWidgetId],
+        Array.isArray(draft.selectedWidgetIds) ? draft.selectedWidgetIds : [draft.selectedWidgetId],
       );
       setScreenConfig(draft.screenConfig ?? defaultScreenConfig);
       setMapLabels(draft.mapLabels);
@@ -431,7 +448,11 @@ export function EditorWorkbench({
         return;
       }
 
-      if ((event.key === "Backspace" || event.key === "Delete") && widgetsRef.current.length > 1) {
+      if (
+        (event.key === "Backspace" || event.key === "Delete") &&
+        widgetsRef.current.length > 1 &&
+        selectedWidgetIds.length
+      ) {
         event.preventDefault();
         deleteSelectedWidget();
         return;
@@ -440,12 +461,13 @@ export function EditorWorkbench({
       const step = event.shiftKey ? 10 : 1;
 
       if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+      if (!selectedWidgetIds.length) return;
       event.preventDefault();
 
       commitSnapshot((snapshot) => ({
         ...snapshot,
         widgets: snapshot.widgets.map((widget) => {
-          const activeIds = snapshot.selectedWidgetIds?.length ? snapshot.selectedWidgetIds : [snapshot.selectedWidgetId];
+          const activeIds = snapshot.selectedWidgetIds?.length ? snapshot.selectedWidgetIds : [];
           if (!activeIds.includes(widget.id) || widget.locked) return widget;
 
           if (event.key === "ArrowLeft") {
@@ -530,16 +552,6 @@ export function EditorWorkbench({
     () => datasetPanelItems.find((dataset) => dataset.name === selectedWidget.dataset)?.fields ?? [],
     [datasetPanelItems, selectedWidget.dataset],
   );
-  const effectiveTableColumns = useMemo(() => {
-    const preferred = selectedWidget.tableColumns?.filter((column) =>
-      selectedDatasetFields.some((field) => field.field === column),
-    );
-
-    return preferred?.length
-      ? preferred
-      : selectedDatasetFields.slice(0, 5).map((field) => field.field);
-  }, [selectedDatasetFields, selectedWidget.tableColumns]);
-
   const datasetLookup = useMemo(
     () =>
       Object.fromEntries(
@@ -587,20 +599,86 @@ export function EditorWorkbench({
     [bindingSummary, selectedDatasetFields],
   );
   const isChartWidget = selectedWidget.type === "line" || selectedWidget.type === "area" || selectedWidget.type === "bar" || selectedWidget.type === "pie";
+  const isMetricLikeWidget = selectedWidget.type === "metric" || selectedWidget.type === "numberFlip";
+  const isDecorationWidget = selectedWidget.type === "decoration";
   const supportsManualData =
-    selectedWidget.type === "metric" ||
+    isMetricLikeWidget ||
     selectedWidget.type === "line" ||
     selectedWidget.type === "area" ||
     selectedWidget.type === "bar" ||
     selectedWidget.type === "pie" ||
+    selectedWidget.type === "map" ||
     selectedWidget.type === "rank" ||
     selectedWidget.type === "table" ||
     selectedWidget.type === "events";
+  const supportsBasicFormatting =
+    isMetricLikeWidget ||
+    isChartWidget ||
+    selectedWidget.type === "rank" ||
+    selectedWidget.type === "table";
+  const supportsDataProcessing =
+    isChartWidget ||
+    selectedWidget.type === "rank" ||
+    selectedWidget.type === "table" ||
+    selectedWidget.type === "events" ||
+    selectedWidget.type === "map";
+  const normalizedDataSourceMode = normalizeDataSourceMode(selectedWidget.dataSourceMode);
+  const usesDatasetBinding = normalizedDataSourceMode === "static";
+  const boundDataset = selectedWidget.dataset ? datasetLookup[selectedWidget.dataset] : undefined;
   const manualDataState = useMemo(
-    () => parseManualWidgetData(selectedWidget),
-    [selectedWidget],
+    () => (normalizedDataSourceMode === "manual" ? parseManualWidgetData(selectedWidget) : null),
+    [normalizedDataSourceMode, selectedWidget],
+  );
+  const availableTableFields = useMemo(() => {
+    if (selectedWidget.type !== "table") return [];
+    if (normalizedDataSourceMode === "manual" && manualDataState?.valid && manualDataState.rows?.length) {
+      return inferFieldsFromRows(manualDataState.rows);
+    }
+    return selectedDatasetFields;
+  }, [manualDataState, normalizedDataSourceMode, selectedDatasetFields, selectedWidget.type]);
+  const effectiveTableColumns = useMemo(() => {
+    const preferred = selectedWidget.tableColumns?.filter((column) =>
+      availableTableFields.some((field) => field.field === column),
+    );
+
+    return preferred?.length
+      ? preferred
+      : availableTableFields.slice(0, 5).map((field) => field.field);
+  }, [availableTableFields, selectedWidget.tableColumns]);
+  const dataProcessingFieldOptions = useMemo(
+    () => buildDataProcessingFieldOptions(selectedWidget.type, availableTableFields, locale),
+    [availableTableFields, locale, selectedWidget.type],
+  );
+  const supportsAggregation = isChartWidget || selectedWidget.type === "rank";
+  const eventTargetOptions = useMemo(
+    () => [
+      {
+        label: locale === "zh-CN" ? "当前组件" : "Current Widget",
+        value: selectedWidget.id,
+      },
+      ...widgets.filter((widget) => widget.id !== selectedWidget.id).map((widget) => ({
+        label: `${widget.title} / ${widget.id}`,
+        value: widget.id,
+      })),
+    ],
+    [locale, selectedWidget.id, widgets],
   );
 
+  const eventConditionFieldOptions = useMemo(
+    () => buildEventConditionFieldOptions(selectedWidget.type, availableTableFields, locale),
+    [availableTableFields, locale, selectedWidget.type],
+  );
+  const selectedEventTargetIds = useMemo(() => {
+    const explicitTargets = selectedWidget.eventTargetWidgetIds?.filter(Boolean);
+    if (explicitTargets?.length) return Array.from(new Set(explicitTargets));
+    if (selectedWidget.eventTargetWidgetId) return [selectedWidget.eventTargetWidgetId];
+    return selectedWidget.eventAction === "focusWidget" ? [selectedWidget.id] : [];
+  }, [
+    selectedWidget.eventAction,
+    selectedWidget.eventTargetWidgetId,
+    selectedWidget.eventTargetWidgetIds,
+    selectedWidget.id,
+  ]);
   const opacityPercent = String(Math.round((selectedWidget.opacity ?? 1) * 100));
   const strokeValue = selectedWidget.stroke ?? "none";
   const scaledCanvasWidth = Math.round(currentCanvasWidth * zoom);
@@ -631,16 +709,25 @@ export function EditorWorkbench({
   }, [selectedWidget]);
 
   useEffect(() => {
-    if (selectedWidgetId) {
-      setRightPanelMode("component");
-    }
-  }, [selectedWidgetId]);
-
-  useEffect(() => {
     setComponentPanelTab("content");
   }, [selectedWidget.type]);
 
-  const visibleWidgets = widgets.filter((widget) => widget.visible);
+  const rightPanelMode: RightPanelMode = selectedWidgetIds.length ? "component" : "page";
+  const pagePanelLabels = {
+    pageTitle: locale === "zh-CN" ? "页面" : "Page",
+    pageSubtitle:
+      locale === "zh-CN" ? "管理页面标题、尺寸与基础信息" : "Manage the screen title, size and base metadata",
+    headerTitle: locale === "zh-CN" ? "头部" : "Header",
+    headerSubtitle:
+      locale === "zh-CN"
+        ? "控制头部模板、时间与状态信息"
+        : "Control header templates, status badges and time metadata",
+    displayTitle: locale === "zh-CN" ? "展示" : "Display",
+    displaySubtitle:
+      locale === "zh-CN"
+        ? "控制预览与展示页的适配方式"
+        : "Control how preview and published screens fit the viewport",
+  };
   const orderedWidgets = useMemo(
     () => [...widgets].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0)),
     [widgets],
@@ -691,7 +778,9 @@ export function EditorWorkbench({
     setWidgets(snapshot.widgets.map((widget) => ({...widget})));
     setSelectedWidgetId(snapshot.selectedWidgetId);
     setSelectedWidgetIds(
-      snapshot.selectedWidgetIds?.length ? [...snapshot.selectedWidgetIds] : [snapshot.selectedWidgetId],
+      Array.isArray(snapshot.selectedWidgetIds)
+        ? [...snapshot.selectedWidgetIds]
+        : [snapshot.selectedWidgetId],
     );
     setScreenConfig(snapshot.screenConfig);
     setMapLabels(snapshot.mapLabels);
@@ -791,6 +880,42 @@ export function EditorWorkbench({
     } finally {
       if (backgroundAssetInputRef.current) {
         backgroundAssetInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleImageAssetSelected = async (file?: File | null) => {
+    if (!file || selectedWidget.type !== "image") return;
+
+    const targetWidgetId = selectedWidget.id;
+    const readFile = () =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.onerror = () => reject(reader.error ?? new Error("Failed to read image asset"));
+        reader.readAsDataURL(file);
+      });
+
+    try {
+      const asset = await readFile();
+      if (!asset) return;
+
+      setWidgets((current) =>
+        current.map((widget) =>
+          widget.id === targetWidgetId
+            ? {
+                ...widget,
+                value: asset,
+              }
+            : widget,
+        ),
+      );
+      setSaveState("dirty");
+    } catch {
+      // Keep the editor resilient for local mock workflows.
+    } finally {
+      if (imageAssetInputRef.current) {
+        imageAssetInputRef.current.value = "";
       }
     }
   };
@@ -959,9 +1084,17 @@ export function EditorWorkbench({
 
   const updateSelection = (nextIds: string[], primaryId?: string) => {
     const normalized = Array.from(new Set(nextIds)).filter((id) => widgetsRef.current.some((widget) => widget.id === id));
-    const fallbackId = primaryId ?? normalized[normalized.length - 1] ?? widgetsRef.current[0]?.id;
+    if (!normalized.length) {
+      setSelectedWidgetIds([]);
+      if (primaryId && widgetsRef.current.some((widget) => widget.id === primaryId)) {
+        setSelectedWidgetId(primaryId);
+      }
+      return;
+    }
+
+    const fallbackId = primaryId ?? normalized[normalized.length - 1];
     if (!fallbackId) return;
-    setSelectedWidgetIds(normalized.length ? normalized : [fallbackId]);
+    setSelectedWidgetIds(normalized);
     setSelectedWidgetId(fallbackId);
   };
 
@@ -1066,10 +1199,20 @@ export function EditorWorkbench({
       setMarqueeRect(null);
 
       if (!active || !currentRect) return;
-      if (currentRect.width < 6 && currentRect.height < 6) return;
+      if (currentRect.width < 6 && currentRect.height < 6) {
+        if (!active.additive) {
+          updateSelection([], selectedWidgetId);
+        }
+        return;
+      }
 
       const hitIds = resolveWidgetsWithinMarquee(currentRect);
-      if (!hitIds.length) return;
+      if (!hitIds.length) {
+        if (!active.additive) {
+          updateSelection([], selectedWidgetId);
+        }
+        return;
+      }
 
       if (active.additive) {
         updateSelection([...selectedWidgetIds, ...hitIds], hitIds[hitIds.length - 1]);
@@ -1085,14 +1228,91 @@ export function EditorWorkbench({
 
   const addWidgetFromPalette = (name: string) => {
     const type = resolveWidgetType(name);
+    const isBorderDecoration = name.includes("Border");
+    const isDividerDecoration = name.includes("Divider");
+    const isGlowDecoration = name.includes("Glow");
+    const isNumberFlip = type === "numberFlip";
+    const isDecoration = type === "decoration";
+    const decorationPreset = isDecoration
+      ? isBorderDecoration
+        ? "frame"
+        : isDividerDecoration
+          ? "divider"
+          : isGlowDecoration
+            ? "glow"
+            : "badge"
+      : undefined;
     const nextId = `${type}-${Date.now()}`;
     const nextWidget: EditorWidget = {
       id: nextId,
       type,
       title: name,
-      x: Math.max(24, currentCanvasWidth - (type === "table" ? 920 : type === "map" ? 760 : type === "image" ? 420 : type === "text" ? 420 : 320) - 160),
-      y: Math.max(120, currentCanvasHeight - (type === "table" ? 220 : type === "map" ? 430 : type === "image" ? 260 : type === "text" ? 190 : type === "rank" ? 250 : 160) - 180),
-      width: type === "table" ? 920 : type === "map" ? 760 : type === "image" ? 420 : type === "text" ? 420 : 320,
+      x: Math.max(
+        24,
+        currentCanvasWidth -
+          (type === "table"
+            ? 920
+            : type === "map"
+              ? 760
+              : type === "image" || type === "text"
+                ? 420
+                : isBorderDecoration
+                  ? 720
+                  : isDividerDecoration
+                    ? 520
+                    : isGlowDecoration
+                      ? 320
+                  : isDecoration
+                    ? 420
+                    : isNumberFlip
+                      ? 360
+                      : 320) -
+          160,
+      ),
+      y: Math.max(
+        120,
+        currentCanvasHeight -
+          (type === "table"
+            ? 220
+            : type === "map"
+              ? 430
+              : type === "image"
+                ? 260
+                : type === "text"
+                  ? 190
+                  : type === "rank"
+                    ? 250
+                    : isBorderDecoration
+                      ? 360
+                      : isDividerDecoration
+                        ? 72
+                        : isGlowDecoration
+                          ? 96
+                      : isDecoration
+                        ? 110
+                        : isNumberFlip
+                          ? 180
+                          : 160) -
+          180,
+      ),
+      width:
+        type === "table"
+          ? 920
+          : type === "map"
+            ? 760
+            : type === "image" || type === "text"
+              ? 420
+              : isBorderDecoration
+                ? 720
+                : isDividerDecoration
+                  ? 520
+                  : isGlowDecoration
+                    ? 320
+                : isDecoration
+                  ? 420
+                  : isNumberFlip
+                    ? 360
+                    : 320,
       height:
         type === "table"
           ? 220
@@ -1104,7 +1324,17 @@ export function EditorWorkbench({
                 ? 190
                 : type === "rank"
                   ? 250
-                  : 160,
+                  : isBorderDecoration
+                    ? 360
+                    : isDividerDecoration
+                      ? 72
+                      : isGlowDecoration
+                        ? 96
+                    : isDecoration
+                      ? 110
+                      : isNumberFlip
+                        ? 180
+                        : 160,
       dataset: datasets[0]?.name ?? "logistics_dump_v2_final.csv",
       fill: type === "map" ? "#20302a" : type === "image" ? "#eef0ea" : "#fafaf5",
       visible: true,
@@ -1179,6 +1409,63 @@ export function EditorWorkbench({
       tableCellSize: type === "table" ? 10 : undefined,
     };
 
+    if (isNumberFlip) {
+      Object.assign(nextWidget, {
+        fill: "#13211d",
+        accent: "#8fe1a7",
+        value: "2048",
+        hint: locale === "zh-CN" ? "当前吞吐 / min" : "Current throughput / min",
+        textColor: "#f5fff7",
+        titleColor: "#e9fff0",
+        numberFlipDigitSize: 44,
+        numberFlipGap: 10,
+        numberFlipSurfaceColor: "#21342d",
+        numberFlipGlowOpacity: 24,
+      } satisfies Partial<EditorWidget>);
+    }
+
+    if (isDecoration) {
+      Object.assign(nextWidget, {
+        fill: "transparent",
+        accent: "#8fe1a7",
+        value: isBorderDecoration
+          ? "Signal Frame"
+          : isDividerDecoration
+            ? "Lane Divider"
+            : isGlowDecoration
+              ? "Focus Glow"
+              : "Live Accent",
+        hint: isBorderDecoration
+          ? locale === "zh-CN"
+            ? "用于收口页面边界和高亮主舞台"
+            : "Use it to anchor the page edge and spotlight the main stage."
+          : locale === "zh-CN"
+            ? "用于强调标签、分割线或发光点缀"
+            : "Use it for labels, dividers or glow accents.",
+        radius: isBorderDecoration ? 22 : isDividerDecoration ? 0 : isGlowDecoration ? 28 : 999,
+        padding: 0,
+        shadow: "none",
+        titleVisible: false,
+        textColor: "#e9fff0",
+        decorationPreset,
+        decorationSecondaryColor: "#315a41",
+        decorationLineWidth: 2,
+        decorationGlowOpacity: 24,
+      } satisfies Partial<EditorWidget>);
+      if (isDividerDecoration) {
+        nextWidget.hint =
+          locale === "zh-CN"
+            ? "\u7528\u4e8e\u8fde\u63a5\u6807\u9898\u3001\u8d8b\u52bf\u533a\u548c\u4fe1\u53f7\u5e26"
+            : "Use it to link a title block, trend zone, or signal strip.";
+      }
+      if (isGlowDecoration) {
+        nextWidget.hint =
+          locale === "zh-CN"
+            ? "\u7528\u4e8e\u7ed9\u5173\u952e\u533a\u57df\u52a0\u4e00\u9053\u805a\u7126\u5149\u6655"
+            : "Use it to add a focused glow pulse around a key area.";
+      }
+    }
+
     commitSnapshot((snapshot) => ({
       ...snapshot,
       widgets: [...snapshot.widgets, nextWidget],
@@ -1193,7 +1480,7 @@ export function EditorWorkbench({
     commitSnapshot((snapshot) => {
       if (!clipboardRef.current.length) return snapshot;
 
-      let nextZIndex = Math.max(...snapshot.widgets.map((widget) => widget.zIndex ?? 0), 0) + 10;
+      const nextZIndex = Math.max(...snapshot.widgets.map((widget) => widget.zIndex ?? 0), 0) + 10;
       const clones = clipboardRef.current.map((widget, index) => ({
         ...widget,
         id: `${widget.type}-${Date.now()}-${index}`,
@@ -1213,9 +1500,10 @@ export function EditorWorkbench({
   };
 
   const duplicateSelectedWidget = () => {
-    const idsToDuplicate = selectedWidgetIds.length ? selectedWidgetIds : [selectedWidgetId];
+    const idsToDuplicate = selectedWidgetIds.length ? selectedWidgetIds : [];
+    if (!idsToDuplicate.length) return;
     commitSnapshot((snapshot) => {
-      let nextZIndex = Math.max(...snapshot.widgets.map((widget) => widget.zIndex ?? 0), 0) + 10;
+      const nextZIndex = Math.max(...snapshot.widgets.map((widget) => widget.zIndex ?? 0), 0) + 10;
       const clones = snapshot.widgets
         .filter((widget) => idsToDuplicate.includes(widget.id))
         .map((widget, index) => ({
@@ -1237,7 +1525,8 @@ export function EditorWorkbench({
   };
 
   const deleteSelectedWidget = () => {
-    const idsToDelete = selectedWidgetIds.length ? selectedWidgetIds : [selectedWidgetId];
+    const idsToDelete = selectedWidgetIds.length ? selectedWidgetIds : [];
+    if (!idsToDelete.length) return;
     if (widgets.length - idsToDelete.length < 1) return;
     commitSnapshot((snapshot) => {
       const nextWidgets = snapshot.widgets.filter((widget) => !idsToDelete.includes(widget.id));
@@ -1252,7 +1541,8 @@ export function EditorWorkbench({
   };
 
   const setSelectedWidgetsLocked = (locked: boolean) => {
-    const idsToLock = selectedWidgetIds.length ? selectedWidgetIds : [selectedWidgetId];
+    const idsToLock = selectedWidgetIds.length ? selectedWidgetIds : [];
+    if (!idsToLock.length) return;
     commitSnapshot((snapshot) => ({
       ...snapshot,
       widgets: snapshot.widgets.map((widget) =>
@@ -1272,6 +1562,7 @@ export function EditorWorkbench({
   };
 
   const moveSelectedWidgetLayer = (direction: "forward" | "backward") => {
+    if (!selectedWidgetIds.length) return;
     const currentIndex = orderedWidgets.findIndex((widget) => widget.id === selectedWidget.id);
     if (currentIndex === -1) return;
 
@@ -1312,7 +1603,7 @@ export function EditorWorkbench({
   };
 
   const handleDatasetCardClick = (datasetName: string) => {
-    handleWidgetPatch({dataset: datasetName});
+    handleWidgetPatch({dataset: datasetName, dataSourceMode: "static"});
   };
 
   const handleFieldAliasChange = (alias: string, fieldName: string) => {
@@ -1335,7 +1626,20 @@ export function EditorWorkbench({
 
   const resetToDatasetBinding = () => {
     handleWidgetPatch({
-      dataSourceMode: "dataset",
+      dataSourceMode: "static",
+    });
+  };
+
+  const resetDataProcessing = () => {
+    handleWidgetPatch({
+      dataFilterField: undefined,
+      dataFilterOperator: undefined,
+      dataFilterValue: undefined,
+      dataSortField: undefined,
+      dataSortDirection: undefined,
+      dataLimit: undefined,
+      dataAggregateMode: undefined,
+      dataTruncateLength: undefined,
     });
   };
 
@@ -1459,7 +1763,8 @@ export function EditorWorkbench({
   };
 
   const alignSelectedWidget = (target: AlignmentTarget) => {
-    const idsToAlign = selectedWidgetIds.length ? selectedWidgetIds : [selectedWidgetId];
+    const idsToAlign = selectedWidgetIds.length ? selectedWidgetIds : [];
+    if (!idsToAlign.length) return;
     commitSnapshot((snapshot) => ({
       ...snapshot,
       widgets: (() => {
@@ -1497,7 +1802,7 @@ export function EditorWorkbench({
   };
 
   const distributeSelectedWidgets = (axis: DistributionAxis) => {
-    const idsToDistribute = selectedWidgetIds.length ? selectedWidgetIds : [selectedWidgetId];
+    const idsToDistribute = selectedWidgetIds.length ? selectedWidgetIds : [];
     if (idsToDistribute.length < 3) return;
 
     commitSnapshot((snapshot) => {
@@ -1546,7 +1851,7 @@ export function EditorWorkbench({
   };
 
   const matchSelectedWidgetSize = (target: MatchSizeTarget) => {
-    const idsToMatch = selectedWidgetIds.length ? selectedWidgetIds : [selectedWidgetId];
+    const idsToMatch = selectedWidgetIds.length ? selectedWidgetIds : [];
     if (idsToMatch.length < 2) return;
 
     const primaryWidget = widgets.find((widget) => widget.id === selectedWidgetId);
@@ -1703,7 +2008,7 @@ export function EditorWorkbench({
 
     const validIds = selectedWidgetIds.filter((id) => widgets.some((widget) => widget.id === id));
     if (!validIds.length) {
-      updateSelection([widgets[0].id], widgets[0].id);
+      setSelectedWidgetIds([]);
       return;
     }
 
@@ -2255,8 +2560,7 @@ export function EditorWorkbench({
                 </div>
                 <Tabs
                   value={rightPanelMode}
-                  onValueChange={(value) => setRightPanelMode(value as RightPanelMode)}
-                  className="w-full rounded-lg bg-[#f4f4ef] p-1"
+                  className="pointer-events-none w-full rounded-lg bg-[#f4f4ef] p-1"
                   options={[
                     {label: locale === "zh-CN" ? "组件" : "Component", value: "component"},
                     {label: locale === "zh-CN" ? "页面" : "Page", value: "page"},
@@ -2271,6 +2575,7 @@ export function EditorWorkbench({
                       {label: locale === "zh-CN" ? "内容" : "Content", value: "content"},
                       {label: locale === "zh-CN" ? "数据" : "Data", value: "data"},
                       {label: locale === "zh-CN" ? "样式" : "Style", value: "style"},
+                      {label: locale === "zh-CN" ? "高级" : "Advanced", value: "advanced"},
                     ]}
                   />
                 ) : null}
@@ -2281,8 +2586,8 @@ export function EditorWorkbench({
                   {rightPanelMode === "page" ? (
                     <>
                   <EditorSection
-                    title={t("rightPanel.page.title")}
-                    subtitle={t("rightPanel.page.subtitle")}
+                    title={pagePanelLabels.pageTitle}
+                    subtitle={pagePanelLabels.pageSubtitle}
                   >
                     <EditorField label={locale === "zh-CN" ? "画布预设" : "Canvas Preset"}>
                       <Select
@@ -2311,74 +2616,6 @@ export function EditorWorkbench({
                         />
                       </EditorField>
                     </div>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <EditorField label={locale === "zh-CN" ? "头部样式" : "Header Style"}>
-                        <Select
-                          className={editorControlClass}
-                          value={screenConfig.headerVariant}
-                          onChange={(event) =>
-                            handleScreenConfigPatch({
-                              headerVariant: event.target.value as ScreenConfig["headerVariant"],
-                            })
-                          }
-                          options={[
-                            {label: locale === "zh-CN" ? "经典信息头" : "Classic", value: "classic"},
-                            {label: locale === "zh-CN" ? "紧凑信息头" : "Compact", value: "compact"},
-                            {label: locale === "zh-CN" ? "极简头部" : "Minimal", value: "minimal"},
-                            {label: locale === "zh-CN" ? "播报头部" : "Broadcast", value: "broadcast"},
-                            {label: locale === "zh-CN" ? "信号头部" : "Signal", value: "signal"},
-                          ]}
-                        />
-                      </EditorField>
-                      <EditorField label={locale === "zh-CN" ? "展示适配" : "Display Fit"}>
-                        <Select
-                          className={editorControlClass}
-                          value={screenConfig.displayMode}
-                          onChange={(event) =>
-                            handleScreenConfigPatch({
-                              displayMode: event.target.value as ScreenConfig["displayMode"],
-                            })
-                          }
-                          options={[
-                            {label: locale === "zh-CN" ? "完整适配" : "Contain", value: "contain"},
-                            {label: locale === "zh-CN" ? "按宽度铺满" : "Fit Width", value: "fit-width"},
-                            {label: locale === "zh-CN" ? "原始尺寸" : "Actual Size", value: "actual"},
-                          ]}
-                        />
-                      </EditorField>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <EditorField label={locale === "zh-CN" ? "展示模式" : "Presentation Mode"}>
-                        <Select
-                          className={editorControlClass}
-                          value={screenConfig.presentationMode}
-                          onChange={(event) =>
-                            handleScreenConfigPatch({
-                              presentationMode: event.target.value as ScreenConfig["presentationMode"],
-                            })
-                          }
-                          options={[
-                            {label: locale === "zh-CN" ? "标准展示" : "Standard", value: "standard"},
-                            {label: locale === "zh-CN" ? "沉浸投屏" : "Immersive", value: "immersive"},
-                          ]}
-                        />
-                      </EditorField>
-                      <EditorField label={locale === "zh-CN" ? "展示对齐" : "Display Alignment"}>
-                        <Select
-                          className={editorControlClass}
-                          value={screenConfig.displayAlign}
-                          onChange={(event) =>
-                            handleScreenConfigPatch({
-                              displayAlign: event.target.value as ScreenConfig["displayAlign"],
-                            })
-                          }
-                          options={[
-                            {label: locale === "zh-CN" ? "居中" : "Centered", value: "center"},
-                            {label: locale === "zh-CN" ? "靠上" : "Top Aligned", value: "top"},
-                          ]}
-                        />
-                      </EditorField>
-                    </div>
                     <EditorField label={t("rightPanel.page.screenTitle")}>
                       <Input
                         className={editorControlClass}
@@ -2393,69 +2630,6 @@ export function EditorWorkbench({
                         onChange={(event) => handleScreenConfigPatch({subtitle: event.target.value})}
                       />
                     </EditorField>
-                    <ToggleRow
-                      label={t("rightPanel.page.showHeader")}
-                      checked={screenConfig.showHeader}
-                      onCheckedChange={(checked) => handleScreenConfigPatch({showHeader: checked})}
-                    />
-                    <ToggleRow
-                      label={t("rightPanel.page.showTimestamp")}
-                      checked={screenConfig.showTimestamp}
-                      onCheckedChange={(checked) => handleScreenConfigPatch({showTimestamp: checked})}
-                    />
-                    <ToggleRow
-                      label={t("rightPanel.page.showBadge")}
-                      checked={screenConfig.showStatusBadge}
-                      onCheckedChange={(checked) => handleScreenConfigPatch({showStatusBadge: checked})}
-                    />
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <EditorField label={t("rightPanel.page.badgeLabel")}>
-                        <Input
-                          className={editorControlClass}
-                          value={screenConfig.statusBadgeLabel}
-                          onChange={(event) => handleScreenConfigPatch({statusBadgeLabel: event.target.value})}
-                        />
-                      </EditorField>
-                      <EditorField label={t("rightPanel.page.metaLabel")}>
-                        <Input
-                          className={editorControlClass}
-                          value={screenConfig.statusMetaLabel}
-                          onChange={(event) => handleScreenConfigPatch({statusMetaLabel: event.target.value})}
-                        />
-                      </EditorField>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <EditorField label={t("rightPanel.page.timeText")}>
-                        <Input
-                          className={editorControlClass}
-                          value={screenConfig.timeText}
-                          onChange={(event) => handleScreenConfigPatch({timeText: event.target.value})}
-                        />
-                      </EditorField>
-                      <EditorField label={t("rightPanel.page.dateText")}>
-                        <Input
-                          className={editorControlClass}
-                          value={screenConfig.dateText}
-                          onChange={(event) => handleScreenConfigPatch({dateText: event.target.value})}
-                        />
-                      </EditorField>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <EditorField label={t("rightPanel.page.rightPrimary")}>
-                        <Input
-                          className={editorControlClass}
-                          value={screenConfig.rightMetaPrimary}
-                          onChange={(event) => handleScreenConfigPatch({rightMetaPrimary: event.target.value})}
-                        />
-                      </EditorField>
-                      <EditorField label={t("rightPanel.page.rightSecondary")}>
-                        <Input
-                          className={editorControlClass}
-                          value={screenConfig.rightMetaSecondary}
-                          onChange={(event) => handleScreenConfigPatch({rightMetaSecondary: event.target.value})}
-                        />
-                      </EditorField>
-                    </div>
                   </EditorSection>
 
                   <EditorSection title={t("rightPanel.background.title")} subtitle={t("rightPanel.background.subtitle")}>
@@ -2584,6 +2758,154 @@ export function EditorWorkbench({
                       </>
                     ) : null}
                   </EditorSection>
+
+                  <EditorSection
+                    title={pagePanelLabels.headerTitle}
+                    subtitle={pagePanelLabels.headerSubtitle}
+                  >
+                    <ToggleRow
+                      label={t("rightPanel.page.showHeader")}
+                      checked={screenConfig.showHeader}
+                      onCheckedChange={(checked) => handleScreenConfigPatch({showHeader: checked})}
+                    />
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <EditorField label={locale === "zh-CN" ? "头部样式" : "Header Style"}>
+                        <Select
+                          className={editorControlClass}
+                          value={screenConfig.headerVariant}
+                          onChange={(event) =>
+                            handleScreenConfigPatch({
+                              headerVariant: event.target.value as ScreenConfig["headerVariant"],
+                            })
+                          }
+                          options={[
+                            {label: locale === "zh-CN" ? "经典信息头" : "Classic", value: "classic"},
+                            {label: locale === "zh-CN" ? "紧凑信息头" : "Compact", value: "compact"},
+                            {label: locale === "zh-CN" ? "极简头部" : "Minimal", value: "minimal"},
+                            {label: locale === "zh-CN" ? "播报头部" : "Broadcast", value: "broadcast"},
+                            {label: locale === "zh-CN" ? "信号头部" : "Signal", value: "signal"},
+                          ]}
+                        />
+                      </EditorField>
+                      <div className="rounded-md border border-[#d7d8d1] bg-[#f7f6f1] px-3 py-2.5 text-[11px] leading-5 text-[#727971]">
+                        {locale === "zh-CN"
+                          ? "头部样式会同时影响编辑器预览、预览页和发布展示页。"
+                          : "Header presets affect the editor preview, preview route and published screen together."}
+                      </div>
+                    </div>
+                    <ToggleRow
+                      label={t("rightPanel.page.showTimestamp")}
+                      checked={screenConfig.showTimestamp}
+                      onCheckedChange={(checked) => handleScreenConfigPatch({showTimestamp: checked})}
+                    />
+                    <ToggleRow
+                      label={t("rightPanel.page.showBadge")}
+                      checked={screenConfig.showStatusBadge}
+                      onCheckedChange={(checked) => handleScreenConfigPatch({showStatusBadge: checked})}
+                    />
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <EditorField label={t("rightPanel.page.badgeLabel")}>
+                        <Input
+                          className={editorControlClass}
+                          value={screenConfig.statusBadgeLabel}
+                          onChange={(event) => handleScreenConfigPatch({statusBadgeLabel: event.target.value})}
+                        />
+                      </EditorField>
+                      <EditorField label={t("rightPanel.page.metaLabel")}>
+                        <Input
+                          className={editorControlClass}
+                          value={screenConfig.statusMetaLabel}
+                          onChange={(event) => handleScreenConfigPatch({statusMetaLabel: event.target.value})}
+                        />
+                      </EditorField>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <EditorField label={t("rightPanel.page.timeText")}>
+                        <Input
+                          className={editorControlClass}
+                          value={screenConfig.timeText}
+                          onChange={(event) => handleScreenConfigPatch({timeText: event.target.value})}
+                        />
+                      </EditorField>
+                      <EditorField label={t("rightPanel.page.dateText")}>
+                        <Input
+                          className={editorControlClass}
+                          value={screenConfig.dateText}
+                          onChange={(event) => handleScreenConfigPatch({dateText: event.target.value})}
+                        />
+                      </EditorField>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <EditorField label={t("rightPanel.page.rightPrimary")}>
+                        <Input
+                          className={editorControlClass}
+                          value={screenConfig.rightMetaPrimary}
+                          onChange={(event) => handleScreenConfigPatch({rightMetaPrimary: event.target.value})}
+                        />
+                      </EditorField>
+                      <EditorField label={t("rightPanel.page.rightSecondary")}>
+                        <Input
+                          className={editorControlClass}
+                          value={screenConfig.rightMetaSecondary}
+                          onChange={(event) => handleScreenConfigPatch({rightMetaSecondary: event.target.value})}
+                        />
+                      </EditorField>
+                    </div>
+                  </EditorSection>
+
+                  <EditorSection
+                    title={pagePanelLabels.displayTitle}
+                    subtitle={pagePanelLabels.displaySubtitle}
+                  >
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <EditorField label={locale === "zh-CN" ? "展示适配" : "Display Fit"}>
+                        <Select
+                          className={editorControlClass}
+                          value={screenConfig.displayMode}
+                          onChange={(event) =>
+                            handleScreenConfigPatch({
+                              displayMode: event.target.value as ScreenConfig["displayMode"],
+                            })
+                          }
+                          options={[
+                            {label: locale === "zh-CN" ? "完整适配" : "Contain", value: "contain"},
+                            {label: locale === "zh-CN" ? "按宽度铺满" : "Fit Width", value: "fit-width"},
+                            {label: locale === "zh-CN" ? "原始尺寸" : "Actual Size", value: "actual"},
+                          ]}
+                        />
+                      </EditorField>
+                      <EditorField label={locale === "zh-CN" ? "展示模式" : "Presentation Mode"}>
+                        <Select
+                          className={editorControlClass}
+                          value={screenConfig.presentationMode}
+                          onChange={(event) =>
+                            handleScreenConfigPatch({
+                              presentationMode: event.target.value as ScreenConfig["presentationMode"],
+                            })
+                          }
+                          options={[
+                            {label: locale === "zh-CN" ? "标准展示" : "Standard", value: "standard"},
+                            {label: locale === "zh-CN" ? "沉浸投屏" : "Immersive", value: "immersive"},
+                          ]}
+                        />
+                      </EditorField>
+                    </div>
+                    <EditorField label={locale === "zh-CN" ? "展示对齐" : "Display Alignment"}>
+                      <Select
+                        className={editorControlClass}
+                        value={screenConfig.displayAlign}
+                        onChange={(event) =>
+                          handleScreenConfigPatch({
+                            displayAlign: event.target.value as ScreenConfig["displayAlign"],
+                          })
+                        }
+                        options={[
+                          {label: locale === "zh-CN" ? "居中" : "Centered", value: "center"},
+                          {label: locale === "zh-CN" ? "靠上" : "Top Aligned", value: "top"},
+                        ]}
+                      />
+                    </EditorField>
+                  </EditorSection>
                     </>
                   ) : null}
 
@@ -2679,6 +3001,17 @@ export function EditorWorkbench({
                       </EditorField>
                       <EditorField label={t("rightPanel.layout.y")}>
                         <Input className={editorControlClass} value={String(selectedWidget.y)} onChange={(event) => handleWidgetPatch({y: numberOr(event.target.value, selectedWidget.y)})} />
+                      </EditorField>
+                      <EditorField label={locale === "zh-CN" ? "图层顺序" : "Layer Order"}>
+                        <Input
+                          className={editorControlClass}
+                          value={String(selectedWidget.zIndex ?? 0)}
+                          onChange={(event) =>
+                            handleWidgetPatch({
+                              zIndex: clamp(numberOr(event.target.value, selectedWidget.zIndex ?? 0), 0, 9999),
+                            })
+                          }
+                        />
                       </EditorField>
                     </div>
                     <EditorField label={t("rightPanel.layout.align")} className="mt-3">
@@ -2784,8 +3117,76 @@ export function EditorWorkbench({
                   </EditorSection>
                   ) : null}
 
-                  {componentPanelTab === "content" && selectedWidget.type === "metric" ? (
-                    <EditorSection title={locale === "zh-CN" ? "指标内容" : "Metric Content"}>
+                  {componentPanelTab === "content" && isChartWidget ? (
+                    <EditorSection
+                      title={locale === "zh-CN" ? "图表内容" : "Chart Content"}
+                      subtitle={
+                        locale === "zh-CN"
+                          ? "标题继续放在上面的组件基础里，这里只收图表说明和数值前后缀。"
+                          : "Keep the title in Widget Basics and use this section for chart copy only."
+                      }
+                    >
+                      <EditorField label={locale === "zh-CN" ? "副说明" : "Supporting Copy"}>
+                        <Textarea
+                          className="min-h-20 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
+                          value={selectedWidget.hint ?? ""}
+                          onChange={(event) => handleWidgetPatch({hint: event.target.value})}
+                          placeholder={locale === "zh-CN" ? "补充图表口径、时间范围或一句解释" : "Add scope, timeframe or one line of context"}
+                        />
+                      </EditorField>
+                      <div className="hidden grid-cols-2 gap-2.5">
+                        <EditorField label={locale === "zh-CN" ? "前缀" : "Prefix"}>
+                          <Input
+                            className={editorControlClass}
+                            value={selectedWidget.valuePrefix ?? ""}
+                            onChange={(event) => handleWidgetPatch({valuePrefix: event.target.value})}
+                            placeholder={locale === "zh-CN" ? "如 $" : "e.g. $"}
+                          />
+                        </EditorField>
+                        <EditorField label={locale === "zh-CN" ? "后缀" : "Suffix"}>
+                          <Input
+                            className={editorControlClass}
+                            value={selectedWidget.valueSuffix ?? ""}
+                            onChange={(event) => handleWidgetPatch({valueSuffix: event.target.value})}
+                            placeholder={locale === "zh-CN" ? "如 % / 件" : "e.g. %"}
+                          />
+                        </EditorField>
+                      </div>
+                    </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "content" && selectedWidget.type === "map" ? (
+                    <EditorSection
+                      title={locale === "zh-CN" ? "地图内容" : "Map Content"}
+                      subtitle={
+                        locale === "zh-CN"
+                          ? "标题继续放在上面的组件基础里，这里补地图说明文案。"
+                          : "Keep the title in Widget Basics and use this section for map-specific copy."
+                      }
+                    >
+                      <EditorField label={locale === "zh-CN" ? "说明文案" : "Description Copy"}>
+                        <Textarea
+                          className="min-h-20 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
+                          value={selectedWidget.hint ?? ""}
+                          onChange={(event) => handleWidgetPatch({hint: event.target.value})}
+                          placeholder={locale === "zh-CN" ? "补充区域范围、业务口径或地图说明" : "Add scope, region or one line of map context"}
+                        />
+                      </EditorField>
+                    </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "content" && isMetricLikeWidget ? (
+                    <EditorSection
+                      title={
+                        selectedWidget.type === "numberFlip"
+                          ? locale === "zh-CN"
+                            ? "数字翻牌内容"
+                            : "Number Flip Content"
+                          : locale === "zh-CN"
+                            ? "指标内容"
+                            : "Metric Content"
+                      }
+                    >
                       <div className="grid grid-cols-2 gap-2.5">
                         <EditorField label={locale === "zh-CN" ? "数值" : "Value"}>
                           <Input
@@ -2802,6 +3203,32 @@ export function EditorWorkbench({
                           />
                         </EditorField>
                       </div>
+                    </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "content" && isDecorationWidget ? (
+                    <EditorSection title={locale === "zh-CN" ? "装饰内容" : "Decoration Content"}>
+                      <EditorField
+                        label={locale === "zh-CN" ? "主标签" : "Primary Label"}
+                        hint={
+                          locale === "zh-CN"
+                            ? "这里的文案会作为装饰标签、边框标识或发光提示语出现。"
+                            : "This copy becomes the label, frame tag or glow caption."
+                        }
+                      >
+                        <Input
+                          className={editorControlClass}
+                          value={selectedWidget.value ?? ""}
+                          onChange={(event) => handleWidgetPatch({value: event.target.value})}
+                        />
+                      </EditorField>
+                      <EditorField label={locale === "zh-CN" ? "辅助说明" : "Supporting Copy"}>
+                        <Textarea
+                          className="min-h-20 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
+                          value={selectedWidget.hint ?? ""}
+                          onChange={(event) => handleWidgetPatch({hint: event.target.value})}
+                        />
+                      </EditorField>
                     </EditorSection>
                   ) : null}
 
@@ -2826,6 +3253,15 @@ export function EditorWorkbench({
 
                   {componentPanelTab === "style" && selectedWidget.type === "text" ? (
                     <EditorSection title={locale === "zh-CN" ? "文本样式" : "Text Style"}>
+                        <ChartConfigGroup
+                          className="mb-3"
+                          title={locale === "zh-CN" ? "排版" : "Typography"}
+                          description={
+                            locale === "zh-CN"
+                              ? "文本组件先把字体层级和节奏调顺，信息表达会更稳。"
+                              : "Tune the type hierarchy and rhythm first so the copy reads cleanly."
+                          }
+                        >
                         <div className="grid grid-cols-2 gap-2.5">
                           <EditorField label={locale === "zh-CN" ? "文字颜色" : "Text Color"}>
                             <ColorSwatchField
@@ -2892,11 +3328,49 @@ export function EditorWorkbench({
                             />
                           </EditorField>
                         </div>
+                        </ChartConfigGroup>
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "容器" : "Container"}
+                          description={
+                            locale === "zh-CN"
+                              ? "文本的背景、边框和阴影继续沿用上面的通用样式区，避免重复出现两套容器控件。"
+                              : "Background, border and shadow stay in the shared appearance section above so the panel does not duplicate container controls."
+                          }
+                        >
+                          <div className="rounded-md border border-[#d7d8d1] bg-[#f7f6f1] px-3 py-3 text-[12px] leading-5 text-[#727971]">
+                            {locale === "zh-CN"
+                              ? "如果要做文本底色、描边、圆角或阴影，请继续使用前面的通用样式区。这里专注文本排版本身。"
+                              : "Use the shared appearance section above for text background, border, radius and shadow. This area stays focused on typography."}
+                          </div>
+                        </ChartConfigGroup>
                       </EditorSection>
                   ) : null}
 
                   {componentPanelTab === "content" && selectedWidget.type === "image" ? (
                     <EditorSection title={locale === "zh-CN" ? "图片内容" : "Image Content"}>
+                      <input
+                        ref={imageAssetInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/avif"
+                        className="hidden"
+                        onChange={(event) => handleImageAssetSelected(event.target.files?.[0] ?? null)}
+                      />
+                      <EditorField
+                        label={locale === "zh-CN" ? "图片资源" : "Image Asset"}
+                        hint={locale === "zh-CN" ? "支持上传图片，或继续直接填写 URL" : "Upload an asset or keep using a direct URL"}
+                      >
+                        <div className="grid grid-cols-2 gap-2">
+                          <MiniActionButton
+                            label={locale === "zh-CN" ? "上传图片" : "Upload"}
+                            onClick={() => imageAssetInputRef.current?.click()}
+                          />
+                          <MiniActionButton
+                            label={locale === "zh-CN" ? "清空图片" : "Clear"}
+                            onClick={() => handleWidgetPatch({value: ""})}
+                            disabled={!selectedWidget.value}
+                          />
+                        </div>
+                      </EditorField>
                       <EditorField label={locale === "zh-CN" ? "图片地址" : "Image URL"}>
                         <Input
                           className={editorControlClass}
@@ -2917,265 +3391,344 @@ export function EditorWorkbench({
                   {componentPanelTab === "style" && selectedWidget.type === "image" ? (
                     <>
                       <EditorSection title={locale === "zh-CN" ? "图片视觉" : "Image Visuals"}>
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <EditorField label={locale === "zh-CN" ? "填充模式" : "Fit Mode"}>
-                            <Select
-                              className={editorControlClass}
-                              value={selectedWidget.imageFit ?? "cover"}
-                              onChange={(event) => handleWidgetPatch({imageFit: event.target.value as EditorWidget["imageFit"]})}
-                              options={[
-                                {label: locale === "zh-CN" ? "铺满裁切" : "Cover", value: "cover"},
-                                {label: locale === "zh-CN" ? "完整显示" : "Contain", value: "contain"},
-                                {label: locale === "zh-CN" ? "拉伸填充" : "Fill", value: "fill"},
-                              ]}
+                        <ChartConfigGroup
+                          className="mb-3"
+                          title={locale === "zh-CN" ? "素材显示" : "Media Display"}
+                          description={
+                            locale === "zh-CN"
+                              ? "先确定画面怎么铺、怎么裁、怎么取景，再去微调色彩和叠加层。"
+                              : "Set how the media fills, crops and frames first before tuning color treatment."
+                          }
+                        >
+                          <div className="hidden grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "填充模式" : "Fit Mode"}>
+                              <Select
+                                className={editorControlClass}
+                                value={selectedWidget.imageFit ?? "cover"}
+                                onChange={(event) => handleWidgetPatch({imageFit: event.target.value as EditorWidget["imageFit"]})}
+                                options={[
+                                  {label: locale === "zh-CN" ? "铺满裁切" : "Cover", value: "cover"},
+                                  {label: locale === "zh-CN" ? "完整显示" : "Contain", value: "contain"},
+                                  {label: locale === "zh-CN" ? "拉伸填充" : "Fill", value: "fill"},
+                                ]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "边框风格" : "Border Style"}>
+                              <Select
+                                className={editorControlClass}
+                                value={selectedWidget.imageBorderStyle ?? "soft"}
+                                onChange={(event) =>
+                                  handleWidgetPatch({imageBorderStyle: event.target.value as EditorWidget["imageBorderStyle"]})
+                                }
+                                options={[
+                                  {label: locale === "zh-CN" ? "柔和边框" : "Soft", value: "soft"},
+                                  {label: locale === "zh-CN" ? "画框边框" : "Frame", value: "frame"},
+                                  {label: locale === "zh-CN" ? "无边框" : "None", value: "none"},
+                                ]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "画面缩放" : "Image Zoom"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.imageZoom ?? 100}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageZoom: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageZoom ?? 100), 80, 140),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+                        <ChartConfigGroup
+                          className="mb-3"
+                          title={locale === "zh-CN" ? "滤镜" : "Filters"}
+                          description={
+                            locale === "zh-CN"
+                              ? "色彩和明暗统一在这里调，方便和图表、地图的视觉节奏保持一致。"
+                              : "Keep tone and contrast adjustments together so media treatment matches the rest of the canvas."
+                          }
+                        >
+                          <div className="mb-2.5">
+                            <ToggleRow
+                              label={locale === "zh-CN" ? "灰度处理" : "Grayscale"}
+                              checked={selectedWidget.imageGrayscale ?? false}
+                              onCheckedChange={(checked) => handleWidgetPatch({imageGrayscale: checked})}
                             />
-                          </EditorField>
-                          <ToggleRow
-                            label={locale === "zh-CN" ? "灰度处理" : "Grayscale"}
-                            checked={selectedWidget.imageGrayscale ?? false}
-                            onCheckedChange={(checked) => handleWidgetPatch({imageGrayscale: checked})}
-                          />
-                        </div>
-                        <div className="grid grid-cols-3 gap-2.5">
-                          <EditorField label={locale === "zh-CN" ? "亮度" : "Brightness"}>
-                            <Input
-                              className={editorControlClass}
-                              value={`${selectedWidget.imageBrightness ?? 100}%`}
-                              onChange={(event) =>
-                                handleWidgetPatch({
-                                  imageBrightness: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageBrightness ?? 100), 40, 160),
-                                })
-                              }
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "对比" : "Contrast"}>
-                            <Input
-                              className={editorControlClass}
-                              value={`${selectedWidget.imageContrast ?? 100}%`}
-                              onChange={(event) =>
-                                handleWidgetPatch({
-                                  imageContrast: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageContrast ?? 100), 40, 180),
-                                })
-                              }
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "饱和" : "Saturation"}>
-                            <Input
-                              className={editorControlClass}
-                              value={`${selectedWidget.imageSaturation ?? 100}%`}
-                              onChange={(event) =>
-                                handleWidgetPatch({
-                                  imageSaturation: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageSaturation ?? 100), 0, 180),
-                                })
-                              }
-                            />
-                          </EditorField>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <EditorField label={locale === "zh-CN" ? "边框风格" : "Border Style"}>
-                            <Select
-                              className={editorControlClass}
-                              value={selectedWidget.imageBorderStyle ?? "soft"}
-                              onChange={(event) =>
-                                handleWidgetPatch({imageBorderStyle: event.target.value as EditorWidget["imageBorderStyle"]})
-                              }
-                              options={[
-                                {label: locale === "zh-CN" ? "柔和边框" : "Soft", value: "soft"},
-                                {label: locale === "zh-CN" ? "画框边框" : "Frame", value: "frame"},
-                                {label: locale === "zh-CN" ? "无边框" : "None", value: "none"},
-                              ]}
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "画面缩放" : "Image Zoom"}>
-                            <Input
-                              className={editorControlClass}
-                              value={`${selectedWidget.imageZoom ?? 100}%`}
-                              onChange={(event) =>
-                                handleWidgetPatch({
-                                  imageZoom: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageZoom ?? 100), 80, 140),
-                                })
-                              }
-                            />
-                          </EditorField>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <EditorField label={locale === "zh-CN" ? "边框颜色" : "Border Color"}>
-                            <ColorSwatchField
-                              value={selectedWidget.imageBorderColor ?? "#c2c8bf"}
-                              onChange={(nextValue) => handleWidgetPatch({imageBorderColor: nextValue})}
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "边框宽度" : "Border Width"}>
-                            <Input
-                              className={editorControlClass}
-                              value={String(selectedWidget.imageBorderWidth ?? 1)}
-                              onChange={(event) => handleWidgetPatch({imageBorderWidth: clamp(numberOr(event.target.value, selectedWidget.imageBorderWidth ?? 1), 0, 10)})}
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "阴影颜色" : "Shadow Color"}>
-                            <ColorSwatchField
-                              value={selectedWidget.imageShadowColor ?? "#1a1c19"}
-                              onChange={(nextValue) => handleWidgetPatch({imageShadowColor: nextValue})}
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "阴影强度" : "Shadow Opacity"}>
-                            <Input
-                              className={editorControlClass}
-                              value={`${selectedWidget.imageShadowOpacity ?? 18}%`}
-                              onChange={(event) => handleWidgetPatch({imageShadowOpacity: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageShadowOpacity ?? 18), 0, 100)})}
-                            />
-                          </EditorField>
-                        </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "亮度" : "Brightness"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.imageBrightness ?? 100}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageBrightness: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageBrightness ?? 100), 40, 160),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "对比" : "Contrast"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.imageContrast ?? 100}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageContrast: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageContrast ?? 100), 40, 180),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "饱和" : "Saturation"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.imageSaturation ?? 100}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageSaturation: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageSaturation ?? 100), 0, 180),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "容器" : "Container"}
+                          description={
+                            locale === "zh-CN"
+                              ? "这一组只处理图片卡片自身的相框和投影，不去重复通用外观区里的基础容器设置。"
+                              : "Use this for the image card's frame and shadow treatment without duplicating the shared appearance controls."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "边框颜色" : "Border Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.imageBorderColor ?? "#c2c8bf"}
+                                onChange={(nextValue) => handleWidgetPatch({imageBorderColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "边框宽度" : "Border Width"}>
+                              <Input
+                                className={editorControlClass}
+                                value={String(selectedWidget.imageBorderWidth ?? 1)}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageBorderWidth: clamp(numberOr(event.target.value, selectedWidget.imageBorderWidth ?? 1), 0, 10),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "阴影颜色" : "Shadow Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.imageShadowColor ?? "#1a1c19"}
+                                onChange={(nextValue) => handleWidgetPatch({imageShadowColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "阴影强度" : "Shadow Opacity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.imageShadowOpacity ?? 18}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageShadowOpacity: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.imageShadowOpacity ?? 18), 0, 100),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
                       </EditorSection>
 
                       <EditorSection title={locale === "zh-CN" ? "遮罩与说明" : "Overlay & Caption"}>
-                        <EditorField label={locale === "zh-CN" ? "遮罩方向" : "Overlay Direction"}>
-                          <Select
-                            className={editorControlClass}
-                            value={selectedWidget.imageOverlayDirection ?? "bottom"}
-                            onChange={(event) =>
-                              handleWidgetPatch({
-                                imageOverlayDirection: event.target.value as EditorWidget["imageOverlayDirection"],
-                              })
-                            }
-                            options={[
-                              {label: locale === "zh-CN" ? "底部渐隐" : "Bottom", value: "bottom"},
-                              {label: locale === "zh-CN" ? "中心聚焦" : "Center", value: "center"},
-                              {label: locale === "zh-CN" ? "全幅压暗" : "Full", value: "full"},
-                            ]}
-                          />
-                        </EditorField>
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <EditorField label={locale === "zh-CN" ? "遮罩颜色" : "Overlay Color"}>
-                            <ColorSwatchField
-                              value={selectedWidget.imageOverlayColor ?? "#111714"}
-                              onChange={(nextValue) => handleWidgetPatch({imageOverlayColor: nextValue})}
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "遮罩强度" : "Overlay Strength"}>
-                            <Input
+                        <ChartConfigGroup
+                          className="mb-3"
+                          title={locale === "zh-CN" ? "遮罩" : "Overlay"}
+                          description={
+                            locale === "zh-CN"
+                              ? "遮罩用来控制信息可读性和视觉重心，不需要和说明层样式混在一起。"
+                              : "Use the overlay to control readability and emphasis without mixing it into the caption styling."
+                          }
+                        >
+                          <EditorField label={locale === "zh-CN" ? "遮罩方向" : "Overlay Direction"}>
+                            <Select
                               className={editorControlClass}
-                              value={`${selectedWidget.imageOverlayOpacity ?? 68}%`}
+                              value={selectedWidget.imageOverlayDirection ?? "bottom"}
                               onChange={(event) =>
                                 handleWidgetPatch({
-                                  imageOverlayOpacity: clamp(
-                                    numberOr(event.target.value.replace("%", ""), selectedWidget.imageOverlayOpacity ?? 68),
-                                    0,
-                                    100,
-                                  ),
+                                  imageOverlayDirection: event.target.value as EditorWidget["imageOverlayDirection"],
                                 })
                               }
+                              options={[
+                                {label: locale === "zh-CN" ? "底部渐隐" : "Bottom", value: "bottom"},
+                                {label: locale === "zh-CN" ? "中心聚焦" : "Center", value: "center"},
+                                {label: locale === "zh-CN" ? "全幅压暗" : "Full", value: "full"},
+                              ]}
                             />
                           </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "遮罩模糊" : "Overlay Blur"}>
-                            <Input
-                              className={editorControlClass}
-                              value={`${selectedWidget.imageOverlayBlur ?? 0}px`}
-                              onChange={(event) =>
-                                handleWidgetPatch({
-                                  imageOverlayBlur: clamp(
-                                    numberOr(event.target.value.replace("px", ""), selectedWidget.imageOverlayBlur ?? 0),
-                                    0,
-                                    32,
-                                  ),
-                                })
-                              }
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "说明文字色" : "Caption Text"}>
-                            <ColorSwatchField
-                              value={selectedWidget.imageCaptionTextColor ?? "#ffffff"}
-                              onChange={(nextValue) => handleWidgetPatch({imageCaptionTextColor: nextValue})}
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "说明底色" : "Caption Surface"}>
-                            <ColorSwatchField
-                              value={selectedWidget.imageCaptionBackgroundColor ?? "#111714"}
-                              onChange={(nextValue) => handleWidgetPatch({imageCaptionBackgroundColor: nextValue})}
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "说明圆角" : "Caption Radius"}>
-                            <Input
-                              className={editorControlClass}
-                              value={`${selectedWidget.imageCaptionRadius ?? 18}px`}
-                              onChange={(event) =>
-                                handleWidgetPatch({
-                                  imageCaptionRadius: clamp(
-                                    numberOr(event.target.value.replace("px", ""), selectedWidget.imageCaptionRadius ?? 18),
-                                    0,
-                                    32,
-                                  ),
-                                })
-                              }
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "说明内边距" : "Caption Padding"}>
-                            <Input
-                              className={editorControlClass}
-                              value={`${selectedWidget.imageCaptionPadding ?? 12}px`}
-                              onChange={(event) =>
-                                handleWidgetPatch({
-                                  imageCaptionPadding: clamp(
-                                    numberOr(event.target.value.replace("px", ""), selectedWidget.imageCaptionPadding ?? 12),
-                                    0,
-                                    32,
-                                  ),
-                                })
-                              }
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "说明底色透明度" : "Caption Surface Opacity"}>
-                            <Input
-                              className={editorControlClass}
-                              value={`${selectedWidget.imageCaptionOpacity ?? 82}%`}
-                              onChange={(event) =>
-                                handleWidgetPatch({
-                                  imageCaptionOpacity: clamp(
-                                    numberOr(event.target.value.replace("%", ""), selectedWidget.imageCaptionOpacity ?? 82),
-                                    0,
-                                    100,
-                                  ),
-                                })
-                              }
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "说明模糊" : "Caption Blur"}>
-                            <Input
-                              className={editorControlClass}
-                              value={`${selectedWidget.imageCaptionBlur ?? 0}px`}
-                              onChange={(event) =>
-                                handleWidgetPatch({
-                                  imageCaptionBlur: clamp(
-                                    numberOr(event.target.value.replace("px", ""), selectedWidget.imageCaptionBlur ?? 0),
-                                    0,
-                                    32,
-                                  ),
-                                })
-                              }
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "说明阴影色" : "Caption Shadow Color"}>
-                            <ColorSwatchField
-                              value={selectedWidget.imageCaptionShadowColor ?? "#111714"}
-                              onChange={(nextValue) => handleWidgetPatch({imageCaptionShadowColor: nextValue})}
-                            />
-                          </EditorField>
-                          <EditorField label={locale === "zh-CN" ? "说明阴影强度" : "Caption Shadow Opacity"}>
-                            <Input
-                              className={editorControlClass}
-                              value={`${selectedWidget.imageCaptionShadowOpacity ?? 0}%`}
-                              onChange={(event) =>
-                                handleWidgetPatch({
-                                  imageCaptionShadowOpacity: clamp(
-                                    numberOr(event.target.value.replace("%", ""), selectedWidget.imageCaptionShadowOpacity ?? 0),
-                                    0,
-                                    100,
-                                  ),
-                                })
-                              }
-                            />
-                          </EditorField>
-                        </div>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "遮罩颜色" : "Overlay Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.imageOverlayColor ?? "#111714"}
+                                onChange={(nextValue) => handleWidgetPatch({imageOverlayColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "遮罩强度" : "Overlay Strength"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.imageOverlayOpacity ?? 68}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageOverlayOpacity: clamp(
+                                      numberOr(event.target.value.replace("%", ""), selectedWidget.imageOverlayOpacity ?? 68),
+                                      0,
+                                      100,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "遮罩模糊" : "Overlay Blur"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.imageOverlayBlur ?? 0}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageOverlayBlur: clamp(
+                                      numberOr(event.target.value.replace("px", ""), selectedWidget.imageOverlayBlur ?? 0),
+                                      0,
+                                      32,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "说明层" : "Caption Layer"}
+                          description={
+                            locale === "zh-CN"
+                              ? "把说明文字、底板、边框和阴影集中在一起，后面扩事件或状态样式时会更顺。"
+                              : "Keep caption copy, surface, border and shadow together so later state styling stays easy to extend."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "说明文字色" : "Caption Text"}>
+                              <ColorSwatchField
+                                value={selectedWidget.imageCaptionTextColor ?? "#ffffff"}
+                                onChange={(nextValue) => handleWidgetPatch({imageCaptionTextColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "说明底色" : "Caption Surface"}>
+                              <ColorSwatchField
+                                value={selectedWidget.imageCaptionBackgroundColor ?? "#111714"}
+                                onChange={(nextValue) => handleWidgetPatch({imageCaptionBackgroundColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "说明边框色" : "Caption Border Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.imageCaptionBorderColor ?? "#ffffff"}
+                                onChange={(nextValue) => handleWidgetPatch({imageCaptionBorderColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "说明边框宽度" : "Caption Border Width"}>
+                              <Input
+                                className={editorControlClass}
+                                value={String(selectedWidget.imageCaptionBorderWidth ?? 0)}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageCaptionBorderWidth: clamp(
+                                      numberOr(event.target.value, selectedWidget.imageCaptionBorderWidth ?? 0),
+                                      0,
+                                      10,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "说明圆角" : "Caption Radius"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.imageCaptionRadius ?? 18}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageCaptionRadius: clamp(
+                                      numberOr(event.target.value.replace("px", ""), selectedWidget.imageCaptionRadius ?? 18),
+                                      0,
+                                      32,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "说明内边距" : "Caption Padding"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.imageCaptionPadding ?? 12}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageCaptionPadding: clamp(
+                                      numberOr(event.target.value.replace("px", ""), selectedWidget.imageCaptionPadding ?? 12),
+                                      0,
+                                      32,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "说明底色透明度" : "Caption Surface Opacity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.imageCaptionOpacity ?? 82}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageCaptionOpacity: clamp(
+                                      numberOr(event.target.value.replace("%", ""), selectedWidget.imageCaptionOpacity ?? 82),
+                                      0,
+                                      100,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "说明模糊" : "Caption Blur"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.imageCaptionBlur ?? 0}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageCaptionBlur: clamp(
+                                      numberOr(event.target.value.replace("px", ""), selectedWidget.imageCaptionBlur ?? 0),
+                                      0,
+                                      32,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "说明阴影色" : "Caption Shadow Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.imageCaptionShadowColor ?? "#111714"}
+                                onChange={(nextValue) => handleWidgetPatch({imageCaptionShadowColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "说明阴影强度" : "Caption Shadow Opacity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.imageCaptionShadowOpacity ?? 0}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    imageCaptionShadowOpacity: clamp(
+                                      numberOr(event.target.value.replace("%", ""), selectedWidget.imageCaptionShadowOpacity ?? 0),
+                                      0,
+                                      100,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
                       </EditorSection>
                     </>
                   ) : null}
@@ -3194,6 +3747,308 @@ export function EditorWorkbench({
 
                   {componentPanelTab === "style" && selectedWidget.type === "table" ? (
                     <EditorSection title={locale === "zh-CN" ? "表格样式" : "Table Style"}>
+                        <ChartConfigGroup
+                          className="mb-3"
+                          title={locale === "zh-CN" ? "表头" : "Header"}
+                          description={
+                            locale === "zh-CN"
+                              ? "先把表头信息层定住，表格读感会稳定很多。"
+                              : "Set the header hierarchy first so the whole table reads more clearly."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "表头底色" : "Header Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableHeaderBgColor ?? "#e8e8e3"}
+                                onChange={(nextValue) => handleWidgetPatch({tableHeaderBgColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "表头文字色" : "Header Text"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableHeaderTextColor ?? "#727971"}
+                                onChange={(nextValue) => handleWidgetPatch({tableHeaderTextColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "表头辅助文字色" : "Header Meta Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableHeaderMetaColor ?? "#727971"}
+                                onChange={(nextValue) => handleWidgetPatch({tableHeaderMetaColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "表头对齐" : "Header Align"}>
+                              <Select
+                                className={editorControlClass}
+                                value={selectedWidget.tableHeaderAlign ?? "left"}
+                                onChange={(event) =>
+                                  handleWidgetPatch({tableHeaderAlign: event.target.value as EditorWidget["tableHeaderAlign"]})
+                                }
+                                options={[
+                                  {label: locale === "zh-CN" ? "左对齐" : "Left", value: "left"},
+                                  {label: locale === "zh-CN" ? "居中" : "Center", value: "center"},
+                                  {label: locale === "zh-CN" ? "右对齐" : "Right", value: "right"},
+                                ]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "表头字号" : "Header Size"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.tableHeaderSize ?? 10}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    tableHeaderSize: clamp(numberOr(event.target.value.replace("px", ""), selectedWidget.tableHeaderSize ?? 10), 8, 18),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "表头字距" : "Header Tracking"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.tableHeaderTracking ?? 1.8}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    tableHeaderTracking: clamp(numberOr(event.target.value.replace("px", ""), selectedWidget.tableHeaderTracking ?? 1.8), 0, 8),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          className="mb-3"
+                          title={locale === "zh-CN" ? "行" : "Rows"}
+                          description={
+                            locale === "zh-CN"
+                              ? "控制行密度、文字层次和 hover/斑马纹这些阅读辅助。"
+                              : "Control density, text hierarchy, hover and zebra behavior for row readability."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "行密度" : "Density"}>
+                              <Select
+                                className={editorControlClass}
+                                value={selectedWidget.tableDensity ?? "comfortable"}
+                                onChange={(event) =>
+                                  handleWidgetPatch({tableDensity: event.target.value as EditorWidget["tableDensity"]})
+                                }
+                                options={[
+                                  {label: locale === "zh-CN" ? "舒适" : "Comfortable", value: "comfortable"},
+                                  {label: locale === "zh-CN" ? "紧凑" : "Compact", value: "compact"},
+                                ]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "表体底色" : "Body Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableBodyColor ?? "#ffffff"}
+                                onChange={(nextValue) => handleWidgetPatch({tableBodyColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "分隔线颜色" : "Divider Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableDividerColor ?? "#c2c8bf"}
+                                onChange={(nextValue) => handleWidgetPatch({tableDividerColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "斑马纹颜色" : "Stripe Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableStripeColor ?? "#fafaf5"}
+                                onChange={(nextValue) => handleWidgetPatch({tableStripeColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "主字段颜色" : "Key Text"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableKeyColor ?? "#23422a"}
+                                onChange={(nextValue) => handleWidgetPatch({tableKeyColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "辅助信息色" : "Meta Text Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableMetaColor ?? "#727971"}
+                                onChange={(nextValue) => handleWidgetPatch({tableMetaColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "悬停底色" : "Row Hover Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableRowHoverColor ?? "#f3f5ef"}
+                                onChange={(nextValue) => handleWidgetPatch({tableRowHoverColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "单元格对齐" : "Cell Align"}>
+                              <Select
+                                className={editorControlClass}
+                                value={selectedWidget.tableCellAlign ?? "left"}
+                                onChange={(event) =>
+                                  handleWidgetPatch({tableCellAlign: event.target.value as EditorWidget["tableCellAlign"]})
+                                }
+                                options={[
+                                  {label: locale === "zh-CN" ? "左对齐" : "Left", value: "left"},
+                                  {label: locale === "zh-CN" ? "居中" : "Center", value: "center"},
+                                  {label: locale === "zh-CN" ? "右对齐" : "Right", value: "right"},
+                                ]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "单元格字号" : "Cell Size"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.tableCellSize ?? 10}px`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    tableCellSize: clamp(numberOr(event.target.value.replace("px", ""), selectedWidget.tableCellSize ?? 10), 8, 18),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <ToggleRow
+                              label={locale === "zh-CN" ? "斑马纹行" : "Zebra Rows"}
+                              checked={selectedWidget.tableZebra !== false}
+                              onCheckedChange={(checked) => handleWidgetPatch({tableZebra: checked})}
+                            />
+                            <ToggleRow
+                              label={locale === "zh-CN" ? "强调首列" : "Highlight First Column"}
+                              checked={selectedWidget.tableHighlightFirstColumn !== false}
+                              onCheckedChange={(checked) => handleWidgetPatch({tableHighlightFirstColumn: checked})}
+                            />
+                          </div>
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          className="mb-3"
+                          title={locale === "zh-CN" ? "数值" : "Numbers"}
+                          description={
+                            locale === "zh-CN"
+                              ? "把数值格式和高亮单独拎出来，避免和行文字样式混在一起。"
+                              : "Keep numeric emphasis separate from the general row styling."
+                          }
+                        >
+                          <div className="hidden grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "数值格式" : "Number Format"}>
+                              <Select
+                                className={editorControlClass}
+                                value={selectedWidget.tableNumberFormat ?? "raw"}
+                                onChange={(event) =>
+                                  handleWidgetPatch({tableNumberFormat: event.target.value as EditorWidget["tableNumberFormat"]})
+                                }
+                                options={[
+                                  {label: locale === "zh-CN" ? "原始值" : "Raw", value: "raw"},
+                                  {label: locale === "zh-CN" ? "紧凑格式" : "Compact", value: "compact"},
+                                  {label: locale === "zh-CN" ? "人民币" : "Currency", value: "currency"},
+                                  {label: locale === "zh-CN" ? "百分比" : "Percent", value: "percent"},
+                                ]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "数值颜色" : "Number Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableNumberColor ?? "#31503a"}
+                                onChange={(nextValue) => handleWidgetPatch({tableNumberColor: nextValue})}
+                              />
+                            </EditorField>
+                          </div>
+                          <EditorField label={locale === "zh-CN" ? "鏁板€奸鑹?" : "Number Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.tableNumberColor ?? "#31503a"}
+                              onChange={(nextValue) => handleWidgetPatch({tableNumberColor: nextValue})}
+                            />
+                          </EditorField>
+                          <ToggleRow
+                            label={locale === "zh-CN" ? "高亮数值列" : "Highlight Numeric Values"}
+                            checked={selectedWidget.tableHighlightNumbers !== false}
+                            onCheckedChange={(checked) => handleWidgetPatch({tableHighlightNumbers: checked})}
+                          />
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          className="mb-3"
+                          title={locale === "zh-CN" ? "状态色" : "Status Colors"}
+                          description={
+                            locale === "zh-CN"
+                              ? "表格里带状态 badge 的列，统一在这里控制语义色。"
+                              : "Control semantic badge colors for status-like columns in one place."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "正常色" : "Positive"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableStatusPositiveColor ?? "#2f6d48"}
+                                onChange={(nextValue) => handleWidgetPatch({tableStatusPositiveColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "预警色" : "Warning"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableStatusWarningColor ?? "#c96b32"}
+                                onChange={(nextValue) => handleWidgetPatch({tableStatusWarningColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "异常色" : "Critical"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableStatusCriticalColor ?? "#ba1a1a"}
+                                onChange={(nextValue) => handleWidgetPatch({tableStatusCriticalColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "中性色" : "Neutral"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableStatusNeutralColor ?? "#5e7866"}
+                                onChange={(nextValue) => handleWidgetPatch({tableStatusNeutralColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "状态底色透明度" : "Status Surface Opacity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.tableStatusBackgroundOpacity ?? 12}%`}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    tableStatusBackgroundOpacity: clamp(
+                                      numberOr(event.target.value.replace("%", ""), selectedWidget.tableStatusBackgroundOpacity ?? 12),
+                                      0,
+                                      100,
+                                    ),
+                                  })
+                                }
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          className="mb-3"
+                          title={locale === "zh-CN" ? "容器" : "Container"}
+                          description={
+                            locale === "zh-CN"
+                              ? "最后调边框和阴影，让表格像大屏组件，而不是普通表格。"
+                              : "Finish with border and shadow so the table feels like a dashboard component, not a default grid."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "边框颜色" : "Border Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableBorderColor ?? "#c2c8bf"}
+                                onChange={(nextValue) => handleWidgetPatch({tableBorderColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "边框宽度" : "Border Width"}>
+                              <Input
+                                className={editorControlClass}
+                                value={String(selectedWidget.tableBorderWidth ?? 1)}
+                                onChange={(event) => handleWidgetPatch({tableBorderWidth: clamp(numberOr(event.target.value, selectedWidget.tableBorderWidth ?? 1), 0, 8)})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "阴影颜色" : "Shadow Color"}>
+                              <ColorSwatchField
+                                value={selectedWidget.tableShadowColor ?? "#1a1c19"}
+                                onChange={(nextValue) => handleWidgetPatch({tableShadowColor: nextValue})}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "阴影强度" : "Shadow Opacity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${selectedWidget.tableShadowOpacity ?? 14}%`}
+                                onChange={(event) => handleWidgetPatch({tableShadowOpacity: clamp(numberOr(event.target.value.replace("%", ""), selectedWidget.tableShadowOpacity ?? 14), 0, 100)})}
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+                        <div className="hidden">
                         <div className="grid grid-cols-2 gap-2.5">
                           <EditorField label={locale === "zh-CN" ? "行密度" : "Density"}>
                             <Select
@@ -3392,6 +4247,7 @@ export function EditorWorkbench({
                             ]}
                           />
                         </EditorField>
+                        </div>
                       </EditorSection>
                   ) : null}
 
@@ -3404,6 +4260,277 @@ export function EditorWorkbench({
                           onChange={(event) => handleWidgetPatch({hint: event.target.value})}
                         />
                       </EditorField>
+                    </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "advanced" && selectedWidget.type === "map" ? (
+                    <EditorSection
+                      title={locale === "zh-CN" ? "地图高级" : "Map Advanced"}
+                      subtitle={
+                        locale === "zh-CN"
+                          ? "把视角和运行时开关单独收进高级区，不和普通样式混在一起。"
+                          : "Keep viewport and runtime switches separate from the visual styling controls."
+                      }
+                    >
+                      <EditorField label={t("rightPanel.map.defaultZoom")}>
+                        <Input className={editorControlClass} value={mapZoom} onChange={(event) => setMapZoom(event.target.value)} />
+                      </EditorField>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <ToggleRow label={t("rightPanel.map.show3DAxis")} checked={map3dAxis} onCheckedChange={setMap3dAxis} />
+                        <ToggleRow label={locale === "zh-CN" ? "显示标记点" : "Show Markers"} checked={mapMarkers} onCheckedChange={setMapMarkers} />
+                      </div>
+                    </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "advanced" ? (
+                    <EditorSection
+                      title={locale === "zh-CN" ? "高级配置" : "Advanced Settings"}
+                      subtitle={
+                        selectedWidget.type === "map"
+                          ? locale === "zh-CN"
+                            ? "把运行时配置和组件事件收进高级区，保持内容 / 数据 / 样式的边界稳定。"
+                            : "Keep runtime controls and widget events in the advanced zone."
+                          : locale === "zh-CN"
+                            ? "高级区只收运行时信息和交互事件，不再和内容 / 数据 / 样式混在一起。"
+                            : "Advanced stays focused on runtime metadata and interaction events."
+                      }
+                    >
+                      <div className="space-y-3">
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "运行时元信息" : "Runtime Meta"}
+                          description={
+                            locale === "zh-CN"
+                              ? "保留当前组件在运行时的唯一标识和数据模式，方便排查交互与请求链路。"
+                              : "Expose widget identity and runtime data mode for debugging interaction and request flows."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "组件 ID" : "Widget ID"}>
+                              <Input className={editorControlClass} value={selectedWidget.id} readOnly />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "数据模式" : "Data Mode"}>
+                              <Input
+                                className={editorControlClass}
+                                value={normalizedDataSourceMode}
+                                readOnly
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "点击事件" : "Click Event"}
+                          description={
+                            locale === "zh-CN"
+                              ? "在这里配置外链、页面跳转、条件触发和多目标联动。"
+                              : "Configure links, page jumps, conditional triggers and multi-target focus here."
+                          }
+                        >
+                          <EditorField label={locale === "zh-CN" ? "动作类型" : "Action Type"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.eventAction ?? "none"}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  eventAction: event.target.value as EditorWidget["eventAction"],
+                                })
+                              }
+                              options={[
+                                {label: locale === "zh-CN" ? "不启用" : "None", value: "none"},
+                                {label: locale === "zh-CN" ? "打开链接" : "Open Link", value: "openLink"},
+                                {label: locale === "zh-CN" ? "跳转预览页" : "Open Preview", value: "openPreview"},
+                                {label: locale === "zh-CN" ? "跳转展示页" : "Open Published Screen", value: "openPublished"},
+                                {label: locale === "zh-CN" ? "聚焦组件" : "Focus Widget", value: "focusWidget"},
+                              ]}
+                            />
+                          </EditorField>
+                          {selectedWidget.eventAction && selectedWidget.eventAction !== "none" && eventConditionFieldOptions.length ? (
+                            <div className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#45664b]">
+                                {locale === "zh-CN" ? "触发条件" : "Trigger Condition"}
+                              </div>
+                              <p className="mt-1 text-[11px] leading-5 text-[#727971]">
+                                {locale === "zh-CN"
+                                  ? "用组件最终渲染出的值控制点击事件是否生效。字段留空时表示始终触发。"
+                                  : "Gate the click action with the widget's rendered output. Leave the field empty to always trigger."}
+                              </p>
+                              <div className="mt-3 grid grid-cols-2 gap-2.5">
+                                <EditorField label={locale === "zh-CN" ? "条件字段" : "Condition Field"}>
+                                  <Select
+                                    className={editorControlClass}
+                                    value={selectedWidget.eventConditionField ?? ""}
+                                    onChange={(event) =>
+                                      handleWidgetPatch({
+                                        eventConditionField: event.target.value || undefined,
+                                        eventConditionOperator: event.target.value
+                                          ? selectedWidget.eventConditionOperator ?? "contains"
+                                          : undefined,
+                                        eventConditionValue: event.target.value
+                                          ? selectedWidget.eventConditionValue
+                                          : undefined,
+                                      })
+                                    }
+                                    options={[
+                                      {label: locale === "zh-CN" ? "始终触发" : "Always On", value: ""},
+                                      ...eventConditionFieldOptions,
+                                    ]}
+                                  />
+                                </EditorField>
+                                <EditorField label={locale === "zh-CN" ? "条件运算" : "Operator"}>
+                                  <Select
+                                    className={editorControlClass}
+                                    value={selectedWidget.eventConditionOperator ?? "contains"}
+                                    disabled={!selectedWidget.eventConditionField}
+                                    onChange={(event) =>
+                                      handleWidgetPatch({
+                                        eventConditionOperator: event.target.value as EditorWidget["eventConditionOperator"],
+                                      })
+                                    }
+                                    options={[
+                                      {label: locale === "zh-CN" ? "包含" : "Contains", value: "contains"},
+                                      {label: locale === "zh-CN" ? "等于" : "Equals", value: "equals"},
+                                      {label: ">", value: "gt"},
+                                      {label: ">=", value: "gte"},
+                                      {label: "<", value: "lt"},
+                                      {label: "<=", value: "lte"},
+                                    ]}
+                                  />
+                                </EditorField>
+                              </div>
+                              <EditorField
+                                label={locale === "zh-CN" ? "条件值" : "Condition Value"}
+                                hint={
+                                  locale === "zh-CN"
+                                    ? "数值字段可直接输入数字，文本字段支持包含和等于。"
+                                    : "Numeric fields accept raw numbers; text fields support contains and equals."
+                                }
+                              >
+                                <Input
+                                  className={editorControlClass}
+                                  disabled={!selectedWidget.eventConditionField}
+                                  value={selectedWidget.eventConditionValue ?? ""}
+                                  onChange={(event) =>
+                                    handleWidgetPatch({eventConditionValue: event.target.value || undefined})
+                                  }
+                                  placeholder={locale === "zh-CN" ? "例如：100 / delayed / East" : "e.g. 100 / delayed / East"}
+                                />
+                              </EditorField>
+                            </div>
+                          ) : null}
+                          {selectedWidget.eventAction === "openLink" ? (
+                            <>
+                              <EditorField label={locale === "zh-CN" ? "链接地址" : "URL"}>
+                                <Input
+                                  className={editorControlClass}
+                                  value={selectedWidget.eventUrl ?? ""}
+                                  onChange={(event) => handleWidgetPatch({eventUrl: event.target.value || undefined})}
+                                  placeholder="https://example.com"
+                                />
+                              </EditorField>
+                              <EditorField label={locale === "zh-CN" ? "打开方式" : "Open Mode"}>
+                                <Select
+                                  className={editorControlClass}
+                                  value={selectedWidget.eventOpenMode ?? "blank"}
+                                  onChange={(event) =>
+                                    handleWidgetPatch({
+                                      eventOpenMode: event.target.value as EditorWidget["eventOpenMode"],
+                                    })
+                                  }
+                                  options={[
+                                    {label: locale === "zh-CN" ? "新标签页" : "New Tab", value: "blank"},
+                                    {label: locale === "zh-CN" ? "当前页" : "Current Tab", value: "self"},
+                                  ]}
+                                />
+                              </EditorField>
+                            </>
+                          ) : null}
+                          {selectedWidget.eventAction === "openPreview" || selectedWidget.eventAction === "openPublished" ? (
+                            <EditorField label={locale === "zh-CN" ? "打开方式" : "Open Mode"}>
+                              <Select
+                                className={editorControlClass}
+                                value={selectedWidget.eventOpenMode ?? "self"}
+                                onChange={(event) =>
+                                  handleWidgetPatch({
+                                    eventOpenMode: event.target.value as EditorWidget["eventOpenMode"],
+                                  })
+                                }
+                                options={[
+                                  {label: locale === "zh-CN" ? "当前页" : "Current Tab", value: "self"},
+                                  {label: locale === "zh-CN" ? "新标签页" : "New Tab", value: "blank"},
+                                ]}
+                              />
+                            </EditorField>
+                          ) : null}
+                          {selectedWidget.eventAction === "focusWidget" ? (
+                            <EditorField
+                              label={locale === "zh-CN" ? "联动目标" : "Target Widgets"}
+                              hint={
+                                locale === "zh-CN"
+                                  ? "预览页和展示页点击当前组件后，会同时高亮一个或多个目标组件。"
+                                  : "Clicking this widget in preview/published mode will highlight one or more target widgets."
+                              }
+                            >
+                              <div className="space-y-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                  {eventTargetOptions.map((target) => {
+                                    const active = selectedEventTargetIds.includes(target.value);
+
+                                    return (
+                                      <button
+                                        key={target.value}
+                                        type="button"
+                                        onClick={() => {
+                                          const nextTargets = active
+                                            ? selectedEventTargetIds.filter((id) => id !== target.value)
+                                            : [...selectedEventTargetIds, target.value];
+                                          const normalizedTargets = Array.from(
+                                            new Set(nextTargets.length ? nextTargets : [selectedWidget.id]),
+                                          );
+
+                                          handleWidgetPatch({
+                                            eventTargetWidgetIds: normalizedTargets,
+                                            eventTargetWidgetId:
+                                              normalizedTargets.length === 1 ? normalizedTargets[0] : undefined,
+                                          });
+                                        }}
+                                        className={`rounded-md border px-2.5 py-2 text-left text-[11px] transition-colors ${
+                                          active
+                                            ? "border-[#45664b] bg-[#eef5ec] text-[#23422a]"
+                                            : "border-[#d7d8d1] bg-[#fafaf5] text-[#424842] hover:bg-[#eef2ea]"
+                                        }`}
+                                      >
+                                        <div className="font-medium">{target.label}</div>
+                                        <div className="mt-1 text-[10px] text-[#727971]">{target.value}</div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <div className="rounded-md border border-[#d7d8d1] bg-[#f7f6f1] px-3 py-2 text-[11px] leading-5 text-[#727971]">
+                                  {selectedEventTargetIds.length > 1
+                                    ? locale === "zh-CN"
+                                      ? `当前会同步高亮 ${selectedEventTargetIds.length} 个组件。`
+                                      : `${selectedEventTargetIds.length} widgets will highlight together.`
+                                    : selectedEventTargetIds[0] === selectedWidget.id
+                                      ? locale === "zh-CN"
+                                        ? "当前只高亮组件自身，可继续追加其他联动目标。"
+                                        : "Only the current widget will highlight right now; add more targets to build linkage."
+                                      : locale === "zh-CN"
+                                        ? "当前会高亮 1 个外部目标组件。"
+                                        : "One external target widget will highlight right now."}
+                                </div>
+                              </div>
+                            </EditorField>
+                          ) : null}
+                          <div className="rounded-md border border-[#d7d8d1] bg-[#f7f6f1] px-3 py-3 text-[12px] leading-5 text-[#727971]">
+                            {selectedWidget.eventAction && selectedWidget.eventAction !== "none"
+                              ? locale === "zh-CN"
+                                ? "事件配置会跟随草稿和发布快照一起保存；编辑态仍以选中组件为主，不会在画布里直接触发条件和联动。"
+                                : "Event config is saved with drafts and published snapshots; the editor canvas still prioritizes selection instead of firing conditions or linkage."
+                              : locale === "zh-CN"
+                                ? "当前组件还没有启用点击事件。"
+                                : "No click event is enabled for this widget yet."}
+                          </div>
+                        </ChartConfigGroup>
+                      </div>
                     </EditorSection>
                   ) : null}
 
@@ -3555,235 +4682,811 @@ export function EditorWorkbench({
                   </EditorSection>
                   ) : null}
 
+                  {componentPanelTab === "style" && selectedWidget.type === "numberFlip" ? (
+                    <EditorSection title={locale === "zh-CN" ? "数字翻牌样式" : "Number Flip Style"}>
+                      <ChartConfigGroup
+                        title={locale === "zh-CN" ? "数字卡片" : "Digit Cards"}
+                        description={
+                          locale === "zh-CN"
+                            ? "把翻牌的字重、间距、底板和光感收在一起，避免重新退回普通指标卡。"
+                            : "Keep digit spacing, surface and glow together so this stays distinct from a plain KPI card."
+                        }
+                      >
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "数字字号" : "Digit Size"}>
+                            <Input
+                              className={editorControlClass}
+                              value={String(selectedWidget.numberFlipDigitSize ?? 44)}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  numberFlipDigitSize: clamp(
+                                    numberOr(event.target.value, selectedWidget.numberFlipDigitSize ?? 44),
+                                    24,
+                                    88,
+                                  ),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "数字间距" : "Digit Gap"}>
+                            <Input
+                              className={editorControlClass}
+                              value={String(selectedWidget.numberFlipGap ?? 10)}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  numberFlipGap: clamp(numberOr(event.target.value, selectedWidget.numberFlipGap ?? 10), 0, 24),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "卡片底色" : "Digit Surface"}>
+                            <ColorSwatchField
+                              value={selectedWidget.numberFlipSurfaceColor ?? "#21342d"}
+                              onChange={(nextValue) => handleWidgetPatch({numberFlipSurfaceColor: nextValue})}
+                              swatches={["#21342d", "#244133", "#2f5240", "#3b2a2a", "#1d2235", "#ffffff"]}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "数字文字色" : "Digit Text"}>
+                            <ColorSwatchField
+                              value={selectedWidget.textColor ?? "#f5fff7"}
+                              onChange={(nextValue) => handleWidgetPatch({textColor: nextValue})}
+                              swatches={["#f5fff7", "#ffffff", "#dfffe7", "#ffe8e2", "#20302a", "#8fe1a7"]}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "发光强度" : "Glow Opacity"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.numberFlipGlowOpacity ?? 24}%`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  numberFlipGlowOpacity: clamp(
+                                    numberOr(event.target.value.replace("%", ""), selectedWidget.numberFlipGlowOpacity ?? 24),
+                                    0,
+                                    100,
+                                  ),
+                                })
+                              }
+                            />
+                          </EditorField>
+                        </div>
+                      </ChartConfigGroup>
+                    </EditorSection>
+                  ) : null}
+
+                  {componentPanelTab === "style" && isDecorationWidget ? (
+                    <EditorSection title={locale === "zh-CN" ? "装饰样式" : "Decoration Style"}>
+                      <ChartConfigGroup
+                        title={locale === "zh-CN" ? "装饰结构" : "Decoration Structure"}
+                        description={
+                          locale === "zh-CN"
+                            ? "先确定装饰是边框、标签、分割线还是发光体，再细调线条和氛围。"
+                            : "Choose frame, badge, divider or glow first, then refine the line work and atmosphere."
+                        }
+                      >
+                        <EditorField label={locale === "zh-CN" ? "装饰预设" : "Preset"}>
+                          <Select
+                            className={editorControlClass}
+                            value={selectedWidget.decorationPreset ?? "badge"}
+                            onChange={(event) =>
+                              handleWidgetPatch({
+                                decorationPreset: event.target.value as EditorWidget["decorationPreset"],
+                              })
+                            }
+                            options={[
+                              {label: locale === "zh-CN" ? "边框装饰" : "Frame", value: "frame"},
+                              {label: locale === "zh-CN" ? "标签装饰" : "Badge", value: "badge"},
+                              {label: locale === "zh-CN" ? "分割线" : "Divider", value: "divider"},
+                              {label: locale === "zh-CN" ? "发光装饰" : "Glow", value: "glow"},
+                            ]}
+                          />
+                        </EditorField>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "辅助色" : "Secondary Color"}>
+                            <ColorSwatchField
+                              value={selectedWidget.decorationSecondaryColor ?? "#315a41"}
+                              onChange={(nextValue) => handleWidgetPatch({decorationSecondaryColor: nextValue})}
+                              swatches={["#315a41", "#486c56", "#274a59", "#5a4031", "#6b6b6b", "#ffffff"]}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "线条宽度" : "Line Width"}>
+                            <Input
+                              className={editorControlClass}
+                              value={String(selectedWidget.decorationLineWidth ?? 2)}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  decorationLineWidth: clamp(
+                                    numberOr(event.target.value, selectedWidget.decorationLineWidth ?? 2),
+                                    1,
+                                    8,
+                                  ),
+                                })
+                              }
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "发光强度" : "Glow Opacity"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${selectedWidget.decorationGlowOpacity ?? 24}%`}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  decorationGlowOpacity: clamp(
+                                    numberOr(event.target.value.replace("%", ""), selectedWidget.decorationGlowOpacity ?? 24),
+                                    0,
+                                    100,
+                                  ),
+                                })
+                              }
+                            />
+                          </EditorField>
+                        </div>
+                      </ChartConfigGroup>
+                    </EditorSection>
+                  ) : null}
+
                   {componentPanelTab === "data" ? (
                   <EditorSection title={t("rightPanel.dataBinding.title")}>
-                    {supportsManualData ? (
-                      <EditorField label={locale === "zh-CN" ? "数据来源" : "Data Source"}>
-                        <Select
-                          className={editorControlClass}
-                          value={selectedWidget.dataSourceMode ?? "dataset"}
-                          onChange={(event) =>
-                            handleWidgetPatch({
-                              dataSourceMode: event.target.value as "dataset" | "manual",
-                            })
-                          }
-                          options={[
-                            {label: locale === "zh-CN" ? "绑定数据集" : "Dataset Binding", value: "dataset"},
-                            {label: locale === "zh-CN" ? "手动 JSON" : "Manual JSON", value: "manual"},
-                          ]}
-                        />
-                      </EditorField>
-                    ) : null}
-
-                    {supportsManualData && (selectedWidget.dataSourceMode ?? "dataset") === "manual" ? (
-                      <>
+                    <div className="space-y-3">
+                    {isDecorationWidget ? (
+                      <ChartConfigGroup
+                        title={locale === "zh-CN" ? "装饰层" : "Presentation Layer"}
+                        description={
+                          locale === "zh-CN"
+                            ? "装饰组件只负责补齐大屏视觉语言，不参与数据绑定、字段映射或数据处理。"
+                            : "Decoration widgets only shape the visual language of the screen, so they do not use dataset binding, field mapping, or data processing."
+                        }
+                      >
                         <div className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3 text-[12px] text-[#424842]">
                           <div className="font-medium text-[#1a1c19]">
-                            {locale === "zh-CN" ? "组件独立数据" : "Widget-local Data"}
+                            {locale === "zh-CN" ? "样式驱动组件" : "Style-driven Widget"}
                           </div>
                           <div className="mt-2 text-[11px] leading-5 text-[#727971]">
                             {locale === "zh-CN"
-                              ? "这个组件将优先使用手动填写的 JSON 数据，不再依赖全局数据集。适合快速做演示图、单独修正某个图表，或临时口径调整。"
-                              : "This widget will prefer the JSON entered below instead of the shared dataset. Use it for quick charts, local overrides or presentation-only data."}
+                              ? "这类组件的结构、发光和边框都在内容与样式页里调整；如果需要页面成品感，优先回到样式页继续细化。"
+                              : "Tune structure, glow, and framing from the content and style tabs. Go back to styling when you want to strengthen the screen's finished look."}
+                          </div>
+                        </div>
+                      </ChartConfigGroup>
+                    ) : (
+                      <>
+                    {supportsManualData ? (
+                      <ChartConfigGroup
+                        className="mb-3"
+                        title={locale === "zh-CN" ? "来源模式" : "Source Mode"}
+                        description={
+                          locale === "zh-CN"
+                            ? "先明确当前组件是吃共享数据集、请求数据，还是组件内手动 JSON。"
+                            : "Set whether the widget reads from a shared dataset, a request source, or widget-local JSON."
+                        }
+                      >
+                        <EditorField label={locale === "zh-CN" ? "数据来源" : "Data Source"}>
+                          <Select
+                            className={editorControlClass}
+                            value={normalizedDataSourceMode}
+                            onChange={(event) =>
+                              handleWidgetPatch({
+                                dataSourceMode: event.target.value as NonNullable<EditorWidget["dataSourceMode"]>,
+                              })
+                            }
+                            options={[
+                              {label: locale === "zh-CN" ? "绑定数据集" : "Dataset Binding", value: "static"},
+                              {label: locale === "zh-CN" ? "请求数据" : "Request Data", value: "request"},
+                              {label: locale === "zh-CN" ? "手动 JSON" : "Manual JSON", value: "manual"},
+                            ]}
+                          />
+                        </EditorField>
+                      </ChartConfigGroup>
+                    ) : null}
+
+                    {normalizedDataSourceMode === "request" ? (
+                      <ChartConfigGroup
+                        title={locale === "zh-CN" ? "请求型数据源" : "Request Source"}
+                        description={
+                          locale === "zh-CN"
+                            ? "把请求地址、方法、刷新间隔和返回映射固定在数据层，后面接执行链时不用再改面板结构。"
+                            : "Keep request URL, method, refresh interval and response mapping in the data layer."
+                        }
+                      >
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "请求方法" : "Method"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.requestMethod ?? "GET"}
+                              onChange={(event) =>
+                                handleWidgetPatch({requestMethod: event.target.value as EditorWidget["requestMethod"]})
+                              }
+                              options={[
+                                {label: "GET", value: "GET"},
+                                {label: "POST", value: "POST"},
+                              ]}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "刷新间隔" : "Refresh"}>
+                            <Input
+                              className={editorControlClass}
+                              value={selectedWidget.requestRefreshInterval ? `${selectedWidget.requestRefreshInterval}s` : ""}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  requestRefreshInterval: event.target.value
+                                    ? clamp(numberOr(event.target.value.replace("s", ""), selectedWidget.requestRefreshInterval ?? 30), 5, 3600)
+                                    : undefined,
+                                })
+                              }
+                              placeholder={locale === "zh-CN" ? "如 30s" : "e.g. 30s"}
+                            />
+                          </EditorField>
+                        </div>
+                        <EditorField
+                          label={locale === "zh-CN" ? "请求地址" : "Request URL"}
+                          hint={
+                            locale === "zh-CN"
+                              ? "当前先保存配置模型；执行层还没接入时，画布仍然沿用已绑定的数据做设计态预览。"
+                              : "This stores the request model first; until execution lands, the canvas still falls back to bound design-time data."
+                          }
+                        >
+                          <Input
+                            className={editorControlClass}
+                            value={selectedWidget.requestUrl ?? ""}
+                            onChange={(event) => handleWidgetPatch({requestUrl: event.target.value || undefined})}
+                            placeholder="https://api.example.com/dashboard"
+                          />
+                        </EditorField>
+                        <EditorField
+                          label={locale === "zh-CN" ? "请求参数" : "Params"}
+                          hint={locale === "zh-CN" ? "支持 query/body 的轻量配置，建议先写 JSON。" : "Use lightweight JSON for query/body params."}
+                        >
+                          <Textarea
+                            value={selectedWidget.requestParams ?? ""}
+                            onChange={(event) => handleWidgetPatch({requestParams: event.target.value || undefined})}
+                            className="min-h-24 resize-y rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 font-mono text-[12px] leading-5 focus:border-[#45664b]"
+                            placeholder={locale === "zh-CN" ? '{"region":"华东","limit":10}' : '{"region":"east","limit":10}'}
+                          />
+                        </EditorField>
+                        <EditorField
+                          label={locale === "zh-CN" ? "返回映射" : "Response Mapping"}
+                          hint={
+                            locale === "zh-CN"
+                              ? "把接口返回收口成组件能消费的字段，例如 data.list -> rows。"
+                              : "Describe how the response should be normalized into widget-ready rows."
+                          }
+                        >
+                          <Textarea
+                            value={selectedWidget.requestResponseMap ?? ""}
+                            onChange={(event) => handleWidgetPatch({requestResponseMap: event.target.value || undefined})}
+                            className="min-h-24 resize-y rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 font-mono text-[12px] leading-5 focus:border-[#45664b]"
+                            placeholder={locale === "zh-CN" ? 'data.list -> rows\nvalue -> metric\nname -> label' : "data.items -> rows\nvalue -> metric\nname -> label"}
+                          />
+                        </EditorField>
+                        <div className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3 text-[12px] text-[#424842]">
+                          <div className="font-medium text-[#1a1c19]">
+                            {locale === "zh-CN" ? "请求配置摘要" : "Request Summary"}
+                          </div>
+                          <div className="mt-2 text-[11px] leading-5 text-[#727971]">
+                            {selectedWidget.requestUrl?.trim()
+                              ? `${selectedWidget.requestMethod ?? "GET"} · ${selectedWidget.requestUrl}`
+                              : locale === "zh-CN"
+                                ? "还没有填写请求地址，当前仅保留了请求型数据源结构。"
+                                : "Request URL is still empty; the request-source structure is ready."}
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <MiniActionButton
-                            label={locale === "zh-CN" ? "填充示例 JSON" : "Fill Sample JSON"}
-                            onClick={fillManualDataTemplate}
-                          />
-                          <MiniActionButton
-                            label={locale === "zh-CN" ? "切回数据集绑定" : "Back to Dataset"}
+                            label={locale === "zh-CN" ? "回到数据集" : "Back to Dataset"}
                             onClick={resetToDatasetBinding}
                           />
-                        </div>
-                        <EditorField
-                          label={locale === "zh-CN" ? "手动 JSON 数据" : "Manual JSON Data"}
-                          hint={manualDataPlaceholderHint(selectedWidget.type, locale)}
-                        >
-                          <Textarea
-                            value={selectedWidget.manualData ?? defaultManualDataTemplate(selectedWidget.type)}
-                            onChange={(event) => handleWidgetPatch({manualData: event.target.value})}
-                            className="min-h-32 resize-y rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 font-mono text-[12px] leading-5 focus:border-[#45664b]"
+                          <MiniActionButton
+                            label={locale === "zh-CN" ? "改用手动 JSON" : "Use Manual JSON"}
+                            onClick={fillManualDataTemplate}
                           />
-                        </EditorField>
-                        <div
-                          className={`rounded-md border px-3 py-3 text-[12px] ${
-                            manualDataState?.valid
-                              ? "border-[#c2d8c4] bg-[#eef5ec] text-[#23422a]"
-                              : "border-[#efc0ba] bg-[#fff4f2] text-[#8a2f25]"
-                          }`}
+                        </div>
+                      </ChartConfigGroup>
+                    ) : supportsManualData && normalizedDataSourceMode === "manual" ? (
+                      <>
+                        <ChartConfigGroup
+                          className="mb-3"
+                          title={locale === "zh-CN" ? "手动 JSON" : "Manual JSON"}
+                          description={
+                            locale === "zh-CN"
+                              ? "手动 JSON 适合做局部演示、临时修正或脱离共享数据集的单组件数据。"
+                              : "Use manual JSON for local demos, one-off overrides, or widget-specific data detached from the shared dataset."
+                          }
                         >
-                          <div className="font-semibold">
-                            {manualDataState?.valid
-                              ? locale === "zh-CN"
-                                ? "JSON 校验通过"
-                                : "JSON validated"
-                              : locale === "zh-CN"
-                                ? "JSON 校验失败"
-                                : "JSON validation failed"}
+                          <div className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3 text-[12px] text-[#424842]">
+                            <div className="font-medium text-[#1a1c19]">
+                              {locale === "zh-CN" ? "组件独立数据" : "Widget-local Data"}
+                            </div>
+                            <div className="mt-2 text-[11px] leading-5 text-[#727971]">
+                              {locale === "zh-CN"
+                                ? "这个组件将优先使用手动填写的 JSON 数据，不再依赖全局数据集。适合快速做演示图、单独修正某个图表，或临时口径调整。"
+                                : "This widget will prefer the JSON entered below instead of the shared dataset. Use it for quick charts, local overrides or presentation-only data."}
+                            </div>
                           </div>
-                          <p className="mt-1 leading-5">
-                            {manualDataState?.valid
-                              ? manualDataSuccessSummary(selectedWidget.type, manualDataState, locale)
-                              : manualDataState?.error ??
-                                (locale === "zh-CN"
-                                  ? "请填写合法的 JSON 数据"
-                                  : "Enter valid JSON data to drive this widget.")}
-                          </p>
-                        </div>
-                        {manualDataState?.valid ? (
-                          <ManualDataPreviewCard
-                            locale={locale}
-                            widgetType={selectedWidget.type}
-                            state={manualDataState}
-                            widget={selectedWidget}
-                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <MiniActionButton
+                              label={locale === "zh-CN" ? "填充示例 JSON" : "Fill Sample JSON"}
+                              onClick={fillManualDataTemplate}
+                            />
+                            <MiniActionButton
+                              label={locale === "zh-CN" ? "切回数据集绑定" : "Back to Dataset"}
+                              onClick={resetToDatasetBinding}
+                            />
+                          </div>
+                          <EditorField
+                            label={locale === "zh-CN" ? "手动 JSON 数据" : "Manual JSON Data"}
+                            hint={manualDataPlaceholderHint(selectedWidget.type, locale)}
+                          >
+                            <Textarea
+                              value={selectedWidget.manualData ?? defaultManualDataTemplate(selectedWidget.type)}
+                              onChange={(event) => handleWidgetPatch({manualData: event.target.value})}
+                              className="min-h-32 resize-y rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 font-mono text-[12px] leading-5 focus:border-[#45664b]"
+                            />
+                          </EditorField>
+                          <div
+                            className={`rounded-md border px-3 py-3 text-[12px] ${
+                              manualDataState && manualDataState.valid
+                                ? "border-[#c2d8c4] bg-[#eef5ec] text-[#23422a]"
+                                : "border-[#efc0ba] bg-[#fff4f2] text-[#8a2f25]"
+                            }`}
+                          >
+                            <div className="font-semibold">
+                              {manualDataState && manualDataState.valid
+                                ? locale === "zh-CN"
+                                  ? "JSON 校验通过"
+                                  : "JSON validated"
+                                : locale === "zh-CN"
+                                  ? "JSON 校验失败"
+                                  : "JSON validation failed"}
+                            </div>
+                            <p className="mt-1 leading-5">
+                              {manualDataState && manualDataState.valid
+                                ? manualDataSuccessSummary(selectedWidget.type, manualDataState, locale)
+                                : manualDataState?.error ??
+                                  (locale === "zh-CN"
+                                    ? "请填写合法的 JSON 数据"
+                                    : "Enter valid JSON data to drive this widget.")}
+                            </p>
+                          </div>
+                        </ChartConfigGroup>
+                        {manualDataState && manualDataState.valid ? (
+                          <ChartConfigGroup title={locale === "zh-CN" ? "预览" : "Preview"}>
+                            <ManualDataPreviewCard
+                              locale={locale}
+                              widgetType={selectedWidget.type}
+                              state={manualDataState}
+                              widget={selectedWidget}
+                            />
+                          </ChartConfigGroup>
                         ) : null}
                       </>
                     ) : (
                       <>
-                    {supportsManualData ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        <MiniActionButton
-                          label={locale === "zh-CN" ? "切到手动 JSON" : "Switch to Manual JSON"}
-                          onClick={fillManualDataTemplate}
-                        />
-                        <MiniActionButton
-                          label={locale === "zh-CN" ? "清空字段映射" : "Clear Field Map"}
-                          onClick={() => handleWidgetPatch({fieldMap: ""})}
-                        />
-                      </div>
-                    ) : null}
-                    <EditorField label={t("rightPanel.dataBinding.dataset")}>
-                      <Select
-                        className={editorControlClass}
-                        value={selectedWidget.dataset}
-                        onChange={(event) => handleWidgetPatch({dataset: event.target.value})}
-                        options={datasets.map((dataset) => ({
-                          label: `${dataset.name} · ${dataset.records}`,
-                          value: dataset.name,
-                        }))}
-                      />
-                    </EditorField>
-                    <div className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3 text-[12px] text-[#424842]">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium text-[#1a1c19]">
-                          {selectedWidget.dataset || (locale === "zh-CN" ? "未绑定数据集" : "No dataset")}
-                        </span>
-                        <span className="text-[10px] uppercase tracking-[0.14em] text-[#727971]">
-                          {selectedDatasetFields.length} {locale === "zh-CN" ? "字段" : "fields"}
-                        </span>
-                      </div>
-                      <div className="mt-2 text-[11px] text-[#727971]">
-                        {locale === "zh-CN"
-                          ? "字段映射会直接驱动图表、指标卡和表格内容。"
-                          : "Field bindings directly drive charts, KPIs and table content."}
-                      </div>
-                    </div>
-                    <EditorField
-                      label={locale === "zh-CN" ? "当前绑定概览" : "Binding Summary"}
-                      hint={
-                        bindingSummary.length
-                          ? locale === "zh-CN"
-                            ? "这里显示当前组件实际会读取到的字段"
-                            : "These fields are currently driving the selected widget"
-                          : locale === "zh-CN"
-                            ? "当前组件不依赖额外字段映射"
-                            : "This widget does not require extra field mappings"
-                      }
-                    >
-                      {bindingSummary.length ? (
-                        <div className="space-y-2">
-                          {bindingSummary.map((binding) => (
-                            <div
-                              key={binding.alias}
-                              className={`rounded-md border px-3 py-2 text-[12px] ${
-                                binding.resolvedField
-                                  ? "border-[#d7d8d1] bg-[#fafaf5] text-[#1a1c19]"
-                                  : "border-[#efc0ba] bg-[#fff4f2] text-[#8a2f25]"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="font-medium">{binding.label}</span>
-                                <span className="text-[10px] uppercase tracking-[0.14em] text-[#727971]">
-                                  {binding.resolvedMeta?.type ?? (locale === "zh-CN" ? "未绑定" : "Unmapped")}
-                                </span>
-                              </div>
-                              <div className="mt-1 text-[11px]">
-                                {binding.resolvedField || (locale === "zh-CN" ? "请选择一个字段" : "Choose a field")}
-                              </div>
+                        <ChartConfigGroup
+                          className="mb-3"
+                          title={locale === "zh-CN" ? "数据集绑定" : "Dataset Binding"}
+                          description={
+                            locale === "zh-CN"
+                              ? "这里决定当前组件绑定哪份共享数据集，并确认这份数据的基本规模。"
+                              : "Choose the shared dataset for this widget and confirm the dataset footprint here."
+                          }
+                        >
+                          {supportsManualData ? (
+                            <div className="grid grid-cols-2 gap-2">
+                              <MiniActionButton
+                                label={locale === "zh-CN" ? "切到手动 JSON" : "Switch to Manual JSON"}
+                                onClick={fillManualDataTemplate}
+                              />
+                              <MiniActionButton
+                                label={locale === "zh-CN" ? "清空字段映射" : "Clear Field Map"}
+                                onClick={() => handleWidgetPatch({fieldMap: ""})}
+                              />
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="rounded-md border border-dashed border-[#d7d8d1] bg-[#fafaf5] px-3 py-3 text-[12px] text-[#727971]">
-                          {locale === "zh-CN"
-                            ? "当前组件主要依赖文本或样式配置，不需要额外字段映射。"
-                            : "This widget mainly relies on its own content and style, so no extra field mapping is required."}
-                        </div>
-                      )}
-                    </EditorField>
-                    {missingBindings.length ? (
-                      <div className="rounded-md border border-[#efc0ba] bg-[#fff4f2] px-3 py-3 text-[12px] text-[#8a2f25]">
-                        <div className="font-semibold">{locale === "zh-CN" ? "绑定提醒" : "Binding Notice"}</div>
-                        <p className="mt-1 leading-5">
-                          {locale === "zh-CN"
-                            ? "当前组件还有字段未完成绑定，画布会先回退到示例数据。"
-                            : "Some bindings are still missing, so the canvas temporarily falls back to sample data."}
-                        </p>
-                      </div>
-                    ) : null}
-                    {fieldMappingOptions.length ? (
-                      <div className="space-y-2.5">
-                        {fieldMappingOptions.map((mapping) => (
-                          <EditorField key={mapping.alias} label={mapping.label} hint={mapping.hint}>
+                          ) : null}
+                          <EditorField label={t("rightPanel.dataBinding.dataset")}>
                             <Select
                               className={editorControlClass}
-                              value={
-                                parsedFieldMap[mapping.alias] ??
-                                selectedDatasetFields.find((field) =>
-                                  mapping.preferredTypes.includes(field.type),
-                                )?.field ??
-                                selectedDatasetFields[0]?.field ??
-                                ""
+                              value={selectedWidget.dataset}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  dataset: event.target.value,
+                                  dataSourceMode: "static",
+                                })
                               }
-                              onChange={(event) => handleFieldAliasChange(mapping.alias, event.target.value)}
-                              options={
-                                selectedDatasetFields.length
-                                  ? selectedDatasetFields.map((field) => ({
-                                      label: `${field.field} · ${field.type}`,
-                                      value: field.field,
-                                    }))
-                                  : [
-                                      {
-                                        label: locale === "zh-CN" ? "暂无可选字段" : "No fields available",
-                                        value: "",
-                                      },
-                                    ]
-                              }
+                              options={datasets.map((dataset) => ({
+                                label: `${dataset.name} · ${dataset.records}`,
+                                value: dataset.name,
+                              }))}
                             />
                           </EditorField>
-                        ))}
-                      </div>
-                    ) : null}
-                    <EditorField label={t("rightPanel.dataBinding.fieldMap")}>
-                      <Textarea
-                        value={fieldMapValue}
-                        onChange={(event) => handleWidgetPatch({fieldMap: event.target.value})}
-                        className="min-h-24 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
-                      />
-                    </EditorField>
+                          <div className="rounded-md border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3 text-[12px] text-[#424842]">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="font-medium text-[#1a1c19]">
+                                {selectedWidget.dataset || (locale === "zh-CN" ? "未绑定数据集" : "No dataset")}
+                              </span>
+                              <span className="text-[10px] uppercase tracking-[0.14em] text-[#727971]">
+                                {selectedDatasetFields.length} {locale === "zh-CN" ? "字段" : "fields"}
+                              </span>
+                            </div>
+                            <div className="mt-2 text-[11px] text-[#727971]">
+                              {locale === "zh-CN"
+                                ? "字段映射会直接驱动图表、指标卡和表格内容。"
+                                : "Field bindings directly drive charts, KPIs and table content."}
+                            </div>
+                          </div>
+                        </ChartConfigGroup>
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "字段映射" : "Field Mapping"}
+                          description={
+                            locale === "zh-CN"
+                              ? "让组件真正知道当前数据里哪些字段对应值、分类、时间或地域。"
+                              : "Tell the widget which fields represent values, labels, time, or regions in the bound dataset."
+                          }
+                        >
+                          <EditorField
+                            label={locale === "zh-CN" ? "当前绑定概览" : "Binding Summary"}
+                            hint={
+                              bindingSummary.length
+                                ? locale === "zh-CN"
+                                  ? "这里显示当前组件实际会读取到的字段"
+                                  : "These fields are currently driving the selected widget"
+                                : locale === "zh-CN"
+                                  ? "当前组件不依赖额外字段映射"
+                                  : "This widget does not require extra field mappings"
+                            }
+                          >
+                            {bindingSummary.length ? (
+                              <div className="space-y-2">
+                                {bindingSummary.map((binding) => (
+                                  <div
+                                    key={binding.alias}
+                                    className={`rounded-md border px-3 py-2 text-[12px] ${
+                                      binding.resolvedField
+                                        ? "border-[#d7d8d1] bg-[#fafaf5] text-[#1a1c19]"
+                                        : "border-[#efc0ba] bg-[#fff4f2] text-[#8a2f25]"
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between gap-3">
+                                      <span className="font-medium">{binding.label}</span>
+                                      <span className="text-[10px] uppercase tracking-[0.14em] text-[#727971]">
+                                        {binding.resolvedMeta?.type ?? (locale === "zh-CN" ? "未绑定" : "Unmapped")}
+                                      </span>
+                                    </div>
+                                    <div className="mt-1 text-[11px]">
+                                      {binding.resolvedField || (locale === "zh-CN" ? "请选择一个字段" : "Choose a field")}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="rounded-md border border-dashed border-[#d7d8d1] bg-[#fafaf5] px-3 py-3 text-[12px] text-[#727971]">
+                                {locale === "zh-CN"
+                                  ? "当前组件主要依赖文本或样式配置，不需要额外字段映射。"
+                                  : "This widget mainly relies on its own content and style, so no extra field mapping is required."}
+                              </div>
+                            )}
+                          </EditorField>
+                          {missingBindings.length ? (
+                            <div className="rounded-md border border-[#efc0ba] bg-[#fff4f2] px-3 py-3 text-[12px] text-[#8a2f25]">
+                              <div className="font-semibold">{locale === "zh-CN" ? "绑定提醒" : "Binding Notice"}</div>
+                              <p className="mt-1 leading-5">
+                                {locale === "zh-CN"
+                                  ? "当前组件还有字段未完成绑定，画布会先回退到示例数据。"
+                                  : "Some bindings are still missing, so the canvas temporarily falls back to sample data."}
+                              </p>
+                            </div>
+                          ) : null}
+                          {fieldMappingOptions.length ? (
+                            <div className="space-y-2.5">
+                              {fieldMappingOptions.map((mapping) => (
+                                <EditorField key={mapping.alias} label={mapping.label} hint={mapping.hint}>
+                                  <Select
+                                    className={editorControlClass}
+                                    value={
+                                      parsedFieldMap[mapping.alias] ??
+                                      selectedDatasetFields.find((field) =>
+                                        mapping.preferredTypes.includes(field.type),
+                                      )?.field ??
+                                      selectedDatasetFields[0]?.field ??
+                                      ""
+                                    }
+                                    onChange={(event) => handleFieldAliasChange(mapping.alias, event.target.value)}
+                                    options={
+                                      selectedDatasetFields.length
+                                        ? selectedDatasetFields.map((field) => ({
+                                            label: `${field.field} · ${field.type}`,
+                                            value: field.field,
+                                          }))
+                                        : [
+                                            {
+                                              label: locale === "zh-CN" ? "暂无可选字段" : "No fields available",
+                                              value: "",
+                                            },
+                                          ]
+                                    }
+                                  />
+                                </EditorField>
+                              ))}
+                            </div>
+                          ) : null}
+                          <EditorField label={t("rightPanel.dataBinding.fieldMap")}>
+                            <Textarea
+                              value={fieldMapValue}
+                              onChange={(event) => handleWidgetPatch({fieldMap: event.target.value})}
+                              className="min-h-24 resize-none rounded-md border-[#d7d8d1] bg-[#fafaf5] px-2.5 text-[12px] leading-5 focus:border-[#45664b]"
+                            />
+                          </EditorField>
+                        </ChartConfigGroup>
                       </>
                     )}
-                    {selectedWidget.type === "table" && selectedDatasetFields.length ? (
+                    {supportsBasicFormatting ? (
+                      <ChartConfigGroup
+                        title={locale === "zh-CN" ? "基础格式化" : "Basic Formatting"}
+                        description={
+                          selectedWidget.type === "table"
+                            ? locale === "zh-CN"
+                              ? "把表格数值的展示格式独立到数据层，避免继续混在表格视觉样式里。"
+                              : "Keep table number formatting in the data layer instead of mixing it into visual styling."
+                            : locale === "zh-CN"
+                              ? "把数值格式、前后缀放回数据层，确保面板、预览和最终渲染说同一种数字语言。"
+                              : "Keep value format and affixes with the data layer so the panel, preview and widget stay in sync."
+                        }
+                      >
+                        {isMetricLikeWidget ? (
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "前缀" : "Prefix"}>
+                              <Input
+                                className={editorControlClass}
+                                value={selectedWidget.valuePrefix ?? ""}
+                                onChange={(event) => handleWidgetPatch({valuePrefix: event.target.value})}
+                                placeholder={locale === "zh-CN" ? "如 $" : "e.g. $"}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "后缀" : "Suffix"}>
+                              <Input
+                                className={editorControlClass}
+                                value={selectedWidget.valueSuffix ?? ""}
+                                onChange={(event) => handleWidgetPatch({valueSuffix: event.target.value})}
+                                placeholder={locale === "zh-CN" ? "如 %" : "e.g. %"}
+                              />
+                            </EditorField>
+                          </div>
+                        ) : null}
+                        {isChartWidget || selectedWidget.type === "rank" ? (
+                          <>
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <EditorField label={locale === "zh-CN" ? "数值格式" : "Value Format"}>
+                                <Select
+                                  className={editorControlClass}
+                                  value={selectedWidget.chartLabelFormat ?? (selectedWidget.type === "pie" ? "percent" : "raw")}
+                                  onChange={(event) =>
+                                    handleWidgetPatch({
+                                      chartLabelFormat: event.target.value as EditorWidget["chartLabelFormat"],
+                                    })
+                                  }
+                                  options={[
+                                    {label: locale === "zh-CN" ? "原始值" : "Raw", value: "raw"},
+                                    {label: locale === "zh-CN" ? "紧凑格式" : "Compact", value: "compact"},
+                                    {label: locale === "zh-CN" ? "百分比" : "Percent", value: "percent"},
+                                  ]}
+                                />
+                              </EditorField>
+                              <EditorField label={locale === "zh-CN" ? "小数位" : "Decimals"}>
+                                <Input
+                                  className={editorControlClass}
+                                  value={String(selectedWidget.chartDecimals ?? 0)}
+                                  onChange={(event) =>
+                                    handleWidgetPatch({
+                                      chartDecimals: clamp(numberOr(event.target.value, selectedWidget.chartDecimals ?? 0), 0, 3),
+                                    })
+                                  }
+                                />
+                              </EditorField>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <EditorField label={locale === "zh-CN" ? "前缀" : "Prefix"}>
+                                <Input
+                                  className={editorControlClass}
+                                  value={selectedWidget.valuePrefix ?? ""}
+                                  onChange={(event) => handleWidgetPatch({valuePrefix: event.target.value})}
+                                  placeholder={locale === "zh-CN" ? "如 $" : "e.g. $"}
+                                />
+                              </EditorField>
+                              <EditorField label={locale === "zh-CN" ? "后缀" : "Suffix"}>
+                                <Input
+                                  className={editorControlClass}
+                                  value={selectedWidget.valueSuffix ?? ""}
+                                  onChange={(event) => handleWidgetPatch({valueSuffix: event.target.value})}
+                                  placeholder={locale === "zh-CN" ? "如 %" : "e.g. %"}
+                                />
+                              </EditorField>
+                            </div>
+                          </>
+                        ) : null}
+                        {selectedWidget.type === "table" ? (
+                          <EditorField label={locale === "zh-CN" ? "数值格式" : "Number Format"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.tableNumberFormat ?? "raw"}
+                              onChange={(event) =>
+                                handleWidgetPatch({tableNumberFormat: event.target.value as EditorWidget["tableNumberFormat"]})
+                              }
+                              options={[
+                                {label: locale === "zh-CN" ? "原始值" : "Raw", value: "raw"},
+                                {label: locale === "zh-CN" ? "紧凑格式" : "Compact", value: "compact"},
+                                {label: locale === "zh-CN" ? "人民币" : "Currency", value: "currency"},
+                                {label: locale === "zh-CN" ? "百分比" : "Percent", value: "percent"},
+                              ]}
+                            />
+                          </EditorField>
+                        ) : null}
+                      </ChartConfigGroup>
+                    ) : null}
+                    {supportsDataProcessing ? (
+                      <ChartConfigGroup
+                        title={locale === "zh-CN" ? "数据处理" : "Data Processing"}
+                        description={
+                          locale === "zh-CN"
+                            ? "把过滤、排序、Top N、聚合和截断独立成数据层能力，不再混在字段映射和内容配置里。"
+                            : "Keep filtering, sorting, Top N, aggregation and truncation as a dedicated data-layer capability."
+                        }
+                      >
+                        <div className="grid grid-cols-2 gap-2">
+                          <MiniActionButton
+                            label={locale === "zh-CN" ? "清空规则" : "Clear Rules"}
+                            onClick={resetDataProcessing}
+                          />
+                          <MiniActionButton
+                            label={locale === "zh-CN" ? "回到字段映射" : "Back to Mapping"}
+                            onClick={() => setComponentPanelTab("data")}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "过滤字段" : "Filter Field"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.dataFilterField ?? ""}
+                              onChange={(event) => handleWidgetPatch({dataFilterField: event.target.value || undefined})}
+                              options={[
+                                {label: locale === "zh-CN" ? "不启用" : "Off", value: ""},
+                                ...dataProcessingFieldOptions,
+                              ]}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "过滤条件" : "Operator"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.dataFilterOperator ?? "contains"}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  dataFilterOperator: event.target.value as EditorWidget["dataFilterOperator"],
+                                })
+                              }
+                              options={[
+                                {label: locale === "zh-CN" ? "包含" : "Contains", value: "contains"},
+                                {label: locale === "zh-CN" ? "等于" : "Equals", value: "equals"},
+                                {label: ">", value: "gt"},
+                                {label: ">=", value: "gte"},
+                                {label: "<", value: "lt"},
+                                {label: "<=", value: "lte"},
+                              ]}
+                            />
+                          </EditorField>
+                        </div>
+                        <EditorField
+                          label={locale === "zh-CN" ? "过滤值" : "Filter Value"}
+                          hint={
+                            locale === "zh-CN"
+                              ? "留空时不生效；数值字段可直接输入数字。"
+                              : "Leave empty to disable; numeric fields accept raw numbers."
+                          }
+                        >
+                          <Input
+                            className={editorControlClass}
+                            value={selectedWidget.dataFilterValue ?? ""}
+                            onChange={(event) => handleWidgetPatch({dataFilterValue: event.target.value || undefined})}
+                            placeholder={locale === "zh-CN" ? "如 华东 / 100 / delayed" : "e.g. East / 100 / delayed"}
+                          />
+                        </EditorField>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField label={locale === "zh-CN" ? "排序字段" : "Sort Field"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.dataSortField ?? ""}
+                              onChange={(event) => handleWidgetPatch({dataSortField: event.target.value || undefined})}
+                              options={[
+                                {label: locale === "zh-CN" ? "保持原顺序" : "Original Order", value: ""},
+                                ...dataProcessingFieldOptions,
+                              ]}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "排序方向" : "Direction"}>
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.dataSortDirection ?? "desc"}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  dataSortDirection: event.target.value as EditorWidget["dataSortDirection"],
+                                })
+                              }
+                              options={[
+                                {label: locale === "zh-CN" ? "降序" : "Descending", value: "desc"},
+                                {label: locale === "zh-CN" ? "升序" : "Ascending", value: "asc"},
+                              ]}
+                            />
+                          </EditorField>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <EditorField
+                            label={selectedWidget.type === "table" || selectedWidget.type === "events" ? (locale === "zh-CN" ? "行数限制" : "Row Limit") : locale === "zh-CN" ? "Top N" : "Top N"}
+                          >
+                            <Input
+                              className={editorControlClass}
+                              value={selectedWidget.dataLimit ? String(selectedWidget.dataLimit) : ""}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  dataLimit: event.target.value ? clamp(numberOr(event.target.value, selectedWidget.dataLimit ?? 0), 1, 50) : undefined,
+                                })
+                              }
+                              placeholder={locale === "zh-CN" ? "留空为不限制" : "Empty for no limit"}
+                            />
+                          </EditorField>
+                          <EditorField label={locale === "zh-CN" ? "文本截断" : "Truncate"}>
+                            <Input
+                              className={editorControlClass}
+                              value={selectedWidget.dataTruncateLength ? String(selectedWidget.dataTruncateLength) : ""}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  dataTruncateLength: event.target.value ? clamp(numberOr(event.target.value, selectedWidget.dataTruncateLength ?? 0), 4, 40) : undefined,
+                                })
+                              }
+                              placeholder={locale === "zh-CN" ? "字符数" : "Characters"}
+                            />
+                          </EditorField>
+                        </div>
+                        {supportsAggregation ? (
+                          <EditorField
+                            label={locale === "zh-CN" ? "聚合方式" : "Aggregation"}
+                            hint={
+                              locale === "zh-CN"
+                                ? "按当前标签维度合并重复项，再对数值做 sum / avg / min / max / count。"
+                                : "Group duplicate labels first, then aggregate their numeric values."
+                            }
+                          >
+                            <Select
+                              className={editorControlClass}
+                              value={selectedWidget.dataAggregateMode ?? "none"}
+                              onChange={(event) =>
+                                handleWidgetPatch({
+                                  dataAggregateMode: event.target.value as EditorWidget["dataAggregateMode"],
+                                })
+                              }
+                              options={[
+                                {label: locale === "zh-CN" ? "不聚合" : "None", value: "none"},
+                                {label: "SUM", value: "sum"},
+                                {label: "AVG", value: "avg"},
+                                {label: "MIN", value: "min"},
+                                {label: "MAX", value: "max"},
+                                {label: "COUNT", value: "count"},
+                              ]}
+                            />
+                          </EditorField>
+                        ) : null}
+                      </ChartConfigGroup>
+                    ) : null}
+                    {selectedWidget.type === "table" && availableTableFields.length ? (
+                      <ChartConfigGroup
+                        title={locale === "zh-CN" ? "列配置" : "Column Config"}
+                        description={
+                          locale === "zh-CN"
+                            ? "表格列的显隐、别名、宽度和顺序先集中在这里收口。"
+                            : "Keep table column visibility, labels, widths and order in one place."
+                        }
+                      >
                       <div className="space-y-3">
                         <EditorField
                           label={locale === "zh-CN" ? "显示列" : "Visible Columns"}
                           hint={locale === "zh-CN" ? "至少保留 1 列；顺序即展示顺序" : "Keep at least one column; order follows the list below"}
                         >
                           <div className="space-y-2">
-                            {selectedDatasetFields.map((field) => {
+                            {availableTableFields.map((field) => {
                               const checked = effectiveTableColumns.includes(field.field);
                               return (
                                 <button
@@ -3840,14 +5543,28 @@ export function EditorWorkbench({
                           </EditorField>
                         ))}
                       </div>
+                      </ChartConfigGroup>
                     ) : null}
+                    {usesDatasetBinding ? (
+                      <ChartConfigGroup title={locale === "zh-CN" ? "预览" : "Preview"}>
+                        <BoundDatasetPreviewCard
+                          locale={locale}
+                          widget={selectedWidget}
+                          dataset={boundDataset}
+                        />
+                      </ChartConfigGroup>
+                    ) : null}
+                      </>
+                    )}
+                    </div>
                   </EditorSection>
                   ) : null}
 
                   {componentPanelTab === "style" && isChartWidget ? (
                     <EditorSection title={locale === "zh-CN" ? "图表配置" : "Chart Settings"}>
-                      <div className="space-y-3">
+                      <div className="flex flex-col gap-3">
                         <ChartConfigGroup
+                          className="order-10"
                           title={locale === "zh-CN" ? "标题" : "Title"}
                           description={
                             locale === "zh-CN"
@@ -3975,6 +5692,7 @@ export function EditorWorkbench({
                         </ChartConfigGroup>
 
                         <ChartConfigGroup
+                          className="order-20"
                           title={locale === "zh-CN" ? "配色与视觉" : "Palette & Visuals"}
                           description={
                             locale === "zh-CN"
@@ -4006,14 +5724,15 @@ export function EditorWorkbench({
                         </ChartConfigGroup>
 
                         <ChartConfigGroup
+                          className="order-40"
                           title={locale === "zh-CN" ? "标签与图例" : "Labels & Legend"}
                           description={
                             locale === "zh-CN"
                               ? "控制数值、数据标签和图例怎么出现在用户眼前。"
-                              : "Control how values, labels and legends are presented to the viewer."
+                              : "Control label visibility, tone and legend presentation."
                           }
                         >
-                          <div className="grid grid-cols-2 gap-2.5">
+                          <div className="hidden grid-cols-2 gap-2.5">
                             <EditorField label={locale === "zh-CN" ? "数值格式" : "Value Format"}>
                               <Select
                                 className={editorControlClass}
@@ -4042,7 +5761,7 @@ export function EditorWorkbench({
                               />
                             </EditorField>
                           </div>
-                          <div className="grid grid-cols-2 gap-2.5">
+                          <div className="hidden grid-cols-2 gap-2.5">
                             <EditorField label={locale === "zh-CN" ? "前缀" : "Prefix"}>
                               <Input
                                 className={editorControlClass}
@@ -4149,6 +5868,7 @@ export function EditorWorkbench({
                         </ChartConfigGroup>
 
                         <ChartConfigGroup
+                          className="order-30"
                           title={locale === "zh-CN" ? "坐标与网格" : "Axes & Grid"}
                           description={
                             locale === "zh-CN"
@@ -4296,6 +6016,7 @@ export function EditorWorkbench({
                         </ChartConfigGroup>
 
                         <ChartConfigGroup
+                          className="order-50"
                           title={locale === "zh-CN" ? "图形细节" : "Series Detail"}
                           description={
                             locale === "zh-CN"
@@ -4409,6 +6130,7 @@ export function EditorWorkbench({
                         </ChartConfigGroup>
 
                         <ChartConfigGroup
+                          className="order-60"
                           title={locale === "zh-CN" ? "容器" : "Container"}
                           description={
                             locale === "zh-CN"
@@ -4482,194 +6204,270 @@ export function EditorWorkbench({
 
                   {componentPanelTab === "style" && selectedWidget.type === "map" ? (
                     <EditorSection title={t("rightPanel.map.title")}>
-                    <div className="space-y-3">
-                      <ToggleRow label={t("rightPanel.map.showLabels")} checked={mapLabels} onCheckedChange={setMapLabels} />
-                      <ToggleRow label={t("rightPanel.map.show3DAxis")} checked={map3dAxis} onCheckedChange={setMap3dAxis} />
-                      <ToggleRow label={locale === "zh-CN" ? "显示标记点" : "Show Markers"} checked={mapMarkers} onCheckedChange={setMapMarkers} />
-                      <EditorField label={locale === "zh-CN" ? "路线密度" : "Route Density"}>
-                        <Select
-                          className={editorControlClass}
-                          value={mapRouteDensity}
-                          onChange={(event) => setMapRouteDensity(event.target.value as "low" | "balanced" | "high")}
-                          options={[
-                            {label: locale === "zh-CN" ? "简洁" : "Low", value: "low"},
-                            {label: locale === "zh-CN" ? "均衡" : "Balanced", value: "balanced"},
-                            {label: locale === "zh-CN" ? "丰富" : "High", value: "high"},
-                          ]}
-                        />
-                      </EditorField>
-                      <EditorField label={locale === "zh-CN" ? "路线样式" : "Route Style"}>
-                        <Select
-                          className={editorControlClass}
-                          value={mapRouteStyle}
-                          onChange={(event) => setMapRouteStyle(event.target.value as "solid" | "dashed" | "pulse")}
-                          options={[
-                            {label: locale === "zh-CN" ? "连续光带" : "Solid", value: "solid"},
-                            {label: locale === "zh-CN" ? "虚线路径" : "Dashed", value: "dashed"},
-                            {label: locale === "zh-CN" ? "脉冲高亮" : "Pulse", value: "pulse"},
-                          ]}
-                        />
-                      </EditorField>
-                      <EditorField label={locale === "zh-CN" ? "标签风格" : "Label Style"}>
-                        <Select
-                          className={editorControlClass}
-                          value={mapLabelStyle}
-                          onChange={(event) => setMapLabelStyle(event.target.value as "pill" | "minimal")}
-                          options={[
-                            {label: locale === "zh-CN" ? "胶囊标签" : "Pill", value: "pill"},
-                            {label: locale === "zh-CN" ? "极简标注" : "Minimal", value: "minimal"},
-                          ]}
-                        />
-                      </EditorField>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <EditorField label={locale === "zh-CN" ? "海洋底色" : "Ocean Color"}>
-                          <ColorSwatchField
-                            value={mapOceanColor}
-                            onChange={setMapOceanColor}
-                            swatches={["#0f1915", "#10231d", "#0e2430", "#201a14", "#162119", "#ffffff"]}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "边界线颜色" : "Border Color"}>
-                          <ColorSwatchField
-                            value={mapBorderColor}
-                            onChange={setMapBorderColor}
-                            swatches={["#4e7459", "#6c8f78", "#7f9d89", "#5d768a", "#c7e0cc", "#ffffff"]}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "地表起始色" : "Land Start"}>
-                          <ColorSwatchField
-                            value={mapLandStartColor}
-                            onChange={setMapLandStartColor}
-                            swatches={["#23422a", "#284a32", "#31503a", "#34503b", "#5c845f", "#ffffff"]}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "地表结束色" : "Land End"}>
-                          <ColorSwatchField
-                            value={mapLandEndColor}
-                            onChange={setMapLandEndColor}
-                            swatches={["#1b3423", "#20302a", "#243b2c", "#314536", "#5c745d", "#dff3e2"]}
-                          />
-                        </EditorField>
+                      <div className="space-y-3">
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "底图" : "Base Map"}
+                          description={
+                            locale === "zh-CN"
+                              ? "先定海洋、陆地和边界层，让地图底座稳定下来。"
+                              : "Set the ocean, land and border layer first so the map has a stable foundation."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "地图质感" : "Surface Tone"}>
+                              <Select
+                                className={editorControlClass}
+                                value={mapSurfaceTone}
+                                onChange={(event) => setMapSurfaceTone(event.target.value as "soft" | "contrast")}
+                                options={[
+                                  {label: locale === "zh-CN" ? "柔和" : "Soft", value: "soft"},
+                                  {label: locale === "zh-CN" ? "对比" : "Contrast", value: "contrast"},
+                                ]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "地表透明度" : "Land Opacity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${mapLandOpacity}%`}
+                                onChange={(event) => setMapLandOpacity(clamp(numberOr(event.target.value.replace("%", ""), mapLandOpacity), 20, 100))}
+                              />
+                            </EditorField>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "海洋底色" : "Ocean Color"}>
+                              <ColorSwatchField
+                                value={mapOceanColor}
+                                onChange={setMapOceanColor}
+                                swatches={["#0f1915", "#10231d", "#0e2430", "#201a14", "#162119", "#ffffff"]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "边界线颜色" : "Border Color"}>
+                              <ColorSwatchField
+                                value={mapBorderColor}
+                                onChange={setMapBorderColor}
+                                swatches={["#4e7459", "#6c8f78", "#7f9d89", "#5d768a", "#c7e0cc", "#ffffff"]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "地表起始色" : "Land Start"}>
+                              <ColorSwatchField
+                                value={mapLandStartColor}
+                                onChange={setMapLandStartColor}
+                                swatches={["#23422a", "#284a32", "#31503a", "#34503b", "#5c845f", "#ffffff"]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "地表结束色" : "Land End"}>
+                              <ColorSwatchField
+                                value={mapLandEndColor}
+                                onChange={setMapLandEndColor}
+                                swatches={["#1b3423", "#20302a", "#243b2c", "#314536", "#5c745d", "#dff3e2"]}
+                              />
+                            </EditorField>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "主轴颜色" : "Axis Color"}>
+                              <ColorSwatchField
+                                value={mapAxisColor}
+                                onChange={setMapAxisColor}
+                                swatches={["#6f8575", "#8ea093", "#bcd0c3", "#6e8897", "#d8e5dc", "#ffffff"]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "副轴颜色" : "Secondary Axis"}>
+                              <ColorSwatchField
+                                value={mapAxisSecondaryColor}
+                                onChange={setMapAxisSecondaryColor}
+                                swatches={["#486050", "#5c745d", "#7e8d80", "#4f6472", "#c7d8cb", "#ffffff"]}
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "点位" : "Markers"}
+                          description={
+                            locale === "zh-CN"
+                              ? "控制 marker 的颜色、halo 和尺寸，让热点读起来更清楚。"
+                              : "Control marker color, halo and scale so hotspots read clearly."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "标记点颜色" : "Marker Color"}>
+                              <ColorSwatchField
+                                value={mapMarkerColor}
+                                onChange={setMapMarkerColor}
+                                swatches={["#dfffe7", "#ffffff", "#ffe9d4", "#d6edff", "#bde7c7", "#8ef0ae"]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "标记 Halo" : "Marker Halo"}>
+                              <ColorSwatchField
+                                value={mapMarkerHaloColor}
+                                onChange={setMapMarkerHaloColor}
+                                swatches={["#9ae9ae", "#dfffe7", "#ffffff", "#bde7c7", "#d6edff", "#ffe9d4"]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "标记辉光色" : "Marker Glow"}>
+                              <ColorSwatchField
+                                value={mapMarkerGlowColor}
+                                onChange={setMapMarkerGlowColor}
+                                swatches={["#8ef0ae", "#bde7c7", "#9ae9ae", "#8ecbff", "#ffd08e", "#ffffff"]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "点位大小" : "Marker Scale"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${mapPointScale}%`}
+                                onChange={(event) => setMapPointScale(clamp(numberOr(event.target.value.replace("%", ""), mapPointScale), 40, 220))}
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "路线" : "Routes"}
+                          description={
+                            locale === "zh-CN"
+                              ? "控制路线的密度、样式和亮度，先保证方向感，再调视觉冲击力。"
+                              : "Tune route density, style and emphasis so the flow reads before it dazzles."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "路线密度" : "Route Density"}>
+                              <Select
+                                className={editorControlClass}
+                                value={mapRouteDensity}
+                                onChange={(event) => setMapRouteDensity(event.target.value as "low" | "balanced" | "high")}
+                                options={[
+                                  {label: locale === "zh-CN" ? "简洁" : "Low", value: "low"},
+                                  {label: locale === "zh-CN" ? "均衡" : "Balanced", value: "balanced"},
+                                  {label: locale === "zh-CN" ? "丰富" : "High", value: "high"},
+                                ]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "路线样式" : "Route Style"}>
+                              <Select
+                                className={editorControlClass}
+                                value={mapRouteStyle}
+                                onChange={(event) => setMapRouteStyle(event.target.value as "solid" | "dashed" | "pulse")}
+                                options={[
+                                  {label: locale === "zh-CN" ? "连续光带" : "Solid", value: "solid"},
+                                  {label: locale === "zh-CN" ? "虚线路径" : "Dashed", value: "dashed"},
+                                  {label: locale === "zh-CN" ? "脉冲高亮" : "Pulse", value: "pulse"},
+                                ]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "路线颜色" : "Route Color"}>
+                              <ColorSwatchField
+                                value={mapRouteColor}
+                                onChange={setMapRouteColor}
+                                swatches={["#bde7c7", "#dfffe7", "#c6e7ff", "#ffd9b3", "#f6f6ef", "#8ef0ae"]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "路线辉光色" : "Route Glow"}>
+                              <ColorSwatchField
+                                value={mapRouteGlowColor}
+                                onChange={setMapRouteGlowColor}
+                                swatches={["#8ef0ae", "#bde7c7", "#8ecbff", "#ffd08e", "#ffffff", "#5cf1b8"]}
+                              />
+                            </EditorField>
+                          </div>
+                          <EditorField label={locale === "zh-CN" ? "路线粗细" : "Route Width"}>
+                            <Input
+                              className={editorControlClass}
+                              value={`${mapRouteWidth}%`}
+                              onChange={(event) => setMapRouteWidth(clamp(numberOr(event.target.value.replace("%", ""), mapRouteWidth), 40, 220))}
+                            />
+                          </EditorField>
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "标签" : "Labels"}
+                          description={
+                            locale === "zh-CN"
+                              ? "控制地名和提示标签的显隐与文字风格。"
+                              : "Control visibility and text styling for place labels and on-map notes."
+                          }
+                        >
+                          <ToggleRow label={t("rightPanel.map.showLabels")} checked={mapLabels} onCheckedChange={setMapLabels} />
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "标签风格" : "Label Style"}>
+                              <Select
+                                className={editorControlClass}
+                                value={mapLabelStyle}
+                                onChange={(event) => setMapLabelStyle(event.target.value as "pill" | "minimal")}
+                                options={[
+                                  {label: locale === "zh-CN" ? "胶囊标签" : "Pill", value: "pill"},
+                                  {label: locale === "zh-CN" ? "极简标注" : "Minimal", value: "minimal"},
+                                ]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "标签透明度" : "Label Opacity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${mapLabelOpacity}%`}
+                                onChange={(event) => setMapLabelOpacity(clamp(numberOr(event.target.value.replace("%", ""), mapLabelOpacity), 20, 100))}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "标签文字色" : "Label Color"}>
+                              <ColorSwatchField
+                                value={mapLabelColor}
+                                onChange={setMapLabelColor}
+                                swatches={["#f5fff7", "#ffffff", "#dfffe7", "#d8f4ff", "#ffe7d2", "#20302a"]}
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "热力" : "Heat"}
+                          description={
+                            locale === "zh-CN"
+                              ? "把强弱层次先定出来，热力表达才不会只有一片亮色。"
+                              : "Set the low and high ends first so heat intensity reads as a real scale."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "热力低值色" : "Heat Low"}>
+                              <ColorSwatchField
+                                value={mapHeatLowColor}
+                                onChange={setMapHeatLowColor}
+                                swatches={["#4d8f67", "#5ca37a", "#5d84a3", "#c99a4b", "#8f8f7a", "#ffffff"]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "热力高值色" : "Heat High"}>
+                              <ColorSwatchField
+                                value={mapHeatHighColor}
+                                onChange={setMapHeatHighColor}
+                                swatches={["#bde7c7", "#dfffe7", "#bde2ff", "#ffd9a6", "#f6f6ef", "#8ef0ae"]}
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
+
+                        <ChartConfigGroup
+                          title={locale === "zh-CN" ? "容器" : "Container"}
+                          description={
+                            locale === "zh-CN"
+                              ? "这里先放当前地图卡片已有的容器级参数，后面再补更完整的边框和阴影。"
+                              : "Keep the current card-level controls here, with room for fuller border and shadow options later."
+                          }
+                        >
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <EditorField label={locale === "zh-CN" ? "面板文字色" : "Panel Text"}>
+                              <ColorSwatchField
+                                value={mapPanelTextColor}
+                                onChange={setMapPanelTextColor}
+                                swatches={["#243129", "#20302a", "#31503a", "#4c5f56", "#ffffff", "#dfffe7"]}
+                              />
+                            </EditorField>
+                            <EditorField label={locale === "zh-CN" ? "辉光强度" : "Glow Intensity"}>
+                              <Input
+                                className={editorControlClass}
+                                value={`${mapGlow}%`}
+                                onChange={(event) => setMapGlow(clamp(numberOr(event.target.value.replace("%", ""), mapGlow), 0, 100))}
+                              />
+                            </EditorField>
+                          </div>
+                        </ChartConfigGroup>
                       </div>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <EditorField label={locale === "zh-CN" ? "路线颜色" : "Route Color"}>
-                          <ColorSwatchField
-                            value={mapRouteColor}
-                            onChange={setMapRouteColor}
-                            swatches={["#bde7c7", "#dfffe7", "#c6e7ff", "#ffd9b3", "#f6f6ef", "#8ef0ae"]}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "路线辉光色" : "Route Glow"}>
-                          <ColorSwatchField
-                            value={mapRouteGlowColor}
-                            onChange={setMapRouteGlowColor}
-                            swatches={["#8ef0ae", "#bde7c7", "#8ecbff", "#ffd08e", "#ffffff", "#5cf1b8"]}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "标记点颜色" : "Marker Color"}>
-                          <ColorSwatchField
-                            value={mapMarkerColor}
-                            onChange={setMapMarkerColor}
-                            swatches={["#dfffe7", "#ffffff", "#ffe9d4", "#d6edff", "#bde7c7", "#8ef0ae"]}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "标记辉光色" : "Marker Glow"}>
-                          <ColorSwatchField
-                            value={mapMarkerGlowColor}
-                            onChange={setMapMarkerGlowColor}
-                            swatches={["#8ef0ae", "#bde7c7", "#9ae9ae", "#8ecbff", "#ffd08e", "#ffffff"]}
-                          />
-                        </EditorField>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <EditorField label={locale === "zh-CN" ? "标签文字色" : "Label Color"}>
-                          <ColorSwatchField
-                            value={mapLabelColor}
-                            onChange={setMapLabelColor}
-                            swatches={["#f5fff7", "#ffffff", "#dfffe7", "#d8f4ff", "#ffe7d2", "#20302a"]}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "热力低值色" : "Heat Low"}>
-                          <ColorSwatchField
-                            value={mapHeatLowColor}
-                            onChange={setMapHeatLowColor}
-                            swatches={["#4d8f67", "#5ca37a", "#5d84a3", "#c99a4b", "#8f8f7a", "#ffffff"]}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "热力高值色" : "Heat High"}>
-                          <ColorSwatchField
-                            value={mapHeatHighColor}
-                            onChange={setMapHeatHighColor}
-                            swatches={["#bde7c7", "#dfffe7", "#bde2ff", "#ffd9a6", "#f6f6ef", "#8ef0ae"]}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "面板文字色" : "Panel Text"}>
-                          <ColorSwatchField
-                            value={mapPanelTextColor}
-                            onChange={setMapPanelTextColor}
-                            swatches={["#243129", "#20302a", "#31503a", "#4c5f56", "#ffffff", "#dfffe7"]}
-                          />
-                        </EditorField>
-                      </div>
-                      <EditorField label={locale === "zh-CN" ? "辉光强度" : "Glow Intensity"}>
-                        <Input
-                          className={editorControlClass}
-                          value={`${mapGlow}%`}
-                          onChange={(event) => setMapGlow(clamp(numberOr(event.target.value.replace("%", ""), mapGlow), 0, 100))}
-                        />
-                      </EditorField>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <EditorField label={locale === "zh-CN" ? "点位大小" : "Marker Scale"}>
-                          <Input
-                            className={editorControlClass}
-                            value={`${mapPointScale}%`}
-                            onChange={(event) => setMapPointScale(clamp(numberOr(event.target.value.replace("%", ""), mapPointScale), 40, 220))}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "路线粗细" : "Route Width"}>
-                          <Input
-                            className={editorControlClass}
-                            value={`${mapRouteWidth}%`}
-                            onChange={(event) => setMapRouteWidth(clamp(numberOr(event.target.value.replace("%", ""), mapRouteWidth), 40, 220))}
-                          />
-                        </EditorField>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <EditorField label={locale === "zh-CN" ? "主轴颜色" : "Axis Color"}>
-                          <ColorSwatchField
-                            value={mapAxisColor}
-                            onChange={setMapAxisColor}
-                            swatches={["#6f8575", "#8ea093", "#bcd0c3", "#6e8897", "#d8e5dc", "#ffffff"]}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "副轴颜色" : "Secondary Axis"}>
-                          <ColorSwatchField
-                            value={mapAxisSecondaryColor}
-                            onChange={setMapAxisSecondaryColor}
-                            swatches={["#486050", "#5c745d", "#7e8d80", "#4f6472", "#c7d8cb", "#ffffff"]}
-                          />
-                        </EditorField>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <EditorField label={locale === "zh-CN" ? "地表透明度" : "Land Opacity"}>
-                          <Input
-                            className={editorControlClass}
-                            value={`${mapLandOpacity}%`}
-                            onChange={(event) => setMapLandOpacity(clamp(numberOr(event.target.value.replace("%", ""), mapLandOpacity), 20, 100))}
-                          />
-                        </EditorField>
-                        <EditorField label={locale === "zh-CN" ? "标签透明度" : "Label Opacity"}>
-                          <Input
-                            className={editorControlClass}
-                            value={`${mapLabelOpacity}%`}
-                            onChange={(event) => setMapLabelOpacity(clamp(numberOr(event.target.value.replace("%", ""), mapLabelOpacity), 20, 100))}
-                          />
-                        </EditorField>
-                      </div>
-                      <EditorField label={t("rightPanel.map.defaultZoom")}>
-                        <Input className={editorControlClass} value={mapZoom} onChange={(event) => setMapZoom(event.target.value)} />
-                      </EditorField>
-                    </div>
                     </EditorSection>
                   ) : null}
 
@@ -5010,6 +6808,8 @@ function ComponentIcon({name, fallback}: {name: string; fallback: string}) {
   if (name.includes("Table")) return <Table2 className={className} strokeWidth={2} />;
   if (name.includes("Rank")) return <ListOrdered className={className} strokeWidth={2} />;
   if (name.includes("World Map")) return <Globe2 className={className} strokeWidth={2} />;
+  if (name.includes("Decoration")) return <Layers3 className={className} strokeWidth={2} />;
+  if (name.includes("Flip")) return <LayoutGrid className={className} strokeWidth={2} />;
   if (name.includes("Image")) return <ImageIcon className={className} strokeWidth={2} />;
   if (name.includes("Text")) return <Type className={className} strokeWidth={2} />;
 
@@ -5024,6 +6824,8 @@ function resolveWidgetType(name: string): EditorWidget["type"] {
   if (name.includes("Table")) return "table";
   if (name.includes("Rank")) return "rank";
   if (name.includes("Map")) return "map";
+  if (name.includes("Decoration")) return "decoration";
+  if (name.includes("Flip")) return "numberFlip";
   if (name.includes("Image")) return "image";
   if (name.includes("Text")) return "text";
   return "metric";
@@ -5032,8 +6834,9 @@ function resolveWidgetType(name: string): EditorWidget["type"] {
 function railTitle(tab: RailTab, t: ReturnType<typeof useTranslations>, locale: string) {
   if (tab === "components") return t("leftPanel.title");
   if (tab === "layers") return t("rightPanel.layers.title");
-  if (tab === "data") return locale === "zh-CN" ? "数据源" : "Datasets";
-  return locale === "zh-CN" ? "模板预设" : "Template Presets";
+  if (tab === "data") return locale === "zh-CN" ? "\u6570\u636e\u6e90" : "Datasets";
+  if (locale === "zh-CN") return "\u6a21\u677f\u9884\u8bbe";
+  return "Template Presets";
 }
 
 function widgetTypeLabel(type: EditorWidget["type"], locale: string) {
@@ -5063,11 +6866,39 @@ function widgetTypeLabel(type: EditorWidget["type"], locale: string) {
     text: "Text Block",
     image: "Image",
   };
-  return locale === "zh-CN" ? zh[type] : en[type];
+  const zhExtended = {
+    ...zh,
+    numberFlip: "鏁板瓧缈荤墝",
+    decoration: "瑁呴グ缁勪欢",
+  };
+  zhExtended.numberFlip = "\u6570\u5b57\u7ffb\u724c";
+  zhExtended.decoration = "\u88c5\u9970\u7ec4\u4ef6";
+  const zhNormalized = {
+    ...zhExtended,
+    metric: "\u6307\u6807\u5361",
+    line: "\u6298\u7ebf\u56fe",
+    area: "\u9762\u79ef\u56fe",
+    pie: "\u73af\u5f62\u56fe",
+    map: "\u5730\u56fe\u7ec4\u4ef6",
+    bar: "\u67f1\u72b6\u56fe",
+    events: "\u4e8b\u4ef6\u5217\u8868",
+    table: "\u6570\u636e\u8868\u683c",
+    rank: "\u6392\u884c\u7ec4\u4ef6",
+    text: "\u6587\u672c\u8bf4\u660e",
+    image: "\u56fe\u7247\u7ec4\u4ef6",
+    numberFlip: "\u6570\u5b57\u7ffb\u724c",
+    decoration: "\u88c5\u9970\u7ec4\u4ef6",
+  };
+  const enExtended = {
+    ...en,
+    numberFlip: "Number Flip",
+    decoration: "Decoration",
+  };
+  return locale === "zh-CN" ? zhNormalized[type] : enExtended[type];
 }
 
 function defaultManualDataTemplate(type: EditorWidget["type"]) {
-  if (type === "metric") {
+  if (type === "metric" || type === "numberFlip") {
     return JSON.stringify(
       {
         value: 1280,
@@ -5102,6 +6933,18 @@ function defaultManualDataTemplate(type: EditorWidget["type"]) {
     );
   }
 
+  if (type === "map") {
+    return JSON.stringify(
+      [
+        {region: "Shanghai", value: 92},
+        {region: "Singapore", value: 88},
+        {region: "Rotterdam", value: 74},
+      ],
+      null,
+      2,
+    );
+  }
+
   if (type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank") {
     return JSON.stringify(
       [
@@ -5118,13 +6961,13 @@ function defaultManualDataTemplate(type: EditorWidget["type"]) {
 }
 
 function manualDataPlaceholderHint(type: EditorWidget["type"], locale: string) {
-  if (type === "metric") {
+  if (type === "metric" || type === "numberFlip") {
     return locale === "zh-CN"
       ? "对象格式，例如 {\"value\":1280,\"hint\":\"较上周 +12%\"}"
       : "Use an object, for example {\"value\":1280,\"hint\":\"+12% vs last week\"}";
   }
 
-  if (type === "table" || type === "events") {
+  if (type === "table" || type === "events" || type === "map") {
     return locale === "zh-CN"
       ? "对象数组格式，例如 [{\"region\":\"华东\",\"sales\":820}]"
       : "Use an array of objects, for example [{\"region\":\"East\",\"sales\":820}]";
@@ -5142,7 +6985,7 @@ function manualDataSuccessSummary(
 ) {
   if (!state.valid) return state.error;
 
-  if (type === "metric" && state.metric) {
+  if ((type === "metric" || type === "numberFlip") && state.metric) {
     return locale === "zh-CN"
       ? `已识别 1 条指标数据，当前值为 ${state.metric.value}`
       : `1 metric record detected. Current value: ${state.metric.value}`;
@@ -5167,13 +7010,15 @@ function ChartConfigGroup({
   title,
   description,
   children,
+  className,
 }: {
   title: string;
   description?: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="space-y-3 rounded-xl border border-[#d7d8d1] bg-[#fcfcf8] px-3 py-3 shadow-[0_1px_0_rgba(255,255,255,0.55)]">
+    <div className={`space-y-3 rounded-xl border border-[#d7d8d1] bg-[#fcfcf8] px-3 py-3 shadow-[0_1px_0_rgba(255,255,255,0.55)] ${className ?? ""}`}>
       <div>
         <div className="text-[12px] font-semibold text-[#1a1c19]">{title}</div>
         {description ? <p className="mt-1 text-[11px] leading-5 text-[#727971]">{description}</p> : null}
@@ -5393,7 +7238,7 @@ function ManualDataPreviewCard({
       ? "这里展示这段 JSON 最终会驱动出的内容结构。"
       : "This preview shows what the widget will actually render from the JSON above.";
 
-  if (widgetType === "metric" && state.metric) {
+  if ((widgetType === "metric" || widgetType === "numberFlip") && state.metric) {
     return (
       <div className="rounded-xl border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3">
         <div className="text-[12px] font-semibold text-[#1a1c19]">{title}</div>
@@ -5408,15 +7253,16 @@ function ManualDataPreviewCard({
   }
 
   if (state.series?.length) {
+    const series = processSeriesSnapshot(state.series, widget);
     return (
       <div className="rounded-xl border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3">
         <div className="text-[12px] font-semibold text-[#1a1c19]">{title}</div>
         <p className="mt-1 text-[11px] leading-5 text-[#727971]">{subtitle}</p>
         <div className="mt-3 space-y-2">
-          {state.series.slice(0, 5).map((item, index) => (
+          {series.slice(0, 5).map((item, index) => (
             <div key={`${item.label}-${index}`} className="flex items-center justify-between rounded-lg border border-[#dde2d7] bg-white/70 px-3 py-2">
               <span className="truncate text-[12px] font-medium text-[#1a1c19]">{item.label}</span>
-              <span className="font-mono text-[12px] text-[#45664b]">{`${widget.valuePrefix ?? ""}${item.value}${widget.valueSuffix ?? ""}`}</span>
+              <span className="font-mono text-[12px] text-[#45664b]">{formatPreviewSeriesValue(widget, item.value)}</span>
             </div>
           ))}
         </div>
@@ -5426,13 +7272,31 @@ function ManualDataPreviewCard({
 
   if (state.rows?.length) {
     const isEventLike = widgetType === "events";
-    const eventRows = isEventLike ? eventSnapshotFromRows(state.rows, widget.fieldMap).slice(0, 4) : [];
-    const tablePreview = !isEventLike
-      ? tableSnapshotFromRows(state.rows, {
-          columns: widget.tableColumns,
-          labels: widget.tableColumnLabels,
-          widths: widget.tableColumnWidths,
-        })
+    const isMapLike = widgetType === "map";
+    const eventRows = isEventLike
+      ? processEventSnapshotRows(eventSnapshotFromRows(state.rows, widget.fieldMap), widget).slice(0, 4)
+      : [];
+    const mapPreview = isMapLike
+      ? processMapSnapshotData(
+          mapSnapshot(
+            {
+              fields: inferFieldsFromRows(state.rows),
+              rows: state.rows,
+            },
+            widget.fieldMap,
+          ),
+          widget,
+        )
+      : null;
+    const tablePreview = !isEventLike && !isMapLike
+      ? processTableSnapshotData(
+          tableSnapshotFromRows(state.rows, {
+            columns: widget.tableColumns,
+            labels: widget.tableColumnLabels,
+            widths: widget.tableColumnWidths,
+          }),
+          widget,
+        )
       : null;
 
     return (
@@ -5448,6 +7312,18 @@ function ManualDataPreviewCard({
               </div>
             ))}
           </div>
+        ) : mapPreview ? (
+          <div className="mt-3 space-y-2">
+            {mapPreview.points.slice(0, 4).map((point) => (
+              <div key={point.id} className="flex items-center justify-between rounded-lg border border-[#dde2d7] bg-white/70 px-3 py-2">
+                <div className="min-w-0">
+                  <div className="truncate text-[12px] font-medium text-[#1a1c19]">{point.label}</div>
+                  <div className="mt-1 text-[11px] text-[#727971]">{`${point.lat.toFixed(2)}, ${point.lon.toFixed(2)}`}</div>
+                </div>
+                <div className="font-mono text-[12px] text-[#45664b]">{point.value}</div>
+              </div>
+            ))}
+          </div>
         ) : tablePreview ? (
           <div className="mt-3 overflow-hidden rounded-lg border border-[#dde2d7] bg-white/80">
             <div className="grid bg-[#eef0e8] text-[10px] uppercase tracking-[0.14em] text-[#727971]" style={{gridTemplateColumns: `repeat(${Math.max(1, tablePreview.columns.length)}, minmax(0, 1fr))`}}>
@@ -5459,7 +7335,9 @@ function ManualDataPreviewCard({
               {tablePreview.rows.slice(0, 3).map((row, rowIndex) => (
                 <div key={rowIndex} className="grid text-[12px] text-[#1a1c19]" style={{gridTemplateColumns: `repeat(${Math.max(1, tablePreview.columns.length)}, minmax(0, 1fr))`}}>
                   {tablePreview.columns.slice(0, 4).map((column) => (
-                    <div key={column.key} className="truncate px-3 py-2.5">{String(row[column.key] ?? "-")}</div>
+                    <div key={column.key} className="truncate px-3 py-2.5">
+                      {formatPreviewTableCellValue(row[column.key], widget.tableNumberFormat ?? "raw")}
+                    </div>
                   ))}
                 </div>
               ))}
@@ -5471,6 +7349,195 @@ function ManualDataPreviewCard({
   }
 
   return null;
+}
+
+function BoundDatasetPreviewCard({
+  locale,
+  widget,
+  dataset,
+}: {
+  locale: string;
+  widget: EditorWidget;
+  dataset?: WidgetDataset;
+}) {
+  const title = locale === "zh-CN" ? "绑定数据预览" : "Bound Data Preview";
+  const subtitle =
+    locale === "zh-CN"
+      ? "这里展示当前数据集绑定最终会驱动出的内容结果。"
+      : "This preview shows what the current dataset binding will actually drive.";
+
+  if (!dataset?.rows.length) {
+    return (
+      <div className="rounded-xl border border-dashed border-[#d7d8d1] bg-[#fafaf5] px-3 py-3 text-[12px] text-[#727971]">
+        {locale === "zh-CN" ? "当前数据集还没有可预览的行数据。" : "The current dataset does not have previewable rows yet."}
+      </div>
+    );
+  }
+
+  if (widget.type === "metric" || widget.type === "numberFlip") {
+    const data = metricSnapshot(dataset, widget.fieldMap);
+    return (
+      <div className="rounded-xl border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3">
+        <div className="text-[12px] font-semibold text-[#1a1c19]">{title}</div>
+        <p className="mt-1 text-[11px] leading-5 text-[#727971]">{subtitle}</p>
+        <div className="mt-3 rounded-lg border border-[#cfe0cf] bg-[#eef5ec] px-3 py-3">
+          <div className="text-[10px] uppercase tracking-[0.16em] text-[#727971]">{widget.title}</div>
+          <div className="mt-2 text-[24px] font-black text-[#23422a]">{`${widget.valuePrefix ?? ""}${data.value}${widget.valueSuffix ?? ""}`}</div>
+          {data.hint ? <div className="mt-1 text-[11px] font-medium text-[#45664b]">{data.hint}</div> : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (widget.type === "line" || widget.type === "area" || widget.type === "bar" || widget.type === "pie" || widget.type === "rank") {
+    const rawSeries =
+      widget.type === "line" || widget.type === "area"
+        ? lineSeries(dataset, widget.fieldMap)
+        : categoricalSeries(dataset, widget.fieldMap);
+    const series = processSeriesSnapshot(rawSeries, widget);
+
+    return (
+      <div className="rounded-xl border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3">
+        <div className="text-[12px] font-semibold text-[#1a1c19]">{title}</div>
+        <p className="mt-1 text-[11px] leading-5 text-[#727971]">{subtitle}</p>
+        <div className="mt-3 space-y-2">
+          {series.slice(0, 5).map((item, index) => (
+            <div key={`${item.label}-${index}`} className="flex items-center justify-between rounded-lg border border-[#dde2d7] bg-white/70 px-3 py-2">
+              <span className="truncate text-[12px] font-medium text-[#1a1c19]">{item.label}</span>
+              <span className="font-mono text-[12px] text-[#45664b]">{formatPreviewSeriesValue(widget, item.value)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (widget.type === "events") {
+    const rows = processEventSnapshotRows(eventSnapshot(dataset, widget.fieldMap), widget).slice(0, 4);
+    return (
+      <div className="rounded-xl border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3">
+        <div className="text-[12px] font-semibold text-[#1a1c19]">{title}</div>
+        <p className="mt-1 text-[11px] leading-5 text-[#727971]">{subtitle}</p>
+        <div className="mt-3 space-y-2">
+          {rows.map((row, index) => (
+            <div key={`${row.title}-${index}`} className="rounded-lg border border-[#dde2d7] bg-white/70 px-3 py-2">
+              <div className="text-[12px] font-medium text-[#1a1c19]">{row.title}</div>
+              {row.meta ? <div className="mt-1 text-[11px] text-[#727971]">{row.meta}</div> : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (widget.type === "table") {
+    const snapshot = processTableSnapshotData(
+      tableSnapshot(dataset, {
+        columns: widget.tableColumns,
+        labels: widget.tableColumnLabels,
+        widths: widget.tableColumnWidths,
+      }),
+      widget,
+    );
+
+    return (
+      <div className="rounded-xl border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3">
+        <div className="text-[12px] font-semibold text-[#1a1c19]">{title}</div>
+        <p className="mt-1 text-[11px] leading-5 text-[#727971]">{subtitle}</p>
+        <div className="mt-3 overflow-hidden rounded-lg border border-[#dde2d7] bg-white/80">
+          <div className="grid bg-[#eef0e8] text-[10px] uppercase tracking-[0.14em] text-[#727971]" style={{gridTemplateColumns: `repeat(${Math.max(1, snapshot.columns.length)}, minmax(0, 1fr))`}}>
+            {snapshot.columns.slice(0, 4).map((column) => (
+              <div key={column.key} className="px-3 py-2">{column.label}</div>
+            ))}
+          </div>
+          <div className="divide-y divide-[#ecefe7]">
+            {snapshot.rows.slice(0, 3).map((row, rowIndex) => (
+              <div key={rowIndex} className="grid text-[12px] text-[#1a1c19]" style={{gridTemplateColumns: `repeat(${Math.max(1, snapshot.columns.length)}, minmax(0, 1fr))`}}>
+                {snapshot.columns.slice(0, 4).map((column) => (
+                  <div key={column.key} className="truncate px-3 py-2.5">
+                    {formatPreviewTableCellValue(row[column.key], widget.tableNumberFormat ?? "raw")}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (widget.type === "map") {
+    const snapshot = processMapSnapshotData(mapSnapshot(dataset, widget.fieldMap), widget);
+    return (
+      <div className="rounded-xl border border-[#d7d8d1] bg-[#fafaf5] px-3 py-3">
+        <div className="text-[12px] font-semibold text-[#1a1c19]">{title}</div>
+        <p className="mt-1 text-[11px] leading-5 text-[#727971]">{subtitle}</p>
+        <div className="mt-3 space-y-2">
+          {snapshot.points.slice(0, 4).map((point) => (
+            <div key={point.id} className="flex items-center justify-between rounded-lg border border-[#dde2d7] bg-white/70 px-3 py-2">
+              <div className="min-w-0">
+                <div className="truncate text-[12px] font-medium text-[#1a1c19]">{point.label}</div>
+                <div className="mt-1 text-[11px] text-[#727971]">{`${point.lat.toFixed(2)}, ${point.lon.toFixed(2)}`}</div>
+              </div>
+              <div className="font-mono text-[12px] text-[#45664b]">{point.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function resolvePreviewChartLabelFormat(widget: Pick<EditorWidget, "type" | "chartLabelFormat">) {
+  return widget.chartLabelFormat ?? (widget.type === "pie" ? "percent" : "raw");
+}
+
+function formatPreviewSeriesValue(
+  widget: Pick<EditorWidget, "type" | "chartLabelFormat" | "chartDecimals" | "valuePrefix" | "valueSuffix">,
+  value: number,
+) {
+  const format = resolvePreviewChartLabelFormat(widget);
+  const decimals = widget.chartDecimals ?? 0;
+  let rendered = "";
+
+  if (format === "percent") {
+    rendered = `${value.toFixed(decimals)}%`;
+  } else if (format === "compact") {
+    rendered = new Intl.NumberFormat("en", {
+      notation: "compact",
+      maximumFractionDigits: decimals,
+      minimumFractionDigits: decimals > 0 ? Math.min(decimals, 1) : 0,
+    }).format(value);
+  } else {
+    rendered = new Intl.NumberFormat("en", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: decimals,
+    }).format(value);
+  }
+
+  return `${widget.valuePrefix ?? ""}${rendered}${widget.valueSuffix ?? ""}`;
+}
+
+function formatPreviewTableCellValue(value: string | number | undefined, format: EditorWidget["tableNumberFormat"]) {
+  if (value === undefined || value === null || value === "") return "-";
+  if (typeof value !== "number") return String(value);
+
+  if (format === "currency") {
+    return new Intl.NumberFormat("zh-CN", {style: "currency", currency: "CNY", maximumFractionDigits: 0}).format(value);
+  }
+
+  if (format === "percent") {
+    const percentValue = Math.abs(value) <= 1 ? value * 100 : value;
+    return `${percentValue.toFixed(percentValue % 1 === 0 ? 0 : 1)}%`;
+  }
+
+  if (format === "compact") {
+    return new Intl.NumberFormat("en", {notation: "compact", maximumFractionDigits: 1}).format(value);
+  }
+
+  return new Intl.NumberFormat("en", {maximumFractionDigits: 2}).format(value);
 }
 
 function numberOr(raw: string, fallback: number) {
@@ -5718,7 +7785,7 @@ type FieldMappingOption = {
 function buildFieldMappingOptions(type: EditorWidget["type"], locale: string): FieldMappingOption[] {
   const zh = locale === "zh-CN";
 
-  if (type === "metric") {
+  if (type === "metric" || type === "numberFlip") {
     return [
       {
         alias: "value",
@@ -5840,6 +7907,96 @@ function stringifyFieldMap(fieldMap: Record<string, string>) {
     .filter(([, fieldName]) => fieldName)
     .map(([alias, fieldName]) => `${fieldName} -> ${alias}`)
     .join("\n");
+}
+
+function buildDataProcessingFieldOptions(
+  type: EditorWidget["type"],
+  availableTableFields: Array<{field: string; type: string}>,
+  locale: string,
+) {
+  if (type === "table") {
+    return availableTableFields.map((field) => ({
+      label: `${field.field} · ${field.type}`,
+      value: field.field,
+    }));
+  }
+
+  if (type === "events") {
+    return [
+      {label: locale === "zh-CN" ? "标题" : "Title", value: "title"},
+      {label: locale === "zh-CN" ? "元信息" : "Meta", value: "meta"},
+    ];
+  }
+
+  if (type === "map") {
+    return [
+      {label: locale === "zh-CN" ? "标签 / 区域" : "Label / Region", value: "label"},
+      {label: locale === "zh-CN" ? "数值" : "Value", value: "value"},
+    ];
+  }
+
+  if (type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank") {
+    return [
+      {label: locale === "zh-CN" ? "标签 / 类别" : "Label / Category", value: "label"},
+      {label: locale === "zh-CN" ? "数值" : "Value", value: "value"},
+    ];
+  }
+
+  return [];
+}
+
+function buildEventConditionFieldOptions(
+  type: EditorWidget["type"],
+  availableTableFields: Array<{field: string; type: string}>,
+  locale: string,
+) {
+  if (type === "metric" || type === "numberFlip") {
+    return [
+      {label: locale === "zh-CN" ? "数值" : "Value", value: "value"},
+      {label: locale === "zh-CN" ? "趋势文案" : "Hint", value: "hint"},
+    ];
+  }
+
+  if (type === "events") {
+    return [
+      {label: locale === "zh-CN" ? "首条标题" : "First Title", value: "title"},
+      {label: locale === "zh-CN" ? "首条副信息" : "First Meta", value: "meta"},
+      {label: locale === "zh-CN" ? "事件数量" : "Event Count", value: "count"},
+    ];
+  }
+
+  if (type === "table") {
+    return [
+      {label: locale === "zh-CN" ? "行数" : "Row Count", value: "rowCount"},
+      ...availableTableFields.map((field) => ({
+        label: `${field.field} / ${field.type}`,
+        value: field.field,
+      })),
+    ];
+  }
+
+  if (type === "map") {
+    return [
+      {label: locale === "zh-CN" ? "首个区域" : "First Region", value: "label"},
+      {label: locale === "zh-CN" ? "首个数值" : "First Value", value: "value"},
+      {label: locale === "zh-CN" ? "点位数量" : "Point Count", value: "count"},
+    ];
+  }
+
+  if (type === "line" || type === "area" || type === "bar" || type === "pie" || type === "rank") {
+    return [
+      {label: locale === "zh-CN" ? "首项标签" : "First Label", value: "label"},
+      {label: locale === "zh-CN" ? "首项数值" : "First Value", value: "value"},
+      {label: locale === "zh-CN" ? "序列数量" : "Series Count", value: "count"},
+    ];
+  }
+
+  return [];
+}
+
+function normalizeDataSourceMode(mode?: EditorWidget["dataSourceMode"]) {
+  if (mode === "manual" || mode === "request") return mode;
+  return "static";
 }
 
 function widgetsForTemplate(templateId: string, baseWidgets: EditorWidget[], locale: string) {

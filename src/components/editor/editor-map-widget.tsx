@@ -5,7 +5,7 @@ import {geoMercator, geoPath} from "d3-geo";
 import {feature} from "topojson-client";
 import countries110m from "world-atlas/countries-110m.json";
 
-import {mapSnapshot, type WidgetDataset} from "@/lib/editor-widget-data";
+import {inferFieldsFromRows, mapSnapshot, parseManualWidgetData, processMapSnapshotData, type WidgetDataset} from "@/lib/editor-widget-data";
 import type {EditorWidget} from "@/lib/mocks/editor";
 
 const MAP_WIDTH = 1280;
@@ -109,9 +109,23 @@ export function EditorMapWidget({
   const heatLow = mapHeatLowColor || theme.heatLow;
   const heatHigh = mapHeatHighColor || theme.heatHigh;
   const zoomFactor = clampNumber(Number.parseFloat(mapZoom.replace("x", "")), 1, 3);
-  // Keep the map data derived from the currently bound dataset so map theme
-  // controls and dataset bindings are working against the same source of truth.
-  const mapData = useMemo(() => mapSnapshot(dataset, widget.fieldMap), [dataset, widget.fieldMap]);
+  const manualData = widget.dataSourceMode === "manual" ? parseManualWidgetData(widget) : null;
+  const effectiveDataset = useMemo<WidgetDataset | undefined>(() => {
+    if (manualData?.valid && manualData.rows?.length) {
+      return {
+        fields: inferFieldsFromRows(manualData.rows),
+        rows: manualData.rows,
+      };
+    }
+
+    return dataset;
+  }, [dataset, manualData]);
+  // Keep the map data derived from the currently active dataset source so map
+  // theme controls and bindings are working against the same payload.
+  const mapData = useMemo(
+    () => processMapSnapshotData(mapSnapshot(effectiveDataset, widget.fieldMap), widget),
+    [effectiveDataset, widget],
+  );
 
   const projection = useMemo(() => {
     const projectionInstance = geoMercator();
