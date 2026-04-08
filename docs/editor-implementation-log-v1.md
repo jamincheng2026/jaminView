@@ -1,8 +1,8 @@
-# Editor Implementation Log V1
+# 编辑器实现记录 V1
 
-## Scope
+## 记录范围
 
-This file records the recent editor implementation pass that followed the reading order in:
+这份文档用于记录本轮编辑器实现推进的实际落地结果。整个过程遵循以下阅读和实施顺序：
 
 - `README.md`
 - `docs/editor-goview-study-notes-v1.md`
@@ -10,93 +10,90 @@ This file records the recent editor implementation pass that followed the readin
 - `docs/editor-panel-wireframe-v1.md`
 - `docs/editor-module-design-plan-v1.md`
 
-The work focused on completing the editor module plan in sequence, then tightening the visual and interaction quality of the newly added capabilities.
+本轮工作的目标不是零散补功能，而是按模块顺序逐步落地，并在模块完成后继续做一轮结构收口、交互补齐和视觉精修。
 
-## Completed Areas
+## 已完成内容
 
-### Panel structure and page or component boundaries
+### 右侧面板结构与页面态/组件态边界
 
-- The right panel now switches cleanly between page state and component state.
-- Page state was organized into clearer groups for page, background, header, and display settings.
-- Component tabs were stabilized around `Content / Data / Style / Advanced`.
+- 右侧面板已经能稳定区分页面态和组件态。
+- 页面态按页面、背景、头部、展示等结构重新整理。
+- 组件态稳定为 `内容 / 数据 / 样式 / 高级` 四个一级页签。
 
-### Shared component foundation
+### 通用组件基础能力
 
-- Shared layout fields were tightened, including explicit `zIndex` support.
-- The panel model now reserves `Advanced` as a first-class tab instead of mixing future settings into style or content.
-- Common control language for color, border, opacity, shadow, and spacing was pushed further across widget types.
+- 通用布局字段进一步收口，包含明确的 `zIndex` 支持。
+- `Advanced` 被正式作为一级页签预留，不再把后续能力继续塞进内容或样式区。
+- 颜色、边框、透明度、阴影、间距等通用控件语言进一步统一。
 
-### Chart, map, table, text, and image modules
+### 图表、地图、表格、文本、图片模块
 
-- Chart panels were reorganized to match the master spec and wireframe grouping.
-- Map panels were split into clearer content, style, and advanced sections.
-- Table styling and column configuration were separated more cleanly from data behavior.
-- Text and image widgets were aligned with the same panel structure, with image upload and clearer style grouping.
+- 图表面板结构按主规格重新整理，分组更接近线框和目标产品形态。
+- 地图面板拆成更清晰的内容、样式和高级结构。
+- 表格的数据层与样式层边界更明确，列配置也更集中。
+- 文本和图片组件对齐了同一套面板结构，图片补上了上传入口和更清晰的样式分组。
 
-### Data system and processing
+### 数据系统与数据处理
 
-- `dataSourceMode` was unified around `static / request / manual`, while keeping compatibility with older dataset behavior.
-- Manual JSON now works as a real widget-level data source for metric-like widgets, charts, events, tables, and maps.
-- Dataset preview and manual preview paths were aligned so the panel preview and actual rendering use the same processed output.
-- Data processing became a dedicated layer with formatting, filtering, sorting, Top N, aggregation, and truncation.
+- `dataSourceMode` 统一到 `static / request / manual`，同时保留旧数据集模式的兼容能力。
+- 手动 JSON 已经不是占位，而是图表、指标类、事件、表格、地图都能使用的真实数据源。
+- 数据预览链路和实际渲染链路进一步对齐，避免面板预览和画布展示不一致。
+- 数据处理被独立为数据层能力，支持格式化、过滤、排序、Top N、聚合、截断。
 
-### Request source and advanced events
+### 请求源与高级事件
 
-- Request-source configuration was added to the component model and right panel:
-  - request URL
-  - method
-  - refresh interval
-  - params
-  - response mapping
-- Advanced click events were added for:
-  - open link
-  - open preview
-  - open published screen
-  - focus target widgets
-- Event conditions and multi-target linking were connected into preview and published screen runtime behavior.
+- 组件模型和右侧数据页已经支持请求源配置，包含：
+  - 请求地址
+  - 请求方法
+  - 刷新间隔
+  - 参数
+  - 返回映射
+- 高级点击事件已经支持：
+  - 打开链接
+  - 跳转预览页
+  - 跳转展示页
+  - 聚焦目标组件
+- 条件事件和多目标联动已经接入预览页与展示页的运行时行为。
 
-### Decoration and number-flip module
+### 装饰组件与数字翻牌
 
-- Added `numberFlip` and `decoration` widget types.
-- Added a `Decor & Display` group to the component pool.
-- Added decoration presets for:
-  - frame
-  - badge
-  - divider
-  - glow
-- Added default decoration and number-flip samples so the screen language is no longer only charts, maps, and text.
+- 新增了 `numberFlip` 和 `decoration` 两类组件。
+- 左侧组件池新增了 `Decor & Display` 分组。
+- 装饰组件支持以下预设：
+  - `frame`
+  - `badge`
+  - `divider`
+  - `glow`
+- 默认样例中加入了数字翻牌、边框装饰和分割线装饰，大屏语言不再只是图表、地图、文本的组合。
 
-### Visual polish
+### 视觉精修
 
-- Divider and glow decorations were exposed directly in the component pool instead of only existing as style presets.
-- Lightweight motion was added to:
-  - number-flip digit cards
-  - divider signal points
-  - glow decorations
-- Reduced-motion support was preserved.
-- High-frequency Chinese labels for rail titles, widget types, and newly added decoration hints were normalized so the newest editor additions do not fall back to garbled text.
+- `divider` 和 `glow` 不再只是样式面板里的预设，而是可以直接从组件池创建。
+- 数字翻牌、分割线信号点、发光装饰补上了克制的轻量动效。
+- 同时保留了 `prefers-reduced-motion` 的兼容处理。
+- 对左侧栏标题、组件类型名、新装饰提示文案等高频中文标签做了稳定化处理，避免最新模块继续出现乱码文案。
 
-### Cleanup
+### 清理项
 
-- Removed several safe unused-variable warnings introduced or surfaced during this pass.
-- The remaining lint warnings are older structural items and one `img` optimization warning; they were intentionally left for a focused cleanup pass.
+- 清掉了一部分没有行为风险的未使用变量 warning。
+- 当前剩余 warning 主要是旧结构遗留的 Hook 依赖提醒，以及一个图片优化提醒，已刻意留到单独清理轮次处理。
 
-## Verification
+## 校验方式
 
-The implementation pass was repeatedly checked with:
+本轮实现过程中多次使用以下方式做校验：
 
-- `npm run lint` on touched editor files
-- `npm run build`
-- `git diff --check`
+- 对触达文件执行 `npm run lint`
+- 执行 `npm run build`
+- 执行 `git diff --check`
 
-Latest known state before commit:
+截至本轮记录时，状态如下：
 
-- `npm run build` passes
-- targeted lint has no errors
-- only a small set of existing warnings remain
-- `git diff --check` reports only line-ending notices
+- `npm run build` 通过
+- 定向 `lint` 无 error
+- 仍有少量旧 warning
+- `git diff --check` 仅提示行尾格式差异
 
-## Files Most Affected
+## 主要变更文件
 
 - `README.md`
 - `src/app/globals.css`
@@ -109,8 +106,8 @@ Latest known state before commit:
 - `src/lib/editor-widget-events.ts`
 - `src/lib/mocks/editor.ts`
 
-## Next Suggested Cleanup
+## 下一步建议
 
-- Replace the remaining plain `img` usage with `next/image` where appropriate.
-- Revisit the existing `useEffect` dependency warnings in `editor-workbench.tsx`.
-- Continue fixing older garbled Chinese text in legacy areas outside the newest module work.
+- 把剩余的普通 `img` 使用进一步收口到更合适的图片方案。
+- 单独处理 `editor-workbench.tsx` 里现存的 `useEffect` 依赖 warning。
+- 继续修复老区域里尚未完全清理的中文乱码文案。
