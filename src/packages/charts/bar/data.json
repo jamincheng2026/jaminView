@@ -1,0 +1,16 @@
+[
+  {"category": "Mon", "value": 120, "type": "Series A"},
+  {"category": "Tue", "value": 200, "type": "Series A"},
+  {"category": "Wed", "value": 150, "type": "Series A"},
+  {"category": "Thu", "value": 80, "type": "Series A"},
+  {"category": "Fri", "value": 70, "type": "Series A"},
+  {"category": "Sat", "value": 110, "type": "Series A"},
+  {"category": "Sun", "value": 130, "type": "Series A"},
+  {"category": "Mon", "value": 98, "type": "Series B"},
+  {"category": "Tue", "value": 155, "type": "Series B"},
+  {"category": "Wed", "value": 190, "type": "Series B"},
+  {"category": "Thu", "value": 134, "type": "Series B"},
+  {"category": "Fri", "value": 90, "type": "Series B"},
+  {"category": "Sat", "value": 120, "type": "Series B"},
+  {"category": "Sun", "value": 160, "type": "Series B"}
+]
