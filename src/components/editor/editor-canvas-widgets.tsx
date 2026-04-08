@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type {CSSProperties} from "react";
 
 import {MiniAreaChart, MiniBarChart, MiniLineChart, MiniPieChart} from "@/components/editor/editor-chart-widgets";
@@ -998,9 +999,14 @@ function ImageWidget({widget}: {widget: EditorWidget}) {
 
   return (
     <div className={`${imageShellClass(borderStyle)} relative h-full overflow-hidden`} style={imageShellStyle}>
-      <img
+      <Image
         src={imageUrl}
-        alt={widget.title}
+        alt={widget.title?.trim() || "Image widget"}
+        fill
+        unoptimized
+        sizes={`${Math.max(1, Math.round(widget.width))}px`}
+        loading="lazy"
+        draggable={false}
         className={`h-full w-full ${imageFitClass(widget.imageFit)} ${grayscale ? "grayscale" : ""}`}
         style={{filter: filterStyle, transform: `scale(${zoom})`}}
       />

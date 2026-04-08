@@ -1,6 +1,7 @@
 "use client";
 
-import {useEffect, useMemo, useState} from "react";
+import Image from "next/image";
+import {useMemo, useState, useSyncExternalStore} from "react";
 import {useLocale, useTranslations} from "next-intl";
 import {
   Archive,
@@ -25,7 +26,7 @@ import {
   formatProjectUpdatedAt,
   projectStatusLabel,
   readProjectRecords,
-  type StoredProject,
+  subscribeProjectRecords,
 } from "@/lib/project-store";
 
 const profileImage =
@@ -34,18 +35,11 @@ const profileImage =
 export function ProjectsPage() {
   const t = useTranslations("Projects");
   const locale = useLocale();
-  const [projects, setProjects] = useState<StoredProject[]>([]);
   const [searchValue, setSearchValue] = useState("");
   const [sortBy, setSortBy] = useState<"updated" | "name" | "created">("updated");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const footerLinks = t.raw("footer.links") as string[];
-
-  useEffect(() => {
-    setProjects(readProjectRecords());
-    const syncProjects = () => setProjects(readProjectRecords());
-    window.addEventListener("storage", syncProjects);
-    return () => window.removeEventListener("storage", syncProjects);
-  }, []);
+  const projects = useSyncExternalStore(subscribeProjectRecords, readProjectRecords, readProjectRecords);
 
   const visibleProjects = useMemo(
     () => {
@@ -89,7 +83,7 @@ export function ProjectsPage() {
             <Settings className="h-5 w-5" strokeWidth={1.8} />
           </TopIconButton>
           <div className="ml-2 h-8 w-8 overflow-hidden rounded-full bg-[#e3e3de]">
-            <img src={profileImage} alt="User Profile" className="h-full w-full object-cover" />
+            <Image src={profileImage} alt="User Profile" width={32} height={32} unoptimized className="h-full w-full object-cover" />
           </div>
         </div>
       </nav>
@@ -213,9 +207,12 @@ export function ProjectsPage() {
                       project.status === "ARCHIVED" ? "grayscale group-hover:grayscale-0" : ""
                     } ${viewMode === "grid" ? "h-48" : "h-auto w-72 shrink-0"}`}
                   >
-                    <img
+                    <Image
                       src={project.image}
                       alt={project.name}
+                      fill
+                      unoptimized
+                      sizes={viewMode === "grid" ? "384px" : "288px"}
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     <div className="absolute left-3 top-3 flex items-center gap-2">

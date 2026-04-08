@@ -1,3 +1,4 @@
+import Image from "next/image";
 import {getTranslations} from "next-intl/server";
 
 import {HeroStage} from "@/components/marketing/hero-stage";
@@ -66,9 +67,12 @@ export async function HomePage() {
 
       <section className="relative flex min-h-screen items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
-          <img
+          <Image
             src={heroBackground}
             alt="Professional Dark Mode Data Dashboard Background"
+            fill
+            unoptimized
+            sizes="100vw"
             className="hero-background-motion h-full w-full object-cover"
           />
           <div className="hero-overlay absolute inset-0" />
@@ -146,11 +150,16 @@ export async function HomePage() {
                   {t("capabilities.template.body")}
                 </p>
               </div>
-              <img
-                src={homeTemplateImages[0].image}
-                alt={templateCopy[0]?.title ?? "Template preview"}
-                className="h-48 w-full rounded object-cover shadow-md grayscale transition-all duration-500 group-hover:grayscale-0"
-              />
+              <div className="relative h-48 w-full overflow-hidden rounded shadow-md">
+                <Image
+                  src={homeTemplateImages[0].image}
+                  alt={templateCopy[0]?.title ?? "Template preview"}
+                  fill
+                  unoptimized
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="grayscale object-cover transition-all duration-500 group-hover:grayscale-0"
+                />
+              </div>
             </div>
 
             <div className="group flex flex-col border border-[#c2c8bf]/5 bg-[#e3e3de] p-10 transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(35,66,42,0.08)]">
@@ -211,9 +220,12 @@ export async function HomePage() {
             {homeTemplateImages.map((template, index) => (
               <div key={template.image} className="group cursor-pointer transition duration-300 hover:-translate-y-1">
                 <div className="relative mb-6 aspect-[16/10] overflow-hidden rounded-lg bg-[#e3e3de]">
-                  <img
+                  <Image
                     src={template.image}
                     alt={templateCopy[index]?.title ?? "Template preview"}
+                    fill
+                    unoptimized
+                    sizes="(max-width: 768px) 100vw, 33vw"
                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 flex items-center justify-center bg-[#23422a]/20 opacity-0 transition group-hover:opacity-100">
@@ -283,11 +295,11 @@ export async function HomePage() {
             </ul>
           </div>
           <div className="relative">
-            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-[#fafaf5] p-1 shadow-sm">
-              <img src={homeScenarioImage} alt="Usage scenarios" className="h-full w-full object-cover" />
+            <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-[#fafaf5] p-1 shadow-sm">
+              <Image src={homeScenarioImage} alt="Usage scenarios" fill unoptimized sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
             </div>
             <div className="absolute -bottom-6 -right-6 max-w-xs rounded-xl bg-[#23422a] p-6 text-white shadow-xl">
-              <p className="text-sm italic">"{t("scenarios.quote")}"</p>
+              <p className="text-sm italic">&ldquo;{t("scenarios.quote")}&rdquo;</p>
               <p className="mt-4 text-xs font-bold">{t("scenarios.quoteAuthor")}</p>
             </div>
           </div>

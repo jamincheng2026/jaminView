@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {useMemo, useRef, useState} from "react";
 import {useLocale, useTranslations} from "next-intl";
 import {useRouter, useSearchParams} from "next/navigation";
@@ -174,7 +175,7 @@ export function DataImportPage() {
             <Bell className="h-5 w-5" strokeWidth={1.9} />
           </button>
           <div className="h-8 w-8 overflow-hidden rounded-full bg-[#e3e3de]">
-            <img src={profileImage} alt="User Profile" className="h-full w-full object-cover" />
+            <Image src={profileImage} alt="User Profile" width={32} height={32} unoptimized className="h-full w-full object-cover" />
           </div>
         </div>
       </header>

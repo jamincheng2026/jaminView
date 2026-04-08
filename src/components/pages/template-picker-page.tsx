@@ -1,17 +1,16 @@
 "use client";
 
+import Image from "next/image";
 import {useMemo, useState} from "react";
 import {useLocale, useTranslations} from "next-intl";
 import {useRouter} from "next/navigation";
 import {
   Bell,
-  ChevronDown,
   Grid2x2,
   Info,
   List,
   PlusCircle,
   Search,
-  Settings2,
 } from "lucide-react";
 
 import {
@@ -116,9 +115,12 @@ export function TemplatePickerPage() {
             <Bell className="h-5 w-5" />
           </IconCircleButton>
           <div className="h-8 w-8 overflow-hidden rounded-full border border-[#c2c8bf]/30 bg-[#e3e3de]">
-            <img
+            <Image
               src={templateSearchProfileImage}
               alt="User Profile"
+              width={32}
+              height={32}
+              unoptimized
               className="h-full w-full object-cover"
             />
           </div>
@@ -239,9 +241,12 @@ export function TemplatePickerPage() {
                   onClick={() => handleTemplateSelect(template.id, template.name)}
                 >
                   <div className="relative aspect-[16/10] overflow-hidden bg-[#1a1c19]">
-                    <img
+                    <Image
                       src={template.image}
                       alt={template.name}
+                      fill
+                      unoptimized
+                      sizes="(max-width: 768px) 100vw, 33vw"
                       className="h-full w-full object-cover opacity-85 transition-transform duration-700 group-hover:scale-105"
                     />
                     {template.badge ? (

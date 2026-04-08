@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect, useMemo, useRef, useState} from "react";
+import {useEffect, useEffectEvent, useMemo, useRef, useState} from "react";
 import {useLocale, useTranslations} from "next-intl";
 import {usePathname, useRouter} from "next/navigation";
 import {
@@ -419,77 +419,75 @@ export function EditorWorkbench({
     return () => observer.disconnect();
   }, [currentCanvasWidth]);
 
+  const handleCanvasKeyboard = useEffectEvent((event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+      return;
+    }
+
+    const commandPressed = event.metaKey || event.ctrlKey;
+    if (commandPressed && event.key.toLowerCase() === "a") {
+      event.preventDefault();
+      updateSelection(widgetsRef.current.map((widget) => widget.id), selectedWidgetId);
+      return;
+    }
+
+    if (commandPressed && event.key.toLowerCase() === "c") {
+      event.preventDefault();
+      clipboardRef.current = widgetsRef.current.filter((widget) => selectedWidgetIds.includes(widget.id)).map((widget) => ({...widget}));
+      return;
+    }
+
+    if (commandPressed && event.key.toLowerCase() === "v") {
+      event.preventDefault();
+      if (!clipboardRef.current.length) return;
+      pasteClipboard();
+      return;
+    }
+
+    if ((event.key === "Backspace" || event.key === "Delete") && widgetsRef.current.length > 1 && selectedWidgetIds.length) {
+      event.preventDefault();
+      deleteSelectedWidget();
+      return;
+    }
+
+    const step = event.shiftKey ? 10 : 1;
+
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+    if (!selectedWidgetIds.length) return;
+    event.preventDefault();
+
+    commitSnapshot((snapshot) => ({
+      ...snapshot,
+      widgets: snapshot.widgets.map((widget) => {
+        const activeIds = snapshot.selectedWidgetIds?.length ? snapshot.selectedWidgetIds : [];
+        if (!activeIds.includes(widget.id) || widget.locked) return widget;
+
+        if (event.key === "ArrowLeft") {
+          return {...widget, x: clamp(widget.x - step, 0, Math.max(0, currentCanvasWidth - widget.width))};
+        }
+
+        if (event.key === "ArrowRight") {
+          return {...widget, x: clamp(widget.x + step, 0, Math.max(0, currentCanvasWidth - widget.width))};
+        }
+
+        if (event.key === "ArrowUp") {
+          return {...widget, y: clamp(widget.y - step, 0, Math.max(0, currentCanvasHeight - widget.height))};
+        }
+
+        return {...widget, y: clamp(widget.y + step, 0, Math.max(0, currentCanvasHeight - widget.height))};
+      }),
+    }));
+  });
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
-        return;
-      }
-
-      const commandPressed = event.metaKey || event.ctrlKey;
-      if (commandPressed && event.key.toLowerCase() === "a") {
-        event.preventDefault();
-        updateSelection(widgetsRef.current.map((widget) => widget.id), selectedWidgetId);
-        return;
-      }
-
-      if (commandPressed && event.key.toLowerCase() === "c") {
-        event.preventDefault();
-        clipboardRef.current = widgetsRef.current
-          .filter((widget) => selectedWidgetIds.includes(widget.id))
-          .map((widget) => ({...widget}));
-        return;
-      }
-
-      if (commandPressed && event.key.toLowerCase() === "v") {
-        event.preventDefault();
-        if (!clipboardRef.current.length) return;
-        pasteClipboard();
-        return;
-      }
-
-      if (
-        (event.key === "Backspace" || event.key === "Delete") &&
-        widgetsRef.current.length > 1 &&
-        selectedWidgetIds.length
-      ) {
-        event.preventDefault();
-        deleteSelectedWidget();
-        return;
-      }
-
-      const step = event.shiftKey ? 10 : 1;
-
-      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
-      if (!selectedWidgetIds.length) return;
-      event.preventDefault();
-
-      commitSnapshot((snapshot) => ({
-        ...snapshot,
-        widgets: snapshot.widgets.map((widget) => {
-          const activeIds = snapshot.selectedWidgetIds?.length ? snapshot.selectedWidgetIds : [];
-          if (!activeIds.includes(widget.id) || widget.locked) return widget;
-
-          if (event.key === "ArrowLeft") {
-            return {...widget, x: clamp(widget.x - step, 0, Math.max(0, currentCanvasWidth - widget.width))};
-          }
-
-          if (event.key === "ArrowRight") {
-            return {...widget, x: clamp(widget.x + step, 0, Math.max(0, currentCanvasWidth - widget.width))};
-          }
-
-          if (event.key === "ArrowUp") {
-            return {...widget, y: clamp(widget.y - step, 0, Math.max(0, currentCanvasHeight - widget.height))};
-          }
-
-          return {...widget, y: clamp(widget.y + step, 0, Math.max(0, currentCanvasHeight - widget.height))};
-        }),
-      }));
+      handleCanvasKeyboard(event);
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedWidgetId, selectedWidgetIds]);
+  }, []);
 
   useEffect(() => {
     // Keep dataset lists fresh when the import page writes back into localStorage.
@@ -728,6 +726,15 @@ export function EditorWorkbench({
         ? "控制预览与展示页的适配方式"
         : "Control how preview and published screens fit the viewport",
   };
+  if (locale === "zh-CN") {
+    pagePanelLabels.pageTitle = "\u9875\u9762";
+    pagePanelLabels.pageSubtitle = "\u7ba1\u7406\u9875\u9762\u6807\u9898\u3001\u5c3a\u5bf8\u4e0e\u57fa\u7840\u4fe1\u606f";
+    pagePanelLabels.headerTitle = "\u5934\u90e8";
+    pagePanelLabels.headerSubtitle = "\u63a7\u5236\u5934\u90e8\u6a21\u677f\u3001\u65f6\u95f4\u4e0e\u72b6\u6001\u4fe1\u606f";
+    pagePanelLabels.displayTitle = "\u5c55\u793a";
+    pagePanelLabels.displaySubtitle = "\u63a7\u5236\u9884\u89c8\u4e0e\u5c55\u793a\u9875\u7684\u9002\u914d\u65b9\u5f0f";
+  }
+
   const orderedWidgets = useMemo(
     () => [...widgets].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0)),
     [widgets],
@@ -1049,24 +1056,28 @@ export function EditorWorkbench({
     });
   };
 
+  const handleSaveShortcut = useEffectEvent((event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+      return;
+    }
+
+    if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "s") {
+      return;
+    }
+
+    event.preventDefault();
+    handleSave();
+  });
+
   useEffect(() => {
-    const handleSaveShortcut = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
-        return;
-      }
-
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "s") {
-        return;
-      }
-
-      event.preventDefault();
-      handleSave();
+    const handleSaveShortcutKeyDown = (event: KeyboardEvent) => {
+      handleSaveShortcut(event);
     };
 
-    window.addEventListener("keydown", handleSaveShortcut);
-    return () => window.removeEventListener("keydown", handleSaveShortcut);
-  }, [projectId, projectTitle, handleSave, locale]);
+    window.addEventListener("keydown", handleSaveShortcutKeyDown);
+    return () => window.removeEventListener("keydown", handleSaveShortcutKeyDown);
+  }, []);
 
   const openDataImport = () => {
     const normalizedReturnTo = decodeRouteSegment(pathname);

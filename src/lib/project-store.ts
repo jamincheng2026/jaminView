@@ -15,6 +15,7 @@ export type StoredProject = {
 };
 
 const projectStoreKey = "jaminview:projects";
+const projectStoreEvent = "jaminview:projects:updated";
 
 function seedProjects(): StoredProject[] {
   const now = Date.now();
@@ -59,6 +60,7 @@ export function readProjectRecord(projectId: string) {
 export function writeProjectRecords(projects: StoredProject[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(projectStoreKey, JSON.stringify(projects));
+  window.dispatchEvent(new Event(projectStoreEvent));
 }
 
 export function upsertProjectRecord(
@@ -85,6 +87,23 @@ export function upsertProjectRecord(
     : [nextRecord, ...current];
 
   writeProjectRecords(nextProjects);
+}
+
+export function subscribeProjectRecords(onChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key && event.key !== projectStoreKey) return;
+    onChange();
+  };
+
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(projectStoreEvent, onChange);
+
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(projectStoreEvent, onChange);
+  };
 }
 
 export function projectStatusLabel(status: StoredProject["status"]) {

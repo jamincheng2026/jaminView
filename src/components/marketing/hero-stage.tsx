@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Activity, ArrowUpRight, BarChart3, Database } from "lucide-react";
+import Image from "next/image";
+import {useMemo, useState} from "react";
+import {Activity, ArrowUpRight, BarChart3, Database} from "lucide-react";
 
 type HeroStageProps = {
   primaryImage: string;
 };
 
-export function HeroStage({ primaryImage }: HeroStageProps) {
-  const [tilt, setTilt] = useState({ x: 0, y: 0, glowX: 50, glowY: 45 });
+export function HeroStage({primaryImage}: HeroStageProps) {
+  const [tilt, setTilt] = useState({x: 0, y: 0, glowX: 50, glowY: 45});
 
   const transform = useMemo(
     () =>
@@ -63,9 +64,12 @@ export function HeroStage({ primaryImage }: HeroStageProps) {
           </div>
 
           <div className="absolute left-6 top-16 right-[210px] bottom-6 overflow-hidden rounded-[22px] border border-white/8 bg-[#111b16] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <img
+            <Image
               src={primaryImage}
               alt="JaminView interactive data screen"
+              fill
+              unoptimized
+              sizes="404px"
               className="h-full w-full object-cover opacity-88 transition duration-300 ease-out group-hover:scale-[1.035]"
             />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,14,12,0.08),rgba(10,14,12,0.28))]" />

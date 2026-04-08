@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { ElementType, ReactNode } from "react";
+import {useEffect, useRef} from "react";
+import type {ElementType, ReactNode} from "react";
 
 type RevealProps = {
   as?: ElementType;
@@ -17,23 +17,21 @@ export function Reveal({
   delay = 0,
 }: RevealProps) {
   const ref = useRef<HTMLElement | null>(null);
-  const [mounted, setMounted] = useState(false);
-  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-
     const node = ref.current;
     if (!node) return;
+
+    node.classList.add("reveal-block--pending");
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setVisible(true);
+          node.classList.add("reveal-block--visible");
           observer.disconnect();
         }
       },
-      { threshold: 0.18, rootMargin: "0px 0px -8% 0px" },
+      {threshold: 0.18, rootMargin: "0px 0px -8% 0px"},
     );
 
     observer.observe(node);
@@ -43,7 +41,7 @@ export function Reveal({
   return (
     <Component
       ref={ref}
-      className={`${className ?? ""} reveal-block${mounted ? " reveal-block--pending" : ""}${visible ? " reveal-block--visible" : ""}`}
+      className={`${className ?? ""} reveal-block`}
       style={{ transitionDelay: `${delay}ms` }}
     >
       {children}
