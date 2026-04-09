@@ -16,6 +16,16 @@ export type StoredProject = {
 
 const projectStoreKey = "jaminview:projects";
 const projectStoreEvent = "jaminview:projects:updated";
+let cachedProjectRecords: StoredProject[] | null = null;
+let cachedServerProjectRecords: StoredProject[] | null = null;
+
+function cloneProjectRecords(projects: StoredProject[]) {
+  if (typeof structuredClone === "function") {
+    return structuredClone(projects);
+  }
+
+  return JSON.parse(JSON.stringify(projects)) as StoredProject[];
+}
 
 function seedProjects(): StoredProject[] {
   const now = Date.now();
@@ -31,25 +41,51 @@ function seedProjects(): StoredProject[] {
   }));
 }
 
-function ensureProjectStore() {
-  if (typeof window === "undefined") return [];
+function getServerProjectRecords() {
+  if (!cachedServerProjectRecords) {
+    cachedServerProjectRecords = seedProjects();
+  }
+
+  return cachedServerProjectRecords;
+}
+
+function syncProjectStoreFromStorage() {
+  if (typeof window === "undefined") {
+    return getServerProjectRecords();
+  }
+
   const raw = window.localStorage.getItem(projectStoreKey);
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as StoredProject[];
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        cachedProjectRecords = parsed;
+        return cachedProjectRecords;
+      }
     } catch {
       window.localStorage.removeItem(projectStoreKey);
     }
   }
 
-  const seeded = seedProjects();
-  window.localStorage.setItem(projectStoreKey, JSON.stringify(seeded));
-  return seeded;
+  cachedProjectRecords = cloneProjectRecords(seedProjects());
+  window.localStorage.setItem(projectStoreKey, JSON.stringify(cachedProjectRecords));
+  return cachedProjectRecords;
+}
+
+function ensureProjectStore() {
+  if (typeof window === "undefined") {
+    return getServerProjectRecords();
+  }
+
+  if (cachedProjectRecords) {
+    return cachedProjectRecords;
+  }
+
+  return syncProjectStoreFromStorage();
 }
 
 export function readProjectRecords() {
-  if (typeof window === "undefined") return seedProjects();
+  if (typeof window === "undefined") return getServerProjectRecords();
   return ensureProjectStore();
 }
 
@@ -59,7 +95,8 @@ export function readProjectRecord(projectId: string) {
 
 export function writeProjectRecords(projects: StoredProject[]) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(projectStoreKey, JSON.stringify(projects));
+  cachedProjectRecords = cloneProjectRecords(projects);
+  window.localStorage.setItem(projectStoreKey, JSON.stringify(cachedProjectRecords));
   window.dispatchEvent(new Event(projectStoreEvent));
 }
 
@@ -94,15 +131,20 @@ export function subscribeProjectRecords(onChange: () => void) {
 
   const handleStorage = (event: StorageEvent) => {
     if (event.key && event.key !== projectStoreKey) return;
+    syncProjectStoreFromStorage();
+    onChange();
+  };
+
+  const handleProjectStoreUpdate = () => {
     onChange();
   };
 
   window.addEventListener("storage", handleStorage);
-  window.addEventListener(projectStoreEvent, onChange);
+  window.addEventListener(projectStoreEvent, handleProjectStoreUpdate);
 
   return () => {
     window.removeEventListener("storage", handleStorage);
-    window.removeEventListener(projectStoreEvent, onChange);
+    window.removeEventListener(projectStoreEvent, handleProjectStoreUpdate);
   };
 }
 
