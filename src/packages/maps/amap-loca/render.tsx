@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { load as loadAMapApi } from "@amap/amap-jsapi-loader";
-import "@amap/amap-jsapi-types";
+import type {} from "@amap/amap-jsapi-types";
 
 import { ChartFrame, type Widget } from "@/packages/types";
 
@@ -16,6 +15,7 @@ import {
   type AmapLocaTheme,
 } from "./config";
 
+type AMapLoaderModule = typeof import("@amap/amap-jsapi-loader");
 type AMapModuleType = typeof AMap;
 
 type LocaPointFeature = {
@@ -480,6 +480,9 @@ export function AmapLocaMapRender({
       }
 
       try {
+        const { load: loadAMapApi } = (await import(
+          "@amap/amap-jsapi-loader"
+        )) as AMapLoaderModule;
         const runtimeWindow = window as AMapRuntimeWindow;
 
         if (config.map.securityJsCode.trim().length > 0) {
