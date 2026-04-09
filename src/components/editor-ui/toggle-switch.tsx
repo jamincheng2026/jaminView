@@ -1,29 +1,67 @@
-import React from 'react';
+"use client";
 
-export function ToggleSwitch({ 
-  label, 
-  checked, 
-  onChange 
-}: { 
-  label: string; 
-  checked: boolean; 
-  onChange: (v: boolean) => void;
-}) {
+import * as React from "react";
+
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+
+type ToggleSwitchProps = {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+};
+
+export function ToggleSwitch({
+  label,
+  description,
+  checked,
+  onCheckedChange,
+  disabled = false,
+  className,
+}: ToggleSwitchProps) {
+  const labelId = React.useId();
+  const descriptionId = React.useId();
+
   return (
-    <label className="flex items-center justify-between cursor-pointer py-2">
-      <span className="text-xs font-medium text-[#1a1c19]">{label}</span>
-      <div className="relative">
-        <input 
-          type="checkbox" 
-          className="sr-only" 
-          checked={checked} 
-          onChange={(e) => onChange(e.target.checked)} 
-        />
-        {/* 拨动槽底色跟随品牌色 #23422a */}
-        <div className={`block w-8 h-5 rounded-full transition-colors duration-200 ease-in-out ${checked ? 'bg-[#23422a]' : 'bg-[#d7d8d1]'}`}></div>
-        {/* 白色圆球滑块 */}
-        <div className={`dot absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition-transform duration-200 ease-in-out ${checked ? 'transform translate-x-3' : ''}`}></div>
+    <div
+      className={cn(
+        "flex items-start justify-between gap-4 rounded-2xl border border-[#d7d8d1] bg-white/78 px-3.5 py-3",
+        disabled && "opacity-55",
+        className,
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <label
+          id={labelId}
+          className={cn(
+            "block text-sm font-semibold text-[#1a1c19]",
+            disabled ? "cursor-not-allowed" : "cursor-pointer",
+          )}
+        >
+          {label}
+        </label>
+        {description ? (
+          <p id={descriptionId} className="mt-1 text-xs leading-5 text-[#727971]">
+            {description}
+          </p>
+        ) : null}
       </div>
-    </label>
+      <Switch
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onCheckedChange}
+        className={cn(
+          "mt-0.5 shrink-0",
+          checked
+            ? "border-[#23422a] bg-[#23422a]"
+            : "border-[#d7d8d1] bg-[#d7d8d1]",
+        )}
+        aria-labelledby={labelId}
+        aria-describedby={description ? descriptionId : undefined}
+      />
+    </div>
   );
 }

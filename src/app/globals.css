@@ -255,6 +255,105 @@ input {
   }
 }
 
+@keyframes jv-widget-fade-in {
+  from {
+    opacity: 0.01;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes jv-widget-rise-in {
+  from {
+    opacity: 0.01;
+    transform: translate3d(0, 26px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes jv-widget-zoom-in {
+  from {
+    opacity: 0.01;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes jv-widget-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 12px 30px rgba(26, 28, 25, 0.08);
+  }
+  50% {
+    transform: scale(1.012);
+    box-shadow: 0 18px 42px rgba(35, 66, 42, 0.16);
+  }
+}
+
+@keyframes jv-widget-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -7px, 0);
+  }
+}
+
+@keyframes jv-widget-breathe {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    box-shadow: 0 12px 30px rgba(26, 28, 25, 0.08);
+  }
+  50% {
+    transform: translate3d(0, -3px, 0);
+    box-shadow: 0 18px 44px rgba(35, 66, 42, 0.14);
+  }
+}
+
+@keyframes jv-flipper-down {
+  from {
+    opacity: 0.16;
+    transform: perspective(380px) rotateX(-88deg);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(380px) rotateX(0deg);
+  }
+}
+
+@keyframes jv-flipper-up {
+  from {
+    opacity: 0.16;
+    transform: perspective(380px) rotateX(88deg);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(380px) rotateX(0deg);
+  }
+}
+
+@keyframes jv-image-frame-scan {
+  0%,
+  100% {
+    opacity: 0.18;
+    transform: translate3d(-12px, 0, 0);
+  }
+  50% {
+    opacity: 0.92;
+    transform: translate3d(12px, 0, 0);
+  }
+}
+
 .jv-number-flip-shell {
   position: relative;
 }
@@ -292,6 +391,11 @@ input {
   will-change: transform, opacity;
 }
 
+.jv-image-frame-scan {
+  animation: jv-image-frame-scan 4.2s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-nav-enter,
   .hero-title-enter,
@@ -312,8 +416,20 @@ input {
   .jv-number-flip-sheen,
   .jv-divider-signal,
   .jv-glow-breath,
-  .jv-glow-scan {
+  .jv-glow-scan,
+  .jv-image-frame-scan {
     animation: none !important;
     transition: none !important;
+  }
+
+  [style*="jv-widget-fade-in"],
+  [style*="jv-widget-rise-in"],
+  [style*="jv-widget-zoom-in"],
+  [style*="jv-widget-pulse"],
+  [style*="jv-widget-float"],
+  [style*="jv-widget-breathe"] {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
   }
 }

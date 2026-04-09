@@ -1,6 +1,21 @@
-import React from "react";
+import * as React from "react";
+
 import { EditorWorkbench } from "./editor-workbench";
 
-export default function EditorPage() {
-  return <EditorWorkbench />;
+type EditorPageProps = {
+  projectId?: string;
+  templateId?: string;
+  projectName?: string;
+};
+
+export function EditorPage(props: EditorPageProps) {
+  return (
+    <EditorWorkbench
+      projectId={props.projectId}
+      projectName={props.projectName}
+      templateId={props.templateId}
+    />
+  );
 }
+
+export default EditorPage;

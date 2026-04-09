@@ -5,9 +5,26 @@ import {useLocale, useTranslations} from "next-intl";
 import {useRouter} from "next/navigation";
 import {ArrowLeft, ExternalLink} from "lucide-react";
 
+import {EditorV2CanvasStage} from "@/components/editor/editor-v2-canvas-stage";
 import {Badge} from "@/components/ui/badge";
 import {ScreenHeader} from "@/components/screen/screen-header";
 import {ScreenStage} from "@/components/screen/screen-stage";
+import {
+  applyDataPondToWidget,
+  useEditorDataPondRuntime,
+} from "@/lib/editor-v2-data-pond";
+import {
+  defaultEditorV2DataPondSettings,
+  readEditorV2Draft,
+  type EditorV2Draft,
+} from "@/lib/editor-v2-storage";
+import {buildEditorV2WorkspaceSummary} from "@/lib/editor-v2-workspace";
+import {
+  hasEditorV2RuntimeAction,
+  isExternalEditorV2Href,
+  resolveEditorV2FocusTargets,
+  resolveEditorV2RuntimeHref,
+} from "@/lib/editor-v2-widget-events";
 import {defaultScreenConfig} from "@/lib/mocks/editor";
 import {readEditorDraft, readImportedDatasets, type ScreenConfig} from "@/lib/editor-storage";
 import {readProjectRecord} from "@/lib/project-store";
@@ -17,10 +34,11 @@ import {
   editorWidgets,
   type EditorWidget,
 } from "@/lib/mocks/editor";
+import type {Widget} from "@/packages/types";
 import {
   EditorCanvasWidget,
   editorWidgetPlacementWithin,
-} from "@/components/editor/editor-canvas-widgets";
+} from "@/components/editor-legacy/editor-canvas-widgets";
 import {
   hasWidgetRuntimeAction,
   isExternalWidgetHref,
@@ -33,6 +51,7 @@ export function PreviewPage({projectId}: {projectId: string}) {
   const t = useTranslations("Preview");
   const locale = useLocale();
   const router = useRouter();
+  const [v2Draft, setV2Draft] = useState<EditorV2Draft | null>(null);
   const [widgets, setWidgets] = useState<EditorWidget[]>(editorWidgets);
   const [mapLabels, setMapLabels] = useState(true);
   const [map3dAxis, setMap3dAxis] = useState(true);
@@ -53,14 +72,44 @@ export function PreviewPage({projectId}: {projectId: string}) {
   const [datasetDrafts, setDatasetDrafts] = useState<Record<string, {fields: {field: string; type: string; sample: string; icon: string}[]; rows: Record<string, string | number>[]}>>({});
   const [importedDatasets, setImportedDatasets] = useState(() => readImportedDatasets(projectId));
   const [activeWidgetIds, setActiveWidgetIds] = useState<string[]>([]);
+  const dataPondRuntimeMap = useEditorDataPondRuntime(
+    v2Draft?.dataPonds ?? [],
+    v2Draft?.dataPondSettings ?? defaultEditorV2DataPondSettings,
+  );
+  const hydratedV2Widgets = useMemo(
+    () =>
+      v2Draft?.widgets.map((widget) => applyDataPondToWidget(widget, dataPondRuntimeMap)) ?? [],
+    [dataPondRuntimeMap, v2Draft],
+  );
+  const v2Summary = useMemo(
+    () =>
+      v2Draft
+        ? buildEditorV2WorkspaceSummary({
+            canvas: v2Draft.canvas,
+            dataPondSettings: v2Draft.dataPondSettings,
+            dataPonds: v2Draft.dataPonds,
+            projectId: v2Draft.projectId,
+            projectTitle: v2Draft.projectTitle,
+            widgets: v2Draft.widgets,
+          })
+        : null,
+    [v2Draft],
+  );
 
   useEffect(() => {
-    // Preview intentionally reads from the same local draft snapshot as the editor.
+    const nextV2Draft = readEditorV2Draft(projectId);
     const draft = readEditorDraft(projectId);
     const projectRecord = readProjectRecord(projectId);
     const nextImportedDatasets = readImportedDatasets(projectId);
 
     startTransition(() => {
+      setV2Draft(nextV2Draft);
+
+      if (nextV2Draft) {
+        setProjectTitle(nextV2Draft.projectTitle.trim() || projectRecord?.name || editorProject.name);
+        return;
+      }
+
       if (draft) {
         if (draft.projectTitle?.trim()) {
           setProjectTitle(draft.projectTitle.trim());
@@ -89,6 +138,29 @@ export function PreviewPage({projectId}: {projectId: string}) {
       setImportedDatasets(nextImportedDatasets);
     });
   }, [projectId]);
+
+  const handleV2WidgetActivate = (widget: Widget) => {
+    const focusTargets = resolveEditorV2FocusTargets(widget);
+    if (focusTargets.length) {
+      setActiveWidgetIds(focusTargets);
+      return;
+    }
+
+    const href = resolveEditorV2RuntimeHref(widget, locale, projectId);
+    if (!href) return;
+
+    if (widget.events.openMode === "blank") {
+      window.open(href, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    if (isExternalEditorV2Href(href)) {
+      window.location.assign(href);
+      return;
+    }
+
+    router.push(href);
+  };
 
   const visibleWidgets = useMemo(() => widgets.filter((widget) => widget.visible), [widgets]);
   const currentCanvasWidth = screenConfig.canvasWidth || 1920;
@@ -133,6 +205,87 @@ export function PreviewPage({projectId}: {projectId: string}) {
 
     router.push(href);
   };
+
+  if (v2Draft) {
+    return (
+      <main className="flex min-h-screen flex-col bg-[#111714] text-white">
+        <header className="flex h-16 items-center justify-between border-b border-white/10 px-6">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push(`/${locale}/editor/${projectId}`)}
+              className="rounded-md p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div>
+              <div className="text-sm font-semibold">{t("title")}</div>
+              <div className="text-xs text-white/55">{v2Draft.projectTitle}</div>
+              {v2Summary ? (
+                <div className="mt-1 text-[11px] text-white/45">
+                  组件 {v2Summary.widgetCount} / 数据池 {v2Summary.dataPondCount} / 画布 {v2Summary.canvasLabel}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <button
+            onClick={() => router.push(`/${locale}/publish-success/${projectId}`)}
+            className="inline-flex items-center gap-2 rounded-md bg-[#23422a] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#31583b]"
+          >
+            <span>{t("publish")}</span>
+            <ExternalLink className="h-4 w-4" />
+          </button>
+        </header>
+
+        <section className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_top,rgba(36,66,42,0.35),transparent_28%),linear-gradient(180deg,#111714_0%,#0b100e_100%)] p-10">
+          <div className="w-[1280px] overflow-hidden rounded-[24px] border border-white/10 bg-[#fafaf5] shadow-[0_40px_90px_rgba(0,0,0,0.45)]">
+            <div className="border-b border-[#c2c8bf]/30 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Badge className="rounded border-[#c7ecca] bg-[#eff6ec] px-2 py-1 tracking-[0.12em] text-[#23422a]">
+                    {`${v2Draft.canvas.width} × ${v2Draft.canvas.height}`}
+                  </Badge>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971]">
+                    {t("live")}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#727971]">
+                    {t("readOnly")}
+                  </div>
+                  {v2Summary ? (
+                    <div className="mt-1 text-[11px] text-[#727971]">
+                      隐藏 {v2Summary.hiddenWidgetCount} / 动态绑定 {v2Summary.dataBoundWidgetCount}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[#fafaf5] p-5">
+              <div className="relative flex min-h-[720px] items-center justify-center overflow-auto rounded-[28px] border border-[#c2c8bf]/50 bg-[radial-gradient(circle_at_top,rgba(36,66,42,0.08),transparent_28%),linear-gradient(180deg,#f7f8f2_0%,#eef2ea_100%)] p-8">
+                <EditorV2CanvasStage
+                  widgets={hydratedV2Widgets}
+                  canvas={{
+                    filters: v2Draft.canvas.filters,
+                    width: v2Draft.canvas.width,
+                    height: v2Draft.canvas.height,
+                    showSafeArea: v2Draft.canvas.showSafeArea,
+                  }}
+                  activeWidgetIds={activeWidgetIds}
+                  onWidgetActivate={(widget) => {
+                    if (!hasEditorV2RuntimeAction(widget)) return;
+                    handleV2WidgetActivate(widget);
+                  }}
+                  emptyTitle="预览画布为空"
+                  emptyDescription="当前项目还没有可展示的组件，请返回编辑器继续配置。"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="flex min-h-screen flex-col bg-[#111714] text-white">

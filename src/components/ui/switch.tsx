@@ -4,11 +4,9 @@ import * as React from "react";
 
 import {cn} from "@/lib/utils";
 
-type SwitchProps = {
+type SwitchProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   checked?: boolean;
   onCheckedChange?: (checked: boolean) => void;
-  className?: string;
-  disabled?: boolean;
 };
 
 export function Switch({
@@ -16,15 +14,19 @@ export function Switch({
   onCheckedChange,
   className,
   disabled = false,
+  type = "button",
+  onClick,
+  ...props
 }: SwitchProps) {
   return (
     <button
-      type="button"
+      type={type}
       role="switch"
       aria-checked={checked}
       disabled={disabled}
-      onClick={() => {
-        if (!disabled) {
+      onClick={(event) => {
+        onClick?.(event);
+        if (!event.defaultPrevented && !disabled) {
           onCheckedChange?.(!checked);
         }
       }}
@@ -36,6 +38,7 @@ export function Switch({
         disabled && "cursor-not-allowed opacity-50",
         className,
       )}
+      {...props}
     >
       <span
         className={cn(

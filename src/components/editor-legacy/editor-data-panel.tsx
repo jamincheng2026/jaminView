@@ -3,7 +3,7 @@
 import {Database, Link2, PencilLine} from "lucide-react";
 
 import {DatasetRowEditor} from "@/components/data/dataset-row-editor";
-import {EditorSection} from "@/components/editor/editor-primitives";
+import {EditorSection} from "@/components/editor-legacy/editor-primitives";
 import {Input} from "@/components/ui/input";
 import {Select} from "@/components/ui/select";
 

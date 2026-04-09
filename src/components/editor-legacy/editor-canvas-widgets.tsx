@@ -3,8 +3,8 @@
 import Image from "next/image";
 import type {CSSProperties} from "react";
 
-import {MiniAreaChart, MiniBarChart, MiniLineChart, MiniPieChart} from "@/components/editor/editor-chart-widgets";
-import {EditorMapWidget} from "@/components/editor/editor-map-widget";
+import {MiniAreaChart, MiniBarChart, MiniLineChart, MiniPieChart} from "@/components/editor-legacy/editor-chart-widgets";
+import {EditorMapWidget} from "@/components/editor-legacy/editor-map-widget";
 import {
   categoricalSeries,
   eventSnapshot,

@@ -1,0 +1,5 @@
+{
+  "imageUrl": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1280 720'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23d9efe0'/%3E%3Cstop offset='1' stop-color='%2323422a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='1280' height='720' fill='url(%23g)'/%3E%3Ccircle cx='1030' cy='120' r='180' fill='rgba(255,255,255,0.24)'/%3E%3Cpath d='M0 560 C220 500 320 420 520 460 C760 510 850 620 1280 470 L1280 720 L0 720 Z' fill='rgba(255,255,255,0.22)'/%3E%3Ctext x='96' y='150' font-size='64' fill='white' font-family='sans-serif' font-weight='700'%3EJaminView%3C/text%3E%3Ctext x='96' y='220' font-size='28' fill='rgba(255,255,255,0.92)' font-family='sans-serif'%3E静态画面占位%3C/text%3E%3C/svg%3E",
+  "caption": "品牌陈列图",
+  "meta": "Static Frame"
+}

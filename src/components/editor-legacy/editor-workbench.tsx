@@ -26,8 +26,8 @@ import {
   ZoomOut,
 } from "lucide-react";
 
-import {EditorDataPanel, type DatasetPanelItem} from "@/components/editor/editor-data-panel";
-import {EditorField, EditorSection} from "@/components/editor/editor-primitives";
+import {EditorDataPanel, type DatasetPanelItem} from "@/components/editor-legacy/editor-data-panel";
+import {EditorField, EditorSection} from "@/components/editor-legacy/editor-primitives";
 import {Badge} from "@/components/ui/badge";
 import {Input} from "@/components/ui/input";
 import {Select} from "@/components/ui/select";
@@ -38,7 +38,7 @@ import {ScreenHeader} from "@/components/screen/screen-header";
 import {
   EditorCanvasWidget,
   editorWidgetPlacementWithin,
-} from "@/components/editor/editor-canvas-widgets";
+} from "@/components/editor-legacy/editor-canvas-widgets";
 import {
   categoricalSeries,
   eventSnapshot,

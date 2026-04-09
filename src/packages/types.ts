@@ -1,3 +1,7 @@
+import type { StaticImageData } from "next/image";
+
+import type { ISpec } from "@visactor/vchart";
+
 /**
  * JaminView Widget Package Type System
  *
@@ -34,11 +38,54 @@ export enum ChartFrame {
 /** Shadow presets */
 export type WidgetShadow = "none" | "soft" | "medium" | "strong";
 
+/** Animation presets aligned with the shared editor motion panel. */
+export type WidgetAnimationPreset =
+  | "fadeIn"
+  | "riseIn"
+  | "zoomIn"
+  | "pulse"
+  | "float"
+  | "breathe";
+
 /** Data source mode */
 export type DataSourceMode = "static" | "dataset" | "manual" | "request";
 
 /** Request method */
 export type RequestMethod = "GET" | "POST";
+
+/** Request payload mode */
+export type RequestContentMode = "default" | "sql";
+
+/** Shared request configuration used by widgets and the global data pond. */
+export interface WidgetRequestConfig {
+  url: string;
+  method: RequestMethod;
+  contentMode?: RequestContentMode;
+  refreshInterval?: number;
+  params?: string;
+  sql?: string;
+  responseMap?: string;
+  transformer?: string;
+}
+
+/** Global shared request entry. Widgets subscribe to it by `id`. */
+export interface EditorDataPond {
+  id: string;
+  name: string;
+  enabled: boolean;
+  request: WidgetRequestConfig;
+}
+
+/** Shared polling settings for the whole canvas. */
+export interface EditorDataPondSettings {
+  pollingInterval: number;
+}
+
+/** Lightweight group metadata shared by grouped widgets. */
+export interface GroupType {
+  id: string;
+  name: string;
+}
 
 // ---------------------------------------------------------------------------
 // Widget Registration (GoView: index.ts → ConfigType)
@@ -61,6 +108,8 @@ export interface WidgetRegistration {
   /** Optional note shown in component pool */
   note?: string;
   noteZh?: string;
+  /** Optional thumbnail sourced from local PNG assets, aligned with GoView component cards. */
+  thumbnail?: StaticImageData;
   /** Default dimensions when dragged onto canvas */
   defaultWidth: number;
   defaultHeight: number;
@@ -87,6 +136,8 @@ export interface WidgetStyles {
   radius: number;
   padding: number;
   shadow: WidgetShadow;
+  /** GoView-style single animation token list, currently supports one active preset. */
+  animations: WidgetAnimationPreset[];
 }
 
 /** Lock / hide status. */
@@ -112,16 +163,12 @@ export interface WidgetDataSource {
   mode: DataSourceMode;
   /** Name of the bound dataset (when mode = "dataset") */
   datasetName?: string;
+  /** Bound global data pond id (when mode = "request") */
+  dataPondId?: string;
   /** Raw JSON string (when mode = "manual") */
   manualJson?: string;
   /** Request configuration (when mode = "request") */
-  request?: {
-    url: string;
-    method: RequestMethod;
-    refreshInterval?: number;
-    params?: string;
-    responseMap?: string;
-  };
+  request?: WidgetRequestConfig;
 }
 
 /** Event / interaction configuration — placeholder for future expansion. */
@@ -142,6 +189,8 @@ export interface WidgetBase {
   id: string;
   /** Registration key — used to look up the widget package from registry */
   registrationKey: string;
+  /** Optional group metadata. Widgets in the same group move together on the canvas. */
+  group?: GroupType;
   /** Position & size */
   attr: WidgetAttr;
   /** Visual styles */
@@ -172,7 +221,7 @@ export interface VChartWidget extends WidgetBase {
    * This is the **exact** spec passed to `<VChart spec={...} />`.
    * Panel fields map 1:1 to spec paths (e.g. `spec.bar.style.cornerRadius`).
    */
-  spec: Record<string, unknown>;
+  spec: ISpec;
 }
 
 // ---------------------------------------------------------------------------
@@ -196,6 +245,20 @@ export interface CustomWidget extends WidgetBase {
 /** Any widget that can appear on the canvas. */
 export type Widget = VChartWidget | CustomWidget;
 
+export type WidgetPatch = {
+  id?: Widget["id"];
+  registrationKey?: Widget["registrationKey"];
+  group?: WidgetBase["group"] | null;
+  attr?: Widget["attr"];
+  styles?: Widget["styles"];
+  title?: Widget["title"];
+  status?: Widget["status"];
+  dataSource?: Widget["dataSource"];
+  events?: Widget["events"];
+  spec?: VChartWidget["spec"];
+  config?: CustomWidget["config"];
+};
+
 // ---------------------------------------------------------------------------
 // Registry Entry (GoView: dynamic component resolution)
 // ---------------------------------------------------------------------------
@@ -218,5 +281,5 @@ export interface WidgetPackage {
    * React component for the right-side configuration panel.
    * Props: { widget: Widget; onUpdate: (patch: Partial<Widget>) => void }
    */
-  PanelComponent: React.ComponentType<{ widget: Widget; onUpdate: (patch: Record<string, unknown>) => void }>;
+  PanelComponent: React.ComponentType<{ widget: Widget; onUpdate: (patch: WidgetPatch) => void }>;
 }

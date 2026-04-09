@@ -1,4 +1,4 @@
-import {EditorWorkbench} from "@/components/editor/editor-workbench";
+import {EditorWorkbench} from "@/components/editor-legacy/editor-workbench";
 
 export function EditorPage({
   projectId,

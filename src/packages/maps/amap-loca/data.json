@@ -1,0 +1,198 @@
+{
+  "regions": [
+    {
+      "adcode": "100000",
+      "name": "全国",
+      "level": "country",
+      "parentAdcode": null,
+      "center": [104.114129, 37.550339],
+      "zoom": 4.6
+    },
+    {
+      "adcode": "310000",
+      "name": "上海市",
+      "level": "province",
+      "parentAdcode": "100000",
+      "center": [121.473701, 31.230416],
+      "zoom": 7.6
+    },
+    {
+      "adcode": "320000",
+      "name": "江苏省",
+      "level": "province",
+      "parentAdcode": "100000",
+      "center": [118.763563, 32.061377],
+      "zoom": 7.2
+    },
+    {
+      "adcode": "330000",
+      "name": "浙江省",
+      "level": "province",
+      "parentAdcode": "100000",
+      "center": [120.152791, 30.267446],
+      "zoom": 7.4
+    },
+    {
+      "adcode": "310100",
+      "name": "上海城区",
+      "level": "city",
+      "parentAdcode": "310000",
+      "center": [121.473701, 31.230416],
+      "zoom": 10.2
+    },
+    {
+      "adcode": "320100",
+      "name": "南京市",
+      "level": "city",
+      "parentAdcode": "320000",
+      "center": [118.796877, 32.060255],
+      "zoom": 10
+    },
+    {
+      "adcode": "320500",
+      "name": "苏州市",
+      "level": "city",
+      "parentAdcode": "320000",
+      "center": [120.585316, 31.298886],
+      "zoom": 10
+    },
+    {
+      "adcode": "330100",
+      "name": "杭州市",
+      "level": "city",
+      "parentAdcode": "330000",
+      "center": [120.15507, 30.274084],
+      "zoom": 10
+    },
+    {
+      "adcode": "330200",
+      "name": "宁波市",
+      "level": "city",
+      "parentAdcode": "330000",
+      "center": [121.62454, 29.860258],
+      "zoom": 10
+    }
+  ],
+  "businessPoints": [
+    {
+      "id": "biz-01",
+      "name": "上海国际供应链中心",
+      "province": "上海市",
+      "city": "上海城区",
+      "provinceAdcode": "310000",
+      "cityAdcode": "310100",
+      "position": [121.473701, 31.230416],
+      "heat": 98,
+      "value": 220,
+      "category": "供应链"
+    },
+    {
+      "id": "biz-02",
+      "name": "浦东保税业务园区",
+      "province": "上海市",
+      "city": "上海城区",
+      "provinceAdcode": "310000",
+      "cityAdcode": "310100",
+      "position": [121.6544, 31.2351],
+      "heat": 86,
+      "value": 176,
+      "category": "仓储"
+    },
+    {
+      "id": "biz-03",
+      "name": "南京总部运营中心",
+      "province": "江苏省",
+      "city": "南京市",
+      "provinceAdcode": "320000",
+      "cityAdcode": "320100",
+      "position": [118.796877, 32.060255],
+      "heat": 92,
+      "value": 204,
+      "category": "运营"
+    },
+    {
+      "id": "biz-04",
+      "name": "南京河西数据节点",
+      "province": "江苏省",
+      "city": "南京市",
+      "provinceAdcode": "320000",
+      "cityAdcode": "320100",
+      "position": [118.7402, 32.0109],
+      "heat": 74,
+      "value": 138,
+      "category": "数据"
+    },
+    {
+      "id": "biz-05",
+      "name": "苏州工业园生产基地",
+      "province": "江苏省",
+      "city": "苏州市",
+      "provinceAdcode": "320000",
+      "cityAdcode": "320500",
+      "position": [120.7019, 31.3247],
+      "heat": 88,
+      "value": 192,
+      "category": "制造"
+    },
+    {
+      "id": "biz-06",
+      "name": "苏州昆山协同仓",
+      "province": "江苏省",
+      "city": "苏州市",
+      "provinceAdcode": "320000",
+      "cityAdcode": "320500",
+      "position": [120.9818, 31.3852],
+      "heat": 63,
+      "value": 121,
+      "category": "仓储"
+    },
+    {
+      "id": "biz-07",
+      "name": "杭州数字商务中心",
+      "province": "浙江省",
+      "city": "杭州市",
+      "provinceAdcode": "330000",
+      "cityAdcode": "330100",
+      "position": [120.15507, 30.274084],
+      "heat": 95,
+      "value": 214,
+      "category": "商务"
+    },
+    {
+      "id": "biz-08",
+      "name": "杭州滨江研发枢纽",
+      "province": "浙江省",
+      "city": "杭州市",
+      "provinceAdcode": "330000",
+      "cityAdcode": "330100",
+      "position": [120.2124, 30.2067],
+      "heat": 82,
+      "value": 169,
+      "category": "研发"
+    },
+    {
+      "id": "biz-09",
+      "name": "宁波港航协同中心",
+      "province": "浙江省",
+      "city": "宁波市",
+      "provinceAdcode": "330000",
+      "cityAdcode": "330200",
+      "position": [121.62454, 29.860258],
+      "heat": 84,
+      "value": 183,
+      "category": "港航"
+    },
+    {
+      "id": "biz-10",
+      "name": "宁波北仑交付节点",
+      "province": "浙江省",
+      "city": "宁波市",
+      "provinceAdcode": "330000",
+      "cityAdcode": "330200",
+      "position": [121.8444, 29.9008],
+      "heat": 71,
+      "value": 143,
+      "category": "交付"
+    }
+  ]
+}

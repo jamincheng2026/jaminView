@@ -1,53 +1,78 @@
-import { WidgetPackage, WidgetCategory } from './types';
+import { horizontalBarWidgetPackage } from "./charts/bar-horizontal";
+import { barWidgetPackage } from "./charts/bar";
+import { lineWidgetPackage } from "./charts/line";
+import { pieWidgetPackage } from "./charts/pie";
+import { radarWidgetPackage } from "./charts/radar";
+import { scatterWidgetPackage } from "./charts/scatter";
+import { clockSystemWidgetPackage } from "./decorates/clock-system";
+import { flipperNumberWidgetPackage } from "./decorates/flipper-number";
+import { amapLocaMapWidgetPackage } from "./maps/amap-loca";
+import { chinaGlMapWidgetPackage } from "./maps/china-gl";
+import { imageFrameWidgetPackage } from "./media/image-frame";
+import { scrollBoardWidgetPackage } from "./tables/scroll-board";
+import { WidgetCategory, type WidgetPackage } from "./types";
 
-/**
- * 组件大管家 (Widget Registry)
- * 负责收集、注册、以及分配 packages 目录下的所有独立组件（五件套）
- */
+const builtinPackages: WidgetPackage[] = [
+  barWidgetPackage,
+  lineWidgetPackage,
+  pieWidgetPackage,
+  horizontalBarWidgetPackage,
+  scatterWidgetPackage,
+  radarWidgetPackage,
+  amapLocaMapWidgetPackage,
+  chinaGlMapWidgetPackage,
+  flipperNumberWidgetPackage,
+  clockSystemWidgetPackage,
+  scrollBoardWidgetPackage,
+  imageFrameWidgetPackage,
+];
+
 class WidgetRegistry {
-  private packages: Map<string, WidgetPackage> = new Map();
+  private packages = new Map<string, WidgetPackage>();
+  private initialized = false;
 
-  /** 注册插件包 */
+  private ensureInitialized() {
+    if (this.initialized) {
+      return;
+    }
+
+    this.initialized = true;
+    builtinPackages.forEach((pkg) => this.register(pkg));
+  }
+
   public register(pkg: WidgetPackage) {
     const key = pkg.registration.key;
     if (this.packages.has(key)) {
-      console.warn(`[Registry] 组件包 ${key} 已存在，忽略覆盖注册。`);
       return;
     }
+
     this.packages.set(key, pkg);
   }
 
-  /** 获取单个插件包 */
-  public getPackage(key: string): WidgetPackage | undefined {
+  public getPackage(key: string) {
+    this.ensureInitialized();
     return this.packages.get(key);
   }
 
-  /**
-   * 按类别获取所有组件包 (左侧物料栏渲染使用)
-   */
   public getPackagesByCategory(): Record<WidgetCategory, WidgetPackage[]> {
+    this.ensureInitialized();
+
     const grouped = {} as Record<WidgetCategory, WidgetPackage[]>;
-    
-    // 初始化所有分类的空数组
-    Object.values(WidgetCategory).forEach((cat) => {
-      grouped[cat as WidgetCategory] = [];
+    Object.values(WidgetCategory).forEach((category) => {
+      grouped[category] = [];
     });
 
-    // 填充分组
     this.packages.forEach((pkg) => {
-      if (grouped[pkg.registration.category]) {
-        grouped[pkg.registration.category].push(pkg);
-      }
+      grouped[pkg.registration.category].push(pkg);
     });
 
     return grouped;
   }
 
-  /** 通用获取所有的 key */
-  public getAllKeys(): string[] {
+  public getAllKeys() {
+    this.ensureInitialized();
     return Array.from(this.packages.keys());
   }
 }
 
-// 导出全局单例
 export const registry = new WidgetRegistry();
