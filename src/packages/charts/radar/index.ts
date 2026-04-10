@@ -1,6 +1,6 @@
 import { ChartFrame, WidgetCategory, type WidgetPackage } from "@/packages/types";
 
-import radarThumbnail from "../../../../reference/go-view/src/assets/images/chart/charts/radar.png";
+import radarThumbnail from "@/assets/widget-thumbnails/charts/radar.png";
 import { createDefaultRadarWidget } from "./config";
 import { RadarChartPanel } from "./panel";
 import { RadarChartRender } from "./render";

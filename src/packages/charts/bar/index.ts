@@ -1,6 +1,6 @@
 import { ChartFrame, WidgetCategory, type WidgetPackage } from "@/packages/types";
 
-import barThumbnail from "../../../../reference/go-view/src/assets/images/chart/charts/bar_x.png";
+import barThumbnail from "@/assets/widget-thumbnails/charts/bar-x.png";
 import { createDefaultBarWidget } from "./config";
 import { BarChartPanel } from "./panel";
 import { BarChartRender } from "./render";

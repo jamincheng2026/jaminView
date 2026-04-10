@@ -1,6 +1,6 @@
 import { ChartFrame, WidgetCategory, type WidgetPackage } from "@/packages/types";
 
-import mapThumbnail from "../../../../reference/go-view/src/assets/images/chart/charts/map_amap.png";
+import mapThumbnail from "@/assets/widget-thumbnails/maps/amap-loca.png";
 import { createDefaultAmapLocaMapWidget } from "./config";
 import { AmapLocaMapPanel } from "./panel";
 import { AmapLocaMapRender } from "./render";

@@ -1,6 +1,6 @@
 import { ChartFrame, WidgetCategory, type WidgetPackage } from "@/packages/types";
 
-import flipperNumberThumbnail from "../../../../reference/go-view/src/assets/images/chart/decorates/flipper-number.png";
+import flipperNumberThumbnail from "@/assets/widget-thumbnails/decorates/flipper-number.png";
 import { createDefaultFlipperNumberWidget } from "./config";
 import { FlipperNumberPanel } from "./panel";
 import { FlipperNumberRender } from "./render";

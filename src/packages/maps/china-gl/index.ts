@@ -1,6 +1,6 @@
 import { ChartFrame, WidgetCategory, type WidgetPackage } from "@/packages/types";
 
-import mapThumbnail from "../../../../reference/go-view/src/assets/images/chart/charts/map.png";
+import mapThumbnail from "@/assets/widget-thumbnails/maps/china-gl.png";
 import { createDefaultChinaGlMapWidget } from "./config";
 import { ChinaGlMapPanel } from "./panel";
 import { ChinaGlMapRender } from "./render";

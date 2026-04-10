@@ -1,6 +1,6 @@
 import { ChartFrame, WidgetCategory, type WidgetPackage } from "@/packages/types";
 
-import clockThumbnail from "../../../../reference/go-view/src/assets/images/chart/decorates/clock.png";
+import clockThumbnail from "@/assets/widget-thumbnails/decorates/clock-system.png";
 import { createDefaultClockSystemWidget } from "./config";
 import { ClockSystemPanel } from "./panel";
 import { ClockSystemRender } from "./render";

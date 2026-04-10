@@ -1,6 +1,6 @@
 import { ChartFrame, WidgetCategory, type WidgetPackage } from "@/packages/types";
 
-import scatterThumbnail from "../../../../reference/go-view/src/assets/images/chart/charts/scatter-multi.png";
+import scatterThumbnail from "@/assets/widget-thumbnails/charts/scatter-multi.png";
 import { createDefaultScatterWidget } from "./config";
 import { ScatterChartPanel } from "./panel";
 import { ScatterChartRender } from "./render";

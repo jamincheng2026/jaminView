@@ -1,6 +1,6 @@
 import { ChartFrame, WidgetCategory, type WidgetPackage } from "@/packages/types";
 
-import pieThumbnail from "../../../../reference/go-view/src/assets/images/chart/charts/pie.png";
+import pieThumbnail from "@/assets/widget-thumbnails/charts/pie.png";
 import { createDefaultPieWidget } from "./config";
 import { PieChartPanel } from "./panel";
 import { PieChartRender } from "./render";

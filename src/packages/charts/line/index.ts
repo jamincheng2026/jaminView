@@ -1,6 +1,6 @@
 import { ChartFrame, WidgetCategory, type WidgetPackage } from "@/packages/types";
 
-import lineThumbnail from "../../../../reference/go-view/src/assets/images/chart/charts/line.png";
+import lineThumbnail from "@/assets/widget-thumbnails/charts/line.png";
 import { createDefaultLineWidget } from "./config";
 import { LineChartPanel } from "./panel";
 import { LineChartRender } from "./render";

@@ -1,6 +1,6 @@
 import { ChartFrame, WidgetCategory, type WidgetPackage } from "@/packages/types";
 
-import imageFrameThumbnail from "../../../../reference/go-view/src/assets/images/chart/informations/photo.png";
+import imageFrameThumbnail from "@/assets/widget-thumbnails/media/image-frame.png";
 import { createDefaultImageFrameWidget } from "./config";
 import { ImageFramePanel } from "./panel";
 import { ImageFrameRender } from "./render";

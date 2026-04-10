@@ -1,6 +1,6 @@
 import { ChartFrame, WidgetCategory, type WidgetPackage } from "@/packages/types";
 
-import scrollBoardThumbnail from "../../../../reference/go-view/src/assets/images/chart/tables/table_scrollboard.png";
+import scrollBoardThumbnail from "@/assets/widget-thumbnails/tables/scroll-board.png";
 import { createDefaultScrollBoardWidget } from "./config";
 import { ScrollBoardPanel } from "./panel";
 import { ScrollBoardRender } from "./render";

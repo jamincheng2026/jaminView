@@ -1,6 +1,6 @@
 import { ChartFrame, WidgetCategory, type WidgetPackage } from "@/packages/types";
 
-import horizontalBarThumbnail from "../../../../reference/go-view/src/assets/images/chart/charts/bar_y.png";
+import horizontalBarThumbnail from "@/assets/widget-thumbnails/charts/bar-y.png";
 import { createDefaultHorizontalBarWidget } from "./config";
 import { HorizontalBarChartPanel } from "./panel";
 import { HorizontalBarChartRender } from "./render";
