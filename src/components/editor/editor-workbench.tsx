@@ -21,6 +21,11 @@ import {
   NumberStepper,
   ToggleSwitch,
 } from "@/components/editor-ui";
+import {
+  CanvasEngine,
+  MAX_CANVAS_ZOOM,
+  MIN_CANVAS_ZOOM,
+} from "@/components/editor/canvas-engine";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Tabs } from "@/components/ui/tabs";
@@ -33,7 +38,6 @@ import {
 import {
   defaultEditorV2CanvasFilters,
   editorV2CanvasFilterPresets,
-  resolveEditorV2CanvasFilterStyle,
   type EditorV2CanvasFilters,
 } from "@/lib/editor-v2-canvas-filters";
 import {
@@ -81,31 +85,6 @@ type CanvasPreviewState = {
   showGrid: boolean;
   showSafeArea: boolean;
   snapToGrid: boolean;
-};
-
-type DropIndicator = {
-  height: number;
-  title: string;
-  width: number;
-  x: number;
-  y: number;
-};
-
-type WidgetPosition = {
-  x: number;
-  y: number;
-};
-
-type ActiveWidgetDrag = {
-  anchorId: string;
-  maxBottom: number;
-  maxRight: number;
-  minLeft: number;
-  minTop: number;
-  originPositions: Record<string, WidgetPosition>;
-  startClientX: number;
-  startClientY: number;
-  widgetIds: string[];
 };
 
 type SelectOption = {
@@ -386,26 +365,6 @@ function getAnimationDescription(animation: WidgetAnimationPreset | null) {
   );
 }
 
-function resolveWidgetAnimation(animations: WidgetAnimationPreset[]) {
-  const preset = animations[0];
-  switch (preset) {
-    case "fadeIn":
-      return "jv-widget-fade-in 720ms cubic-bezier(0.22, 1, 0.36, 1) both";
-    case "riseIn":
-      return "jv-widget-rise-in 780ms cubic-bezier(0.22, 1, 0.36, 1) both";
-    case "zoomIn":
-      return "jv-widget-zoom-in 760ms cubic-bezier(0.22, 1, 0.36, 1) both";
-    case "pulse":
-      return "jv-widget-pulse 2.8s ease-in-out infinite";
-    case "float":
-      return "jv-widget-float 3.6s ease-in-out infinite";
-    case "breathe":
-      return "jv-widget-breathe 4.2s ease-in-out infinite";
-    default:
-      return undefined;
-  }
-}
-
 function clampPosition(value: number, min: number, max: number) {
   if (value < min) {
     return min;
@@ -422,22 +381,7 @@ function snapToGrid(value: number, size: number) {
   return Math.round(value / size) * size;
 }
 
-function getDisplayPosition(
-  widget: Widget,
-  previewPositions: Record<string, WidgetPosition> | null,
-): WidgetPosition {
-  const nextPosition = previewPositions?.[widget.id];
-
-  return {
-    x: nextPosition?.x ?? widget.attr.x,
-    y: nextPosition?.y ?? widget.attr.y,
-  };
-}
-
-function getSelectionBounds(
-  widgets: Widget[],
-  previewPositions: Record<string, WidgetPosition> | null = null,
-) {
+function getSelectionBounds(widgets: Widget[]) {
   if (widgets.length === 0) {
     return null;
   }
@@ -448,11 +392,10 @@ function getSelectionBounds(
   let bottom = Number.NEGATIVE_INFINITY;
 
   widgets.forEach((widget) => {
-    const position = getDisplayPosition(widget, previewPositions);
-    left = Math.min(left, position.x);
-    top = Math.min(top, position.y);
-    right = Math.max(right, position.x + widget.attr.w);
-    bottom = Math.max(bottom, position.y + widget.attr.h);
+    left = Math.min(left, widget.attr.x);
+    top = Math.min(top, widget.attr.y);
+    right = Math.max(right, widget.attr.x + widget.attr.w);
+    bottom = Math.max(bottom, widget.attr.y + widget.attr.h);
   });
 
   return {
@@ -461,14 +404,6 @@ function getSelectionBounds(
     x: left,
     y: top,
   };
-}
-
-function haveSameIds(left: string[], right: string[]) {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  return left.every((id, index) => right[index] === id);
 }
 
 function PanelField({
@@ -664,7 +599,6 @@ export function EditorWorkbench({
   projectName?: string;
   templateId?: string;
 }) {
-  const canvasRef = React.useRef<HTMLDivElement | null>(null);
   const workspaceImportInputRef = React.useRef<HTMLInputElement | null>(null);
   const locale = useLocale();
   const router = useRouter();
@@ -693,10 +627,6 @@ export function EditorWorkbench({
   const [canvasPreview, setCanvasPreview] =
     React.useState<CanvasPreviewState>(DEFAULT_CANVAS_PREVIEW);
   const [draggingPackageKey, setDraggingPackageKey] = React.useState<string | null>(null);
-  const [dropIndicator, setDropIndicator] = React.useState<DropIndicator | null>(null);
-  const [dragPreviewPositions, setDragPreviewPositions] = React.useState<
-    Record<string, WidgetPosition> | null
-  >(null);
   const [projectTitle, setProjectTitle] = React.useState(projectName?.trim() || "未命名项目");
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
   const [lastSavedAt, setLastSavedAt] = React.useState<string | null>(null);
@@ -704,9 +634,6 @@ export function EditorWorkbench({
   const [workspaceTransferState, setWorkspaceTransferState] =
     React.useState<WorkspaceTransferState | null>(null);
   const lastSavedSignatureRef = React.useRef<string>("");
-  const activeWidgetDragRef = React.useRef<ActiveWidgetDrag | null>(null);
-  const dragPreviewPositionsRef = React.useRef<Record<string, WidgetPosition> | null>(null);
-  const widgetsRef = React.useRef(widgets);
   const dataPondRuntimeMap = useEditorDataPondRuntime(dataPonds, dataPondSettings);
 
   const packageGroups = React.useMemo(() => {
@@ -736,10 +663,6 @@ export function EditorWorkbench({
   const selectedPackage = selectedWidget
     ? registry.getPackage(selectedWidget.registrationKey) ?? null
     : null;
-  const orderedWidgets = React.useMemo(
-    () => [...hydratedWidgets].sort((left, right) => left.attr.zIndex - right.attr.zIndex),
-    [hydratedWidgets],
-  );
   const selectedWidgets = React.useMemo(
     () => widgets.filter((widget) => selectedIds.includes(widget.id)),
     [selectedIds, widgets],
@@ -776,48 +699,6 @@ export function EditorWorkbench({
   const canUngroupSelection = React.useMemo(
     () => selectedGroupIds.length === 1 && selectedSharedGroupMembers.length > 1,
     [selectedGroupIds, selectedSharedGroupMembers.length],
-  );
-  const activeGroupFrames = React.useMemo(() => {
-    const groups = new Map<string, { group: GroupType; widgets: Widget[] }>();
-
-    orderedWidgets.forEach((widget) => {
-      if (!selectedIds.includes(widget.id) || widget.status.hidden || !widget.group) {
-        return;
-      }
-
-      const bucket = groups.get(widget.group.id);
-      if (bucket) {
-        bucket.widgets.push(widget);
-        return;
-      }
-
-      groups.set(widget.group.id, {
-        group: widget.group,
-        widgets: orderedWidgets.filter(
-          (candidate) => !candidate.status.hidden && candidate.group?.id === widget.group?.id,
-        ),
-      });
-    });
-
-    return Array.from(groups.values())
-      .map((entry) => {
-        const bounds = getSelectionBounds(entry.widgets, dragPreviewPositions);
-        if (!bounds || entry.widgets.length < 2) {
-          return null;
-        }
-
-        return {
-          ...bounds,
-          id: entry.group.id,
-          label: `${entry.group.name} / ${entry.widgets.length} 项`,
-        };
-      })
-      .filter((entry): entry is { height: number; id: string; label: string; width: number; x: number; y: number } => Boolean(entry));
-  }, [dragPreviewPositions, orderedWidgets, selectedIds]);
-  const canvasScale = canvasPreview.zoom / 100;
-  const canvasFilterStyle = React.useMemo(
-    () => resolveEditorV2CanvasFilterStyle(canvasPreview.filters),
-    [canvasPreview.filters],
   );
   const selectedAnimation = selectedWidget?.styles.animations[0] ?? null;
   const selectedWidgetIsVChart = selectedWidget?.chartFrame === ChartFrame.VCHART;
@@ -966,14 +847,6 @@ export function EditorWorkbench({
       setSelectedDataPondId(dataPonds[0]?.id ?? null);
     }
   }, [dataPonds, selectedDataPondId]);
-
-  React.useEffect(() => {
-    widgetsRef.current = widgets;
-  }, [widgets]);
-
-  React.useEffect(() => {
-    dragPreviewPositionsRef.current = dragPreviewPositions;
-  }, [dragPreviewPositions]);
 
   React.useEffect(() => {
     const draft = readEditorV2Draft(resolvedProjectId);
@@ -1228,55 +1101,34 @@ export function EditorWorkbench({
     }));
   };
 
-  const createPositionedWidget = (pkg: WidgetPackage, x: number, y: number) => {
-    const created = pkg.createDefault();
-    const maxX = Math.max(0, canvasPreview.width - created.attr.w);
-    const maxY = Math.max(0, canvasPreview.height - created.attr.h);
-    const nextX = clampPosition(
-      canvasPreview.snapToGrid ? snapToGrid(x, 24) : Math.round(x),
-      0,
-      maxX,
-    );
-    const nextY = clampPosition(
-      canvasPreview.snapToGrid ? snapToGrid(y, 24) : Math.round(y),
-      0,
-      maxY,
-    );
+  const createPositionedWidget = React.useCallback(
+    (pkg: WidgetPackage, x: number, y: number) => {
+      const created = pkg.createDefault();
+      const maxX = Math.max(0, canvasPreview.width - created.attr.w);
+      const maxY = Math.max(0, canvasPreview.height - created.attr.h);
+      const nextX = clampPosition(
+        canvasPreview.snapToGrid ? snapToGrid(x, 24) : Math.round(x),
+        0,
+        maxX,
+      );
+      const nextY = clampPosition(
+        canvasPreview.snapToGrid ? snapToGrid(y, 24) : Math.round(y),
+        0,
+        maxY,
+      );
 
-    return {
-      ...created,
-      attr: {
-        ...created.attr,
-        x: nextX,
-        y: nextY,
-        zIndex: widgets.length + 1,
-      },
-    };
-  };
-
-  const buildDropIndicator = (pkg: WidgetPackage, clientX: number, clientY: number) => {
-    const canvasNode = canvasRef.current;
-    if (!canvasNode) {
-      return null;
-    }
-
-    const rect = canvasNode.getBoundingClientRect();
-    const localX = (clientX - rect.left) / canvasScale;
-    const localY = (clientY - rect.top) / canvasScale;
-    const widget = createPositionedWidget(
-      pkg,
-      localX - pkg.registration.defaultWidth / 2,
-      localY - pkg.registration.defaultHeight / 2,
-    );
-
-    return {
-      x: widget.attr.x,
-      y: widget.attr.y,
-      width: widget.attr.w,
-      height: widget.attr.h,
-      title: pkg.registration.titleZh,
-    };
-  };
+      return {
+        ...created,
+        attr: {
+          ...created.attr,
+          x: nextX,
+          y: nextY,
+          zIndex: widgets.length + 1,
+        },
+      };
+    },
+    [canvasPreview.height, canvasPreview.snapToGrid, canvasPreview.width, widgets.length],
+  );
 
   const handleAddWidget = (pkg: WidgetPackage) => {
     const offset = widgets.length * 24;
@@ -1301,55 +1153,33 @@ export function EditorWorkbench({
 
   const handlePackageDragEnd = () => {
     setDraggingPackageKey(null);
-    setDropIndicator(null);
   };
 
-  const handleCanvasDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    const registrationKey = event.dataTransfer.getData(WIDGET_DRAG_MIME) || draggingPackageKey;
-    if (!registrationKey) {
-      return;
-    }
+  const handleCanvasPackageDrop = React.useCallback(
+    (registrationKey: string, position: { x: number; y: number }) => {
+      const pkg = registry.getPackage(registrationKey);
+      if (!pkg) {
+        return;
+      }
 
-    const pkg = registry.getPackage(registrationKey);
-    if (!pkg) {
-      return;
-    }
+      const nextWidget = createPositionedWidget(pkg, position.x, position.y);
+      addWidget(nextWidget);
+      selectWidget(nextWidget.id);
+      setDraggingPackageKey(null);
+    },
+    [addWidget, createPositionedWidget, selectWidget],
+  );
 
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-    setDropIndicator(buildDropIndicator(pkg, event.clientX, event.clientY));
-  };
-
-  const handleCanvasDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    const registrationKey = event.dataTransfer.getData(WIDGET_DRAG_MIME) || draggingPackageKey;
-    if (!registrationKey) {
-      return;
-    }
-
-    const pkg = registry.getPackage(registrationKey);
-    if (!pkg) {
-      return;
-    }
-
-    event.preventDefault();
-    const indicator = buildDropIndicator(pkg, event.clientX, event.clientY);
-    setDraggingPackageKey(null);
-    setDropIndicator(null);
-
-    if (!indicator) {
-      return;
-    }
-
-    const nextWidget = createPositionedWidget(pkg, indicator.x, indicator.y);
-    addWidget(nextWidget);
-    selectWidget(nextWidget.id);
-  };
-
-  const handleCanvasDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
-    if (!canvasRef.current?.contains(event.relatedTarget as Node | null)) {
-      setDropIndicator(null);
-    }
-  };
+  const handleCanvasZoomChange = React.useCallback((zoom: number) => {
+    setCanvasPreview((current) =>
+      current.zoom === zoom
+        ? current
+        : {
+            ...current,
+            zoom,
+          },
+    );
+  }, []);
 
   const expandSelectionWithGroups = React.useCallback(
     (ids: string[]) => {
@@ -1395,160 +1225,6 @@ export function EditorWorkbench({
 
     ungroupSelectedWidgets();
   }, [canUngroupSelection, ungroupSelectedWidgets]);
-
-  const handleWidgetPointerDown = (
-    widgetId: string,
-    event: React.PointerEvent<HTMLDivElement>,
-  ) => {
-    if (event.button !== 0) {
-      return;
-    }
-
-    const anchorWidget = widgets.find((widget) => widget.id === widgetId);
-    if (!anchorWidget || anchorWidget.status.hidden || anchorWidget.status.locked) {
-      return;
-    }
-
-    const isMultiToggle = event.shiftKey || event.metaKey || event.ctrlKey;
-    const directSelectionIds = getSelectionIdsForWidget(widgetId);
-
-    if (isMultiToggle) {
-      event.preventDefault();
-      event.stopPropagation();
-      selectWidgets(directSelectionIds, true);
-      return;
-    }
-
-    const nextSelectionIds = expandSelectionWithGroups(
-      selectedIds.includes(widgetId) ? selectedIds : directSelectionIds,
-    );
-
-    if (!haveSameIds(nextSelectionIds, selectedIds)) {
-      selectWidgets(nextSelectionIds);
-    }
-
-    const movableWidgets = widgets.filter(
-      (widget) => nextSelectionIds.includes(widget.id) && !widget.status.locked,
-    );
-    if (movableWidgets.length === 0) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const bounds = getSelectionBounds(movableWidgets);
-    if (!bounds) {
-      return;
-    }
-
-    activeWidgetDragRef.current = {
-      anchorId: widgetId,
-      maxBottom: bounds.y + bounds.height,
-      maxRight: bounds.x + bounds.width,
-      minLeft: bounds.x,
-      minTop: bounds.y,
-      originPositions: Object.fromEntries(
-        movableWidgets.map((widget) => [widget.id, { x: widget.attr.x, y: widget.attr.y }]),
-      ),
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      widgetIds: movableWidgets.map((widget) => widget.id),
-    };
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      const activeDrag = activeWidgetDragRef.current;
-      if (!activeDrag) {
-        return;
-      }
-
-      const rawDeltaX = (moveEvent.clientX - activeDrag.startClientX) / canvasScale;
-      const rawDeltaY = (moveEvent.clientY - activeDrag.startClientY) / canvasScale;
-      const limitedDeltaX = clampPosition(
-        Math.round(rawDeltaX),
-        -activeDrag.minLeft,
-        canvasPreview.width - activeDrag.maxRight,
-      );
-      const limitedDeltaY = clampPosition(
-        Math.round(rawDeltaY),
-        -activeDrag.minTop,
-        canvasPreview.height - activeDrag.maxBottom,
-      );
-      const groupWidth = activeDrag.maxRight - activeDrag.minLeft;
-      const groupHeight = activeDrag.maxBottom - activeDrag.minTop;
-      const snappedLeft = canvasPreview.snapToGrid
-        ? clampPosition(snapToGrid(activeDrag.minLeft + limitedDeltaX, 24), 0, canvasPreview.width - groupWidth)
-        : activeDrag.minLeft + limitedDeltaX;
-      const snappedTop = canvasPreview.snapToGrid
-        ? clampPosition(snapToGrid(activeDrag.minTop + limitedDeltaY, 24), 0, canvasPreview.height - groupHeight)
-        : activeDrag.minTop + limitedDeltaY;
-      const nextDeltaX = snappedLeft - activeDrag.minLeft;
-      const nextDeltaY = snappedTop - activeDrag.minTop;
-
-      setDragPreviewPositions(
-        Object.fromEntries(
-          activeDrag.widgetIds.map((id) => {
-            const origin = activeDrag.originPositions[id];
-            return [
-              id,
-              {
-                x: origin.x + nextDeltaX,
-                y: origin.y + nextDeltaY,
-              },
-            ];
-          }),
-        ),
-      );
-    };
-
-    const handlePointerUp = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-
-      const activeDrag = activeWidgetDragRef.current;
-      activeWidgetDragRef.current = null;
-
-      const previewPositions = dragPreviewPositionsRef.current;
-      if (!activeDrag || !previewPositions) {
-        setDragPreviewPositions(null);
-        return;
-      }
-
-      const patches: Array<{ id: string; patch: WidgetPatch }> = [];
-
-      activeDrag.widgetIds.forEach((id) => {
-        const widget = widgetsRef.current.find((entry) => entry.id === id);
-        const preview = previewPositions[id];
-        if (!widget || !preview) {
-          return;
-        }
-
-        if (widget.attr.x === preview.x && widget.attr.y === preview.y) {
-          return;
-        }
-
-        patches.push({
-          id,
-          patch: {
-            attr: {
-              ...widget.attr,
-              x: preview.x,
-              y: preview.y,
-            },
-          },
-        });
-      });
-
-      if (patches.length > 0) {
-        updateWidgets(patches);
-      }
-
-      setDragPreviewPositions(null);
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-  };
 
   const handleWidgetPatch = (patch: WidgetPatch) => {
     if (!selectedWidget) {
@@ -1824,7 +1500,7 @@ export function EditorWorkbench({
 
   const renderCustomizePanel = () => {
     if (selectedWidgets.length > 1) {
-      const selectionBounds = getSelectionBounds(selectedWidgets, dragPreviewPositions);
+      const selectionBounds = getSelectionBounds(selectedWidgets);
       const selectionDescription = selectedSharedGroup
         ? "当前选择已经属于同一组合，拖动任意成员都会联动整组，解组后才可以重新编排。"
         : canGroupSelection
@@ -1938,8 +1614,8 @@ export function EditorWorkbench({
             <NumberStepper
               label="预览缩放"
               value={canvasPreview.zoom}
-              min={10}
-              max={100}
+              min={MIN_CANVAS_ZOOM}
+              max={MAX_CANVAS_ZOOM}
               step={5}
               unit="%"
               onValueChange={(value) => updateCanvasPreview("zoom", value)}
@@ -3400,141 +3076,20 @@ export function EditorWorkbench({
         <main className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_top,rgba(67,98,74,0.14),transparent_24%),linear-gradient(180deg,#eef2ea_0%,#e8eee5_100%)]">
           <div className="absolute left-0 right-0 top-0 h-7 border-b border-[#d7d8d1] bg-[#fafaf5]/92 backdrop-blur" />
           <div className="absolute bottom-0 left-0 top-0 w-7 border-r border-[#d7d8d1] bg-[#fafaf5]/92 backdrop-blur" />
-
-          <div className="absolute inset-0 flex items-center justify-center overflow-auto px-8 pb-8 pt-10">
-            <div
-              ref={canvasRef}
-              className="relative rounded-[30px] bg-white shadow-[0_28px_70px_rgba(26,28,25,0.12)] ring-1 ring-[#d7d8d1]"
-              style={{
-                width: canvasPreview.width,
-                height: canvasPreview.height,
-                transform: `scale(${canvasScale})`,
-                transformOrigin: "center",
-                ...canvasFilterStyle,
-              }}
-              onDragOver={handleCanvasDragOver}
-              onDrop={handleCanvasDrop}
-              onDragLeave={handleCanvasDragLeave}
-              onClick={() => {
-                setDragPreviewPositions(null);
-                clearSelection();
-              }}
-            >
-              {canvasPreview.showGrid ? (
-                <div className="absolute inset-0 bg-[radial-gradient(#cbd1c8_1px,transparent_1px)] [background-size:24px_24px] opacity-45" />
-              ) : null}
-
-              {canvasPreview.showSafeArea ? (
-                <div className="pointer-events-none absolute inset-[88px] rounded-[28px] border border-dashed border-[#23422a]/40" />
-              ) : null}
-
-              {activeGroupFrames.map((frame) => (
-                <div
-                  key={frame.id}
-                  className="pointer-events-none absolute rounded-[28px] border-2 border-dashed border-[#23422a]/55 bg-[#23422a]/6"
-                  style={{
-                    left: frame.x - 8,
-                    top: frame.y - 8,
-                    width: frame.width + 16,
-                    height: frame.height + 16,
-                  }}
-                >
-                  <div className="absolute left-3 top-3 rounded-full border border-[#23422a]/20 bg-white/96 px-3 py-1 text-[11px] font-bold tracking-[0.08em] text-[#23422a] shadow-sm">
-                    {frame.label}
-                  </div>
-                </div>
-              ))}
-
-              {dropIndicator ? (
-                <div
-                  className="pointer-events-none absolute rounded-[24px] border-2 border-dashed border-[#23422a] bg-[#23422a]/8 shadow-[0_18px_40px_rgba(35,66,42,0.12)]"
-                  style={{
-                    left: dropIndicator.x,
-                    top: dropIndicator.y,
-                    width: dropIndicator.width,
-                    height: dropIndicator.height,
-                  }}
-                >
-                  <div className="absolute left-3 top-3 rounded-full border border-[#23422a]/20 bg-white/94 px-3 py-1 text-[11px] font-bold tracking-[0.08em] text-[#23422a]">
-                    放置 {dropIndicator.title}
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="absolute left-8 top-8 rounded-full border border-[#d7d8d1] bg-[#fafaf5] px-3 py-1.5 text-[12px] font-semibold text-[#23422a] shadow-sm">
-                {canvasPreview.width} x {canvasPreview.height}
-              </div>
-
-              <div className="absolute right-8 top-8 rounded-full border border-[#d7d8d1] bg-white/92 px-3 py-1.5 text-[12px] font-medium text-[#727971]">
-                缩放 {canvasPreview.zoom}%
-              </div>
-
-              {orderedWidgets.length === 0 ? (
-                <div className="flex h-full w-full items-center justify-center">
-                  <div className="max-w-[560px] rounded-[34px] border border-[#d7d8d1] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,249,243,0.92))] px-10 py-12 text-center shadow-[0_18px_40px_rgba(26,28,25,0.06)]">
-                    <div className="text-[11px] font-black uppercase tracking-[0.28em] text-[#23422a]">
-                      V2 工作台已就绪
-                    </div>
-                    <h1 className="mt-4 text-4xl font-extrabold tracking-tight text-[#1a1c19]">
-                      从左侧选择图表开始搭建画布
-                    </h1>
-                    <p className="mt-4 text-sm leading-7 text-[#727971]">
-                      当前版本已经打通注册表、组件五件套、画布渲染、右侧四大 Tab，以及静态/API
-                      两态的数据面板结构。
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-
-              {orderedWidgets.map((widget) => {
-                const pkg = registry.getPackage(widget.registrationKey);
-                if (!pkg || widget.status.hidden) {
-                  return null;
-                }
-
-                const active = selectedIds.includes(widget.id);
-                const position = getDisplayPosition(widget, dragPreviewPositions);
-
-                return (
-                  <div
-                    key={widget.id}
-                    className={`absolute overflow-hidden rounded-[24px] border bg-white shadow-[0_12px_30px_rgba(26,28,25,0.08)] transition-shadow ${
-                      active
-                        ? "border-[#23422a] ring-2 ring-[#23422a]/25"
-                        : "border-[#d7d8d1] hover:shadow-[0_16px_34px_rgba(26,28,25,0.12)]"
-                    } ${widget.status.locked ? "cursor-not-allowed" : "cursor-move"}`}
-                    style={{
-                      left: position.x,
-                      top: position.y,
-                      width: widget.attr.w,
-                      height: widget.attr.h,
-                      zIndex: widget.attr.zIndex,
-                      opacity: widget.styles.opacity,
-                      animation: resolveWidgetAnimation(widget.styles.animations),
-                    }}
-                    onPointerDown={(event) => handleWidgetPointerDown(widget.id, event)}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      selectWidgets(
-                        getSelectionIdsForWidget(widget.id),
-                        event.shiftKey || event.metaKey || event.ctrlKey,
-                      );
-                    }}
-                  >
-                    <div className="absolute left-3 top-3 z-10 rounded-full border border-[#d7d8d1] bg-white/92 px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-[#23422a] shadow-sm">
-                      {pkg.registration.titleZh}
-                    </div>
-                    {widget.group ? (
-                      <div className="absolute right-3 top-3 z-10 rounded-full border border-[#23422a]/12 bg-[#23422a]/8 px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-[#23422a] shadow-sm">
-                        {widget.group.name}
-                      </div>
-                    ) : null}
-                    <pkg.RenderComponent widget={widget} width={widget.attr.w} height={widget.attr.h} />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <CanvasEngine
+            canvas={canvasPreview}
+            widgets={hydratedWidgets}
+            selectedIds={selectedIds}
+            draggingRegistrationKey={draggingPackageKey}
+            expandSelectionIds={expandSelectionWithGroups}
+            getSelectionIdsForWidget={getSelectionIdsForWidget}
+            onClearSelection={clearSelection}
+            onPackageDrop={handleCanvasPackageDrop}
+            onSelectWidgets={selectWidgets}
+            onUpdateWidget={updateWidget}
+            onUpdateWidgets={updateWidgets}
+            onZoomChange={handleCanvasZoomChange}
+          />
         </main>
 
         <aside className="z-10 flex w-[380px] flex-col border-l border-[#d7d8d1] bg-[#fafaf5] shadow-[-2px_0_12px_rgba(26,28,25,0.02)]">

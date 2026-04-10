@@ -28,6 +28,8 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.72.0",
+    "react-rnd": "^10.5.3",
+    "react-zoom-pan-pinch": "^4.0.3",
     "tailwind-merge": "^3.5.0",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2",
