@@ -7,7 +7,6 @@ import { scatterWidgetPackage } from "./charts/scatter";
 import { clockSystemWidgetPackage } from "./decorates/clock-system";
 import { flipperNumberWidgetPackage } from "./decorates/flipper-number";
 import { amapLocaMapWidgetPackage } from "./maps/amap-loca";
-import { chinaGlMapWidgetPackage } from "./maps/china-gl";
 import { imageFrameWidgetPackage } from "./media/image-frame";
 import { scrollBoardWidgetPackage } from "./tables/scroll-board";
 import { WidgetCategory, type WidgetPackage } from "./types";
@@ -20,7 +19,6 @@ const builtinPackages: WidgetPackage[] = [
   scatterWidgetPackage,
   radarWidgetPackage,
   amapLocaMapWidgetPackage,
-  chinaGlMapWidgetPackage,
   flipperNumberWidgetPackage,
   clockSystemWidgetPackage,
   scrollBoardWidgetPackage,

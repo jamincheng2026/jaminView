@@ -7,6 +7,8 @@ import { registry } from "@/packages/registry";
 import { type Widget, type WidgetAnimationPreset } from "@/packages/types";
 import { type EditorV2CanvasFilters } from "@/lib/editor-v2-canvas-filters";
 
+import { WidgetErrorBoundary } from "./widget-error-boundary";
+
 type EditorV2CanvasStageProps = {
   widgets: Widget[];
   canvas: {
@@ -122,7 +124,9 @@ export function EditorV2CanvasStage({
             <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-full border border-[#d7d8d1] bg-white/92 px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-[#23422a] shadow-sm">
               {pkg.registration.titleZh}
             </div>
-            <pkg.RenderComponent widget={widget} width={widget.attr.w} height={widget.attr.h} />
+            <WidgetErrorBoundary widgetId={widget.id} widgetTitle={pkg.registration.titleZh}>
+              <pkg.RenderComponent widget={widget} width={widget.attr.w} height={widget.attr.h} />
+            </WidgetErrorBoundary>
           </button>
         );
       })}

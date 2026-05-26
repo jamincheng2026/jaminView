@@ -21,6 +21,8 @@ import {
   type WidgetPackage,
 } from "@/packages/types";
 
+import { WidgetErrorBoundary } from "./widget-error-boundary";
+
 export const CANVAS_GRID_SIZE = 24;
 export const MIN_CANVAS_ZOOM = 20;
 export const MAX_CANVAS_ZOOM = 300;
@@ -1002,11 +1004,16 @@ export function CanvasEngine({
                       </div>
                     ) : null}
                     <div className="pointer-events-none h-full w-full">
-                      <pkg.RenderComponent
-                        widget={widget}
-                        width={layout.w}
-                        height={layout.h}
-                      />
+                      <WidgetErrorBoundary
+                        widgetId={widget.id}
+                        widgetTitle={pkg.registration.titleZh}
+                      >
+                        <pkg.RenderComponent
+                          widget={widget}
+                          width={layout.w}
+                          height={layout.h}
+                        />
+                      </WidgetErrorBoundary>
                     </div>
                   </div>
                 </Rnd>

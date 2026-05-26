@@ -388,5 +388,36 @@
     "missingSnapshot": "当前没有可展示的已发布快照",
     "enterFullscreen": "进入全屏",
     "exitFullscreen": "退出全屏"
+  },
+  "Error": {
+    "runtime": {
+      "title": "出了一点小状况",
+      "description": "页面在渲染过程中遇到了错误。可以尝试重试，或返回首页继续操作。",
+      "retry": "重试",
+      "backHome": "返回首页"
+    },
+    "notFound": {
+      "title": "找不到这个页面",
+      "description": "你访问的路径不存在，或者已经被移除。",
+      "backHome": "返回首页"
+    },
+    "widget": {
+      "title": "组件渲染失败",
+      "description": "该组件的渲染遇到错误，已暂停以避免影响其他组件。",
+      "retry": "重试",
+      "showDetails": "查看错误详情"
+    },
+    "global": {
+      "title": "应用遇到严重错误",
+      "description": "请刷新页面重试。如果问题持续，请联系支持团队。",
+      "reload": "刷新页面"
+    }
+  },
+  "Loading": {
+    "default": "加载中…"
+  },
+  "EditorRisk": {
+    "transformerSandbox": "⚠️ JS Transformer 在沙箱内执行（无 window/document/网络），250ms 超时；请勿引用未知工作区的脚本。",
+    "transformerReview": "导入的工作区包含 {count} 段 JS Transformer 代码，已默认禁用。请在数据池面板逐一审查后再启用。"
   }
 }

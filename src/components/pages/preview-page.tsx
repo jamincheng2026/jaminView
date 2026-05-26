@@ -39,6 +39,7 @@ import {
   EditorCanvasWidget,
   editorWidgetPlacementWithin,
 } from "@/components/editor-legacy/editor-canvas-widgets";
+import {WidgetErrorBoundary} from "@/components/editor/widget-error-boundary";
 import {
   hasWidgetRuntimeAction,
   isExternalWidgetHref,
@@ -467,26 +468,28 @@ function PreviewWidget({
 }) {
   return (
     <div className="absolute text-left" style={editorWidgetPlacementWithin(widget, canvasWidth, canvasHeight)}>
-      <EditorCanvasWidget
-        widget={widget}
-        selected={selected}
-        onActivate={onActivate}
-        mapLabels={mapLabels}
-        map3dAxis={map3dAxis}
-        mapZoom={mapZoom}
-        mapTheme={mapTheme}
-        mapRouteDensity={mapRouteDensity}
-        mapMarkers={mapMarkers}
-        mapGlow={mapGlow}
-        mapRouteStyle={mapRouteStyle}
-        mapLabelStyle={mapLabelStyle}
-        mapSurfaceTone={mapSurfaceTone}
-        mapPointScale={mapPointScale}
-        mapRouteWidth={mapRouteWidth}
-        mapLandOpacity={mapLandOpacity}
-        mapLabelOpacity={mapLabelOpacity}
-        dataset={dataset}
-      />
+      <WidgetErrorBoundary widgetId={widget.id} widgetTitle={widget.title}>
+        <EditorCanvasWidget
+          widget={widget}
+          selected={selected}
+          onActivate={onActivate}
+          mapLabels={mapLabels}
+          map3dAxis={map3dAxis}
+          mapZoom={mapZoom}
+          mapTheme={mapTheme}
+          mapRouteDensity={mapRouteDensity}
+          mapMarkers={mapMarkers}
+          mapGlow={mapGlow}
+          mapRouteStyle={mapRouteStyle}
+          mapLabelStyle={mapLabelStyle}
+          mapSurfaceTone={mapSurfaceTone}
+          mapPointScale={mapPointScale}
+          mapRouteWidth={mapRouteWidth}
+          mapLandOpacity={mapLandOpacity}
+          mapLabelOpacity={mapLabelOpacity}
+          dataset={dataset}
+        />
+      </WidgetErrorBoundary>
     </div>
   );
 }

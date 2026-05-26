@@ -2,6 +2,7 @@ import {hasLocale, NextIntlClientProvider} from "next-intl";
 import {getMessages, setRequestLocale} from "next-intl/server";
 import {notFound} from "next/navigation";
 
+import {PrototypeFreezeBoundary} from "@/components/editor/prototype-freeze-boundary";
 import {routing} from "@/i18n/routing";
 
 export default async function LocaleLayout({
@@ -23,6 +24,7 @@ export default async function LocaleLayout({
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
+      <PrototypeFreezeBoundary />
       {children}
     </NextIntlClientProvider>
   );

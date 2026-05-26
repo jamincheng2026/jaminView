@@ -5,6 +5,7 @@ import {
   type EditorV2CanvasFilters,
 } from "@/lib/editor-v2-canvas-filters";
 import { defaultEditorV2DataPondSettings, type EditorV2CanvasState } from "@/lib/editor-v2-storage";
+import { workspaceDocumentSchema } from "@/lib/editor-v2-workspace-schema";
 import type { EditorDataPond, EditorDataPondSettings, Widget } from "@/packages/types";
 
 type WorkspaceLike = {
@@ -21,6 +22,11 @@ export type EditorV2WorkspaceDocument = WorkspaceLike & {
   kind: "jaminview-editor-v2-workspace";
   sourceProjectId?: string;
   version: "v2";
+  /**
+   * 导入工作区时，若数据池里携带了 JS Transformer 代码，会被强制清空并把池子 id 记录在此。
+   * 调用方应在 UI 上提示用户审查后再手动启用。
+   */
+  pendingTransformerReviews: string[];
 };
 
 export type EditorV2WorkspaceSummary = {
@@ -68,31 +74,45 @@ function normalizeDataPondSettings(settings: unknown): EditorDataPondSettings {
 }
 
 function sanitizeWorkspaceDocument(raw: unknown): EditorV2WorkspaceDocument {
-  if (!isRecord(raw) || raw.version !== "v2" || !Array.isArray(raw.widgets) || !("canvas" in raw)) {
-    throw new Error("工作区 JSON 结构无效，缺少必要的 V2 字段。");
+  const parsed = workspaceDocumentSchema.safeParse(raw);
+  if (!parsed.success) {
+    const firstIssue = parsed.error.issues[0];
+    const path = firstIssue?.path.join(".") ?? "(root)";
+    throw new Error(
+      `工作区 JSON 校验失败：${path} ${firstIssue?.message ?? "结构无效"}`,
+    );
   }
 
+  const value = parsed.data;
+  const pendingTransformerReviews: string[] = [];
+
+  // 数据池里的 transformer 代码视为不可信，强制清空并记录待审查池子
+  const sanitizedDataPonds: EditorDataPond[] = value.dataPonds.map((pond) => {
+    if (pond.request.transformer && pond.request.transformer.trim().length > 0) {
+      pendingTransformerReviews.push(pond.id);
+      return {
+        ...pond,
+        request: {
+          ...pond.request,
+          transformer: "",
+        },
+      };
+    }
+    return pond;
+  }) as EditorDataPond[];
+
   return {
-    canvas: normalizeCanvasState(raw.canvas),
-    dataPondSettings: normalizeDataPondSettings(raw.dataPondSettings),
-    dataPonds: Array.isArray(raw.dataPonds) ? (raw.dataPonds as EditorDataPond[]) : [],
-    exportedAt:
-      typeof raw.exportedAt === "string"
-        ? raw.exportedAt
-        : typeof raw.updatedAt === "string"
-          ? raw.updatedAt
-          : new Date().toISOString(),
+    canvas: normalizeCanvasState(value.canvas),
+    dataPondSettings: normalizeDataPondSettings(value.dataPondSettings),
+    dataPonds: sanitizedDataPonds,
+    exportedAt: value.exportedAt ?? value.updatedAt ?? new Date().toISOString(),
     kind: "jaminview-editor-v2-workspace",
-    projectId: typeof raw.projectId === "string" ? raw.projectId : undefined,
-    projectTitle: typeof raw.projectTitle === "string" ? raw.projectTitle : "",
-    sourceProjectId:
-      typeof raw.sourceProjectId === "string"
-        ? raw.sourceProjectId
-        : typeof raw.projectId === "string"
-          ? raw.projectId
-          : undefined,
+    projectId: value.projectId,
+    projectTitle: value.projectTitle ?? "",
+    sourceProjectId: value.sourceProjectId ?? value.projectId,
     version: "v2",
-    widgets: raw.widgets as Widget[],
+    widgets: value.widgets as unknown as Widget[],
+    pendingTransformerReviews,
   };
 }
 
@@ -108,6 +128,7 @@ export function createEditorV2WorkspaceDocument(source: WorkspaceLike): EditorV2
     sourceProjectId: source.projectId,
     version: "v2",
     widgets: source.widgets,
+    pendingTransformerReviews: [],
   };
 }
 

@@ -388,5 +388,36 @@
     "missingSnapshot": "No published snapshot is available for this project yet",
     "enterFullscreen": "Enter Fullscreen",
     "exitFullscreen": "Exit Fullscreen"
+  },
+  "Error": {
+    "runtime": {
+      "title": "Something went wrong",
+      "description": "The page hit an error while rendering. You can retry, or go back home.",
+      "retry": "Retry",
+      "backHome": "Back to home"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "description": "This path does not exist or has been moved.",
+      "backHome": "Back to home"
+    },
+    "widget": {
+      "title": "Widget failed to render",
+      "description": "This widget hit a runtime error and was paused to protect the rest of the canvas.",
+      "retry": "Retry",
+      "showDetails": "Show error details"
+    },
+    "global": {
+      "title": "The app hit a fatal error",
+      "description": "Please reload the page. If it keeps happening, reach out to support.",
+      "reload": "Reload page"
+    }
+  },
+  "Loading": {
+    "default": "Loading…"
+  },
+  "EditorRisk": {
+    "transformerSandbox": "⚠️ The JS Transformer runs in a sandbox with no window/document/network access and a 250ms timeout. Do not run scripts from untrusted workspaces.",
+    "transformerReview": "The imported workspace contains {count} JS Transformer snippets. They are disabled by default; review each one in the data pond panel before turning them back on."
   }
 }

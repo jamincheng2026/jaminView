@@ -100,6 +100,10 @@ export function DataImportPage() {
 
   const handleFileSelect = async (file: File) => {
     setParseError(null);
+    if (file.size > 5 * 1024 * 1024) {
+      setParseError("文件超过 5MB 上限，请先在源端筛选后再导入。");
+      return;
+    }
     try {
       const parsed = await parseDatasetFile(file);
       setDatasetName(parsed.name);
@@ -112,8 +116,11 @@ export function DataImportPage() {
         columns: parsed.columns,
         status: "READY TO IMPORT",
       });
+      if (parsed.truncated) {
+        setParseError(`文件超过 1 万行上限，已截断为前 ${parsed.records} 行。如需完整导入请先在源端切分。`);
+      }
     } catch (error) {
-      setParseError(error instanceof Error ? error.message : "Unable to parse the selected file.");
+      setParseError(error instanceof Error ? error.message : "无法解析所选文件。");
     }
   };
 

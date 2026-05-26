@@ -43,6 +43,7 @@ import {
   EditorCanvasWidget,
   editorWidgetPlacementWithin,
 } from "@/components/editor-legacy/editor-canvas-widgets";
+import {WidgetErrorBoundary} from "@/components/editor/widget-error-boundary";
 import {
   hasWidgetRuntimeAction,
   isExternalWidgetHref,
@@ -395,30 +396,32 @@ export function ScreenPage({projectId}: {projectId: string}) {
                         className="absolute"
                         style={editorWidgetPlacementWithin(widget, currentCanvasWidth, currentCanvasHeight)}
                       >
-                        <EditorCanvasWidget
-                          widget={widget}
-                          mapLabels={snapshot?.draft.mapLabels ?? true}
-                          map3dAxis={snapshot?.draft.map3dAxis ?? true}
-                          mapZoom={snapshot?.draft.mapZoom ?? "2.4x"}
-                          mapTheme={snapshot?.draft.mapTheme ?? "emerald"}
-                          mapRouteDensity={snapshot?.draft.mapRouteDensity ?? "balanced"}
-                          mapMarkers={snapshot?.draft.mapMarkers ?? true}
-                        mapGlow={snapshot?.draft.mapGlow ?? 72}
-                        mapRouteStyle={snapshot?.draft.mapRouteStyle ?? "pulse"}
-                        mapLabelStyle={snapshot?.draft.mapLabelStyle ?? "pill"}
-                        mapSurfaceTone={snapshot?.draft.mapSurfaceTone ?? "soft"}
-                        mapPointScale={snapshot?.draft.mapPointScale ?? 100}
-                        mapRouteWidth={snapshot?.draft.mapRouteWidth ?? 100}
-                        mapLandOpacity={snapshot?.draft.mapLandOpacity ?? 96}
-                        mapLabelOpacity={snapshot?.draft.mapLabelOpacity ?? 92}
-                          dataset={datasetLookup[widget.dataset]}
-                          selected={activeWidgetIds.includes(widget.id)}
-                          onActivate={
-                            hasWidgetRuntimeAction(widget, locale, projectId)
-                              ? () => handleWidgetActivate(widget)
-                              : undefined
-                          }
-                        />
+                        <WidgetErrorBoundary widgetId={widget.id} widgetTitle={widget.title}>
+                          <EditorCanvasWidget
+                            widget={widget}
+                            mapLabels={snapshot?.draft.mapLabels ?? true}
+                            map3dAxis={snapshot?.draft.map3dAxis ?? true}
+                            mapZoom={snapshot?.draft.mapZoom ?? "2.4x"}
+                            mapTheme={snapshot?.draft.mapTheme ?? "emerald"}
+                            mapRouteDensity={snapshot?.draft.mapRouteDensity ?? "balanced"}
+                            mapMarkers={snapshot?.draft.mapMarkers ?? true}
+                            mapGlow={snapshot?.draft.mapGlow ?? 72}
+                            mapRouteStyle={snapshot?.draft.mapRouteStyle ?? "pulse"}
+                            mapLabelStyle={snapshot?.draft.mapLabelStyle ?? "pill"}
+                            mapSurfaceTone={snapshot?.draft.mapSurfaceTone ?? "soft"}
+                            mapPointScale={snapshot?.draft.mapPointScale ?? 100}
+                            mapRouteWidth={snapshot?.draft.mapRouteWidth ?? 100}
+                            mapLandOpacity={snapshot?.draft.mapLandOpacity ?? 96}
+                            mapLabelOpacity={snapshot?.draft.mapLabelOpacity ?? 92}
+                            dataset={datasetLookup[widget.dataset]}
+                            selected={activeWidgetIds.includes(widget.id)}
+                            onActivate={
+                              hasWidgetRuntimeAction(widget, locale, projectId)
+                                ? () => handleWidgetActivate(widget)
+                                : undefined
+                            }
+                          />
+                        </WidgetErrorBoundary>
                       </div>
                     ))}
                   </div>

@@ -44,6 +44,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/**
+ * 禁止用户传入的路径片段访问原型链关键属性。
+ * 配合 hasOwnProperty 守卫，杜绝通过 responseMap / 自定义路径触发原型污染。
+ */
+const FORBIDDEN_PATH_KEYS = new Set([
+  "__proto__",
+  "prototype",
+  "constructor",
+]);
+
 function tryParseJson(value: string | undefined) {
   if (!value || !value.trim()) {
     return null;
@@ -60,7 +70,7 @@ function splitPath(path: string) {
   return path
     .split(".")
     .flatMap((segment) => segment.split(/\[|\]/).filter(Boolean))
-    .filter(Boolean);
+    .filter((segment) => segment && !FORBIDDEN_PATH_KEYS.has(segment));
 }
 
 function resolveValueByPath(source: unknown, path: string | undefined) {
@@ -85,6 +95,10 @@ function resolveValueByPath(source: unknown, path: string | undefined) {
       return undefined;
     }
 
+    if (!Object.prototype.hasOwnProperty.call(current, segment)) {
+      return undefined;
+    }
+
     current = current[segment];
   }
 
@@ -105,31 +119,78 @@ type RequestTransformerContext = {
   request: WidgetRequestConfig;
 };
 
-function applyRequestTransformer(
+const TRANSFORMER_TIMEOUT_MS = 250;
+
+/**
+ * 沙箱化执行用户提供的 JS Transformer。
+ *
+ * 历史实现直接在主线程 `new Function(...)` 执行用户字符串，等于浏览器原点 RCE。
+ * 当前实现把代码放进 Web Worker：
+ *   1. Worker 全局没有 window/document/localStorage/cookie
+ *   2. Worker 启动时主动剥离 fetch/XMLHttpRequest/importScripts/WebSocket
+ *   3. 250ms 超时强制 terminate，挡住死循环 / 长时占用
+ *   4. 一次性 worker（每次新建 + terminate），杜绝跨次状态污染
+ *
+ * 注意：必须在浏览器端调用（SSR 阶段没有 Worker），调用方均为 client component。
+ */
+async function applyRequestTransformer(
   payload: unknown,
   request: WidgetRequestConfig,
   context: RequestTransformerContext,
-) {
+): Promise<unknown> {
   const transformer = request.transformer?.trim();
   if (!transformer) {
     return payload;
   }
 
+  if (typeof Worker === "undefined") {
+    throw new Error("当前环境不支持 Web Worker，无法安全执行 JS Transformer");
+  }
+
+  const clonedPayload = cloneValue(payload);
+  const worker = new Worker(
+    new URL("./workers/transformer.worker.ts", import.meta.url),
+    {type: "module"},
+  );
+
   try {
-    const clonedPayload = cloneValue(payload);
-    const executeTransformer = new Function(
-      "payload",
-      "context",
-      `"use strict";\n${transformer}`,
-    ) as (payload: unknown, context: RequestTransformerContext) => unknown;
-    const result = executeTransformer(clonedPayload, context);
-    return result === undefined ? clonedPayload : result;
-  } catch (error) {
-    throw new Error(
-      error instanceof Error
-        ? `JS Transformer 执行失败：${error.message}`
-        : "JS Transformer 执行失败",
-    );
+    return await new Promise<unknown>((resolve, reject) => {
+      const timeoutId = window.setTimeout(() => {
+        worker.terminate();
+        reject(new Error(`JS Transformer 执行超时（${TRANSFORMER_TIMEOUT_MS}ms）`));
+      }, TRANSFORMER_TIMEOUT_MS);
+
+      worker.addEventListener(
+        "message",
+        (event: MessageEvent<{ok: true; result: unknown} | {ok: false; error: string}>) => {
+          window.clearTimeout(timeoutId);
+          const data = event.data;
+          if (data.ok) {
+            resolve(data.result);
+          } else {
+            reject(new Error(`JS Transformer 执行失败：${data.error}`));
+          }
+        },
+        {once: true},
+      );
+
+      worker.addEventListener(
+        "error",
+        (event) => {
+          window.clearTimeout(timeoutId);
+          reject(new Error(`JS Transformer 执行失败：${event.message}`));
+        },
+        {once: true},
+      );
+
+      worker.postMessage({
+        code: transformer,
+        payload: clonedPayload,
+        context,
+      });
+    });
+  } finally {
+    worker.terminate();
   }
 }
 
@@ -203,7 +264,7 @@ async function fetchDataPondResponse(dataPond: EditorDataPond) {
   }
 
   const mappedData = normalizeResponsePayload(payload, dataPond.request.responseMap);
-  const data = applyRequestTransformer(mappedData, dataPond.request, {
+  const data = await applyRequestTransformer(mappedData, dataPond.request, {
     dataPondId: dataPond.id,
     request: dataPond.request,
   });

@@ -19,6 +19,12 @@ import {
 } from "@/lib/editor-widget-data";
 import type {EditorWidget} from "@/lib/mocks/editor";
 
+/**
+ * 与 V2 同款的安全跳转白名单：仅允许 https?:// 或站内 `/path` 路径。
+ * 拒绝 javascript:、data:、vbscript:、file:、blob:、协议相对（`//host`）。
+ */
+const SAFE_HREF_PATTERN = /^(https?:\/\/|\/(?!\/))/i;
+
 type EventConditionAwareWidget = Pick<
   EditorWidget,
   | "type"
@@ -49,7 +55,10 @@ type EventConditionAwareWidget = Pick<
 export function resolveWidgetEventHref(widget: EditorWidget, locale: string, projectId: string) {
   if (widget.eventAction === "openPreview") return `/${locale}/preview/${projectId}`;
   if (widget.eventAction === "openPublished") return `/${locale}/screen/${projectId}`;
-  if (widget.eventAction === "openLink") return widget.eventUrl?.trim() || null;
+  if (widget.eventAction === "openLink") {
+    const raw = widget.eventUrl?.trim() || "";
+    return SAFE_HREF_PATTERN.test(raw) ? raw : null;
+  }
   return null;
 }
 

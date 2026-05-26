@@ -948,13 +948,18 @@ export function EditorWorkbench({
       setActiveTab("customize");
       setSaveState("dirty");
       setLastSavedAt(null);
+      const reviewCount = document.pendingTransformerReviews.length;
+      const successMessage =
+        reviewCount > 0
+          ? `工作区已导入。检测到 ${reviewCount} 段 JS Transformer 代码已被默认禁用，请在数据池面板逐一审查后再启用。`
+          : "工作区导入成功，当前变更尚未保存。";
       setWorkspaceTransferState({
         at: new Date().toISOString(),
         detail: document.sourceProjectId
           ? `来源项目：${document.sourceProjectId}`
           : "来源项目：外部工作区文件",
         kind: "import",
-        message: "工作区导入成功，当前变更尚未保存。",
+        message: successMessage,
         status: "success",
         summary: buildEditorV2WorkspaceSummary({
           canvas: document.canvas,
@@ -1926,6 +1931,9 @@ export function EditorWorkbench({
                       label="JS Transformer"
                       description="映射后的结果会以 `payload` 变量传入。你可以直接修改 `payload`，或显式 `return` 一份新数据。"
                     >
+                      <div className="mb-2 rounded-xl border border-[#d7d8d1] bg-[#fafaf5] px-3 py-2 text-[11px] leading-5 text-[#727971]">
+                        ⚠️ JS Transformer 在 Web Worker 沙箱内执行（无 window/document/网络），250ms 超时后强制终止；请勿运行未知来源工作区里的脚本。
+                      </div>
                       <MonacoJsonEditor
                         height={220}
                         language="javascript"
